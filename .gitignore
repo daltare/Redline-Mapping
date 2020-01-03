@@ -1,0 +1,9 @@
+*.Rproj
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+rsconnect/
+data_raw/
+x_NOTE.txt
+*.xlsx
