@@ -190,9 +190,19 @@ server <- function(input, output) {
         # get the bounds of the redline polygons for the selected city
             bounds_1 <- attributes(st_geometry(redline_selected_1))$bbox
         
-        # get the regional board boundary containing the selected city
-            rb_boundary <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
-                filter(RB_OFF == cities_regions[[input$city_selected_1]])
+        # # get the regional board boundary containing the selected city
+        #     rb_boundary <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
+        #         filter(RB_OFF == cities_regions[[input$city_selected_1]])
+            
+            # Get Regional Board Office Areas from WB GIS SERVICES (GEOJSON)
+            #url_rb_office_areas <- 'http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson'
+            url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=UPPER(rb_off)%20like%20'%25",
+                                          cities_regions[[input$city_selected_1]],
+                                          "%25'&outFields=*&outSR=4326&f=geojson") 
+            rb_boundary <- read_lines(url_rb_office_areas) %>% 
+                geojson_sf() #%>% 
+                #filter(RB_OFF == cities_regions[[input$city_selected_1]])
+
         
         # create the new (empty) map
             l_map1 <- leaflet()
