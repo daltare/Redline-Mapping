@@ -8,9 +8,10 @@ For more information on the history around Redline mapping see:
 - [The Effects of the 1930s HOLC “Redlining” Maps (Federal Reserve Bank of Chicago)](https://www.chicagofed.org/publications/working-papers/2017/wp2017-12)
 
 ### Data Sources
-- [Mapping Inequality: Redlining in New Deal America (University of Richmond)](http://dsl.richmond.edu/panorama/redlining/#text=downloads)
-- [CalEPA Regulated Site Portal](https://siteportal.calepa.ca.gov/nsite/map)
-- [California EPA Geoserver](https://services.calepa.ca.gov/geoserver/)
-- [CalEnviroScreen 3.0](https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30)
-- [2014/2016 Clean Water Act Section 303(d) Listed Waterbodies](https://www.waterboards.ca.gov/water_issues/programs/tmdl/integrated2014_2016.shtml)
-- [California Drinking Water Service Areas](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c)
+- [Redline Maps (University of Richmond)](http://dsl.richmond.edu/panorama/redlining/#text=downloads)
+- [CalEnviroScreen 3.0 (California Office of Environmental Health Hazard Assessment)](https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30)
+- [2014/2016 Clean Water Act Section 303(d) Listed Waterbodies (California State Water Resources Control Board)](https://www.waterboards.ca.gov/water_issues/programs/tmdl/integrated2014_2016.shtml)
+- [CalEPA Regulated Sites (California EPA Geoserver)](https://services.calepa.ca.gov/geoserver/)
+- [CalEPA Regulated Sites Violations and Enforcement Actions (CalEPA Regulated Site Portal)](https://siteportal.calepa.ca.gov/nsite/map/export)
+- [California Drinking Water Provider Service Areas (California State Water Resources Control Board Map Services)](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c)
+- [California Water Board Regional Office Boundaries (California State Water Resources Control Board Map Services)](http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0)

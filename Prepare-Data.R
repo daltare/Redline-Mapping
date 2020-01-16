@@ -64,6 +64,17 @@
     # save to RDS file
         saveRDS(object = redline_polygons, file = 'data_prepared/redline_polygons.RDS')
 
+        
+        
+
+# Regional Board Office Boundaries (from saved internal waterboard dataset)--------------------------------------------------
+        # NOTE: NO LONGER USED -- INSTEAD USING WATERBOARDS GIS WEB SERVICES (SEE APPLICATION SCRIPT): http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0
+        # # read data
+        #     rb_boundary <- st_read('data_raw/Regional_Board_Office_Boundaries_ModifiedR6_6A_6B/Regional_Board_Offices.shp') %>% 
+        #         st_transform(4326) 
+        # # save to RDS file
+        #     saveRDS(object = rb_boundary, file = 'data_prepared/Regional_Board_Offices.RDS')
+
 
 
 
@@ -94,28 +105,20 @@
         
 
 
-# Regional Board Office Boundaries (from saved internal waterboard dataset)--------------------------------------------------
-    # read data
-        rb_boundary <- st_read('data_raw/Regional_Board_Office_Boundaries_ModifiedR6_6A_6B/Regional_Board_Offices.shp') %>% 
-            st_transform(4326) 
-    # save to RDS file
-        saveRDS(object = rb_boundary, file = 'data_prepared/Regional_Board_Offices.RDS')
-        
-
-
         
 # Water Supplier Service Areas ----------------------------------------------------------------------------------------------
-    # File Source: https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c#overview
-        # NOTE: Followed link to 'Open in ArcGIS Desktop' and saved shapefile from there
-    # read data
-    service_areas <- st_read("data_raw/Service_Area_Boundaries/Service_Area_Boundaries_2019-12-13.shp") %>% 
-        st_transform(4326)
-    # save to RDS file
-        # saveRDS(object = service_areas, file = 'data_prepared/Service_Area_Boundaries_2019-12-13.RDS')
-    # SIMPLIFY
-        service_areas_simplify <- rmapshaper::ms_simplify(service_areas)
-        # save to RDS file
-            saveRDS(object = service_areas_simplify, file = 'data_prepared/service_areas_simplify.RDS')
+    # NOTE: NO LONGER USED -- INSTEAD USING WATERBOARDS GIS WEB SERVICES (SEE APPLICATION SCRIPT): https://gispublic.waterboards.ca.gov/portalserver/rest/services/Hosted/California_Drinking_Water_Service_Areas/FeatureServer/0/
+    # # File Source: https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c#overview
+    #     # NOTE: Followed link to 'Open in ArcGIS Desktop' and saved shapefile from there
+    # # read data
+    # service_areas <- st_read("data_raw/Service_Area_Boundaries/Service_Area_Boundaries_2019-12-13.shp") %>% 
+    #     st_transform(4326)
+    # # save to RDS file
+    #     # saveRDS(object = service_areas, file = 'data_prepared/Service_Area_Boundaries_2019-12-13.RDS')
+    # # SIMPLIFY
+    #     service_areas_simplify <- rmapshaper::ms_simplify(service_areas)
+    #     # save to RDS file
+    #         saveRDS(object = service_areas_simplify, file = 'data_prepared/service_areas_simplify.RDS')
 
 
 

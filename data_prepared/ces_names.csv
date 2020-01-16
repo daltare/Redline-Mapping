@@ -1,0 +1,71 @@
+id, name
+tract,Census Tract
+pop2010,Population (2010)
+California,California County
+ZIP,ZIP
+City,Nearby City
+Longitude,Longitude
+Latitude,Latitude
+CIscore,CES 3 Score
+CIscoreP,CES 3 Percentile
+ozone,Ozone
+ozoneP,Ozone Percentile
+pm,PM2.5
+pmP,PM 2.5 Percentile
+diesel,Diesel PM
+dieselP,Diesel PM Percentile
+drink,Drinking Water
+drinkP,Drinking Water Percentile
+pest,Pesticides
+pestP,Pesticides Percentile
+RSEIhaz,Tox Releases
+RSEIhazP,Tox Releases Percentile
+traffic,Traffic
+trafficP,Traffic Percentile
+cleanups,Cleanups
+cleanupsP,Cleanups Percentile
+gwthreats,Groundwater Threats
+gwthreatsP,GroundWater Threats Percentile
+haz,Haz Waste
+hazP,Haz Waste Percentile
+iwb,Imp Water Bodies
+iwbP,Imp Water Bodies Percentile
+swis,Solid Waste
+swisP,Solid Waste Percentile
+Pollution,Pollution Burden
+PollutionS,Pollution Burden Score
+PollutionP,Pollution Burden Percentile
+asthma,Asthma
+asthmaP,Asthma Percentile
+lbw,Low Birth Weight
+lbwP,Low Birth Weight Percentile
+cvd,Cardiovascular Disease
+cvdP,Cardiovascular Disease Percentile
+edu,Education
+eduP,Education Percentile
+ling,Linguistic Isolation
+lingP,Linguistic Isolation Percentile
+pov,Poverty
+povP,Poverty Percentile
+unemp,Unemployment
+unempP,Unemployment Percentile
+housingB,Housing Burden
+housingBP,Housing Burden Percentile
+PopChar,Population Characteristics
+PopCharSco,Population Characteristics Score
+PopCharP,Population Characteristics Percentile
+Children_u,Children < 10 (%)
+Pop_11_64_,Pop 11-64 years (%)
+Elderly_ov,Elderly > 65 (%)
+Hispanic_p,Hispanic (%)
+White_pct,White (%)
+African_Am,African American (%)
+Native_Ame,Native American (%)
+Asian_Amer,Asian American (%)
+Other_pct,Other (%)
+OBJECTID_1,OBJECTID_1
+CIdecile,CES Score decile
+CIvigintil,CES Score vigintile
+Shape_Leng,Shape_Leng
+Shape_Area,Shape_Area
+CES_3_0_Pe,CES Percentile Range

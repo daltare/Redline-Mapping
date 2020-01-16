@@ -7,11 +7,18 @@
         library(dplyr)
         library(janitor)
         # library(gtools)
+        library(stringr)
+    # API-related
+        library(jsonlite)
+        library(urltools)
     # Mapping and GIS operations
         library(sf)
         library(leaflet)
         library(htmlwidgets)
-    
+        library(geojsonsf)
+        library(rmapshaper)
+        
+        
 # Read data into R ------------------------------------------------------------------------------------------------------------------
     # Redline Polygons
         redline_polygons <- read_rds('data_prepared/redline_polygons.RDS')
@@ -51,20 +58,11 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                        choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
                                        selected = NULL),
                     checkboxGroupInput(inputId = 'show_violations_enforcement',
-                                       label = 'Show CalEPA Regulated Sites With:',
+                                       label = 'Filter For CalEPA Regulated Sites With:',
                                        choices = c('Violations', 'Enforcement Actions'),
                                        selected = NULL),
                     hr(style="border: 1px solid darkgrey"),
-                    p(tags$b('NOTE:'), 'To pan/zoom, use the left side map')
-                    # checkboxGroupInput(inputId = 'site_type_1', 
-                    #                    label = 'Select CalEPA Regulated Site Types:', 
-                    #                    choices = cal_epa_sites_programs %>% distinct(EI_Description) %>% arrange(EI_Description) %>% pull(EI_Description), 
-                    #                    selected = NULL) # to select all: cal_epa_sites_programs %>% distinct(EI_Description) %>% pull(EI_Description))
-                    # sliderInput(inputId = 'redline_fill_1', 
-                    #             label = 'Redline Polygon Opacity:', 
-                    #             min = 0, 
-                    #             max = 1, 
-                    #             value = c(0)),
+                    p(tags$b('NOTE:'), 'Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off.')
                 ),
                 # Main panel for displaying outputs ----
                 mainPanel(
@@ -101,29 +99,35 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                      h3('Data Sources'),
                      p('Data used in this application comes from the following sources:'),
                      tags$li(tags$a(href = 'http://dsl.richmond.edu/panorama/redlining/#text=downloads',
-                                    'Redlining Maps'), 
-                             '(University of Richmond)',
+                                    'Redline Maps'), 
+                             '(University of Richmond)'
                      ),
-                     tags$li(tags$a(href = 'https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30',
-                                    'CalEnviroScreen 3.0'), 
-                             '(California Office of Environmental Health Hazard Assessment)',
+                     tags$li(tags$a(href = 'https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30', 'CalEnviroScreen 3.0'), 
+                             '(California Office of Environmental Health Hazard Assessment) | Web-service available ',
+                             tags$a(href = 'https://services.calepa.ca.gov/geoserver/', 'here'), 
+                             ' (click on the "Layer Preview" link, layer name: "calepa:CES3June2018Update")'
                      ),
-                     tags$li(tags$a(href = 'https://www.waterboards.ca.gov/water_issues/programs/tmdl/integrated2014_2016.shtml',
+                     tags$li(tags$a(href = 'https://www.waterboards.ca.gov/water_issues/programs/tmdl/integrated2014_2016.shtml', 
                                     '2014/2016 Clean Water Act Section 303(d) Listed Waterbodies'), 
-                             '(California State Water Resources Control Board)',
+                             '(California State Water Resources Control Board)'
                      ),   
+                     tags$li(tags$a(href = 'https://services.calepa.ca.gov/geoserver/', 'CalEPA Regulated Sites '), 
+                             '(CalEPA Geoserver) | Web-service available ',
+                             tags$a(href = 'https://services.calepa.ca.gov/geoserver/', 'here'), 
+                             ' (click on the "Layer Preview" link, layer names: "calepa:mv_fac_from_ciwqs", "calepa:mv_fac_from_smarts", "calepa:mv_fac_from_geotracker")', 
+                     ),
+                     tags$li(tags$a(href = 'https://siteportal.calepa.ca.gov/nsite/map/export',
+                                    'CalEPA Regulated Sites Violations and Enforcement Actions'), 
+                             '(CalEPA Regulated Site Portal)'
+                     ),
                      tags$li(tags$a(href = 'https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c',
                                     'California Drinking Water Service Areas'), 
-                             '(California State Water Resources Control Board)'
+                             '(California State Water Resources Control Board\'s Map Services) | Use the "Service URL" link'
                      ),
-                     tags$li(tags$a(href = 'https://services.calepa.ca.gov/geoserver/',
-                                    'CalEPA Regulated Sites'), 
-                             '(California EPA Geoserver)',
+                     tags$li(tags$a(href = 'http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0',
+                                    'California State Water Board Regional Board Office Boundaries'), 
+                             '(California State Water Resources Control Board\'s Map Services)'
                      ),
-                     # tags$li(tags$a(href = 'https://siteportal.calepa.ca.gov/nsite/map',
-                     #                'CalEPA Regulated Sites'), 
-                     #         '(California State Water Resources Control Board)',
-                     # ),
                  # Application Information
                      h3('Application Information'),
                      p('This application is built with the ', 
@@ -137,32 +141,6 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                     'Github Site')
                      )
         )
-                 
-    # Single Map Tab ----
-        # tabPanel("Single Map",
-        #     # Sidebar layout with input and output definitions ----
-        #     sidebarLayout(
-        #         # Sidebar
-        #         sidebarPanel(
-        #             # Inputs:  ----
-        #             selectInput(inputId = 'city_selected_3', label = 'Select City:', 
-        #                         choices = c(unique(redline_polygons$city)), 
-        #                         selected = 'Sacramento'), # 'All',
-        #             checkboxGroupInput(inputId = 'rating_selected_3',
-        #                                label = 'Select HOLC Rating:',
-        #                                choices = list('A (Best):' = 'A',
-        #                                               'B (Still Desirable)' = 'B',
-        #                                               'C (Definitely Declining)' = 'C',
-        #                                               'D (Hazardous)' = 'D'),
-        #                                selected = c('A','B','C','D'))
-        #         ),
-        #         # Main panel for displaying outputs ----
-        #         mainPanel(
-        #             # Output: Map
-        #             # leafletOutput(outputId = 'map3', height = 700)
-        #         )
-        #     )
-        # )
 )
 
 # Define server logic ----
@@ -177,35 +155,204 @@ server <- function(input, output) {
                                'San Francisco' = '2',
                                'San Jose' = '2',
                                'Stockton' = '5S')
+    # create list of simplification levels that work best for each region (for use in APIs as a geographic filter)
+        simplification_regions <- list('1' = '0.001',
+                                       '2' = '0.0035',
+                                       '3' = '0.001',
+                                       '4' = '0.0015',
+                                       '5R' = '0.003',
+                                       '5S' = '0.0025',
+                                       '5F' = '0.0025',
+                                       '6A' = '0.004',
+                                       '6B' = '0.0025',
+                                       '7' = '0.004',
+                                       '8' = '0.007',
+                                       '9' = '0.006')
 
+        
+        # get reactive values (to isolate from each other and prevent map from completely rebuilding when an input is changed)
+            # regional board boundary containing the selected city
+                rb_boundary <- reactive({
+                    # Get Regional Board Office Areas from WB GIS Services (GEOJSON) - note that this filters for just the regional board containing the selected city
+                    url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=UPPER(rb_off)%20like%20'%25",
+                                                  cities_regions[[input$city_selected_1]],
+                                                  "%25'&outFields=*&outSR=4326&f=geojson") 
+                    rb_boundary <- read_lines(url_rb_office_areas) %>% 
+                        geojson_sf()
+                    return(rb_boundary)
+                    
+                    # # get the regional board boundary containing the selected city from a saved file (old method - not used)
+                    #     rb_boundary <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
+                    #         filter(RB_OFF == cities_regions[[input$city_selected_1]])
+                })
+                
+            # create a simplified version of the regional board boundary for use in api filtering
+                rb_boundary_simplify <- reactive({
+                    # simplify and convert rb boundary to geojson
+                        rb_boundary() %>% 
+                            ms_simplify(keep = as.numeric(
+                                simplification_regions[[cities_regions[[input$city_selected_1]]]])) 
+                })
+                
+                
+            # CalEnvironScreen Polygons (just for the region containing the selected city)
+                ces_3_poly <- reactive({
+                    # # get data
+                    #     ces_3_poly <- read_rds('data_prepared/ces_3_poly.RDS')
+                    # get data from API
+                        # transform to rb boundary to coordinate system used in web service
+                            rb_boundary_simplify_transform <- st_transform(rb_boundary_simplify(), 3310)
+                        # convert to geojson
+                            rb_boundary_simplify_transform_geojson <- rb_boundary_simplify_transform %>% sf_geojson()
+                        # get coordinates
+                            rb_boundary_coordinates <- rb_boundary_simplify_transform_geojson %>%
+                                str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
+                                        end = nchar(rb_boundary_simplify_transform_geojson)-7)
+                        # format the coordinates for the api
+                            rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\],\\[', replacement = '|')
+                            rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = ',', replacement = '%20')
+                            rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\|', replacement = ',%20')
+                        # construct api call - NOTE -- for more info see: https://docs.geoserver.org/stable/en/user/tutorials/cql/cql_tutorial.html
+                            url_ces3_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
+                                                   'ows?service=WFS&version=1.0.0',
+                                                   '&request=GetFeature',
+                                                   '&typeName=calepa:CES3June2018Update',
+                                                   '&outputFormat=application%2Fjson',
+                                                   '&CQL_FILTER=INTERSECTS(the_geom,POLYGON((',
+                                                   rb_boundary_coordinates,
+                                                   ')))')
+                        # make api call
+                            ces_3_poly <- read_lines(url_ces3_api) %>% geojson_sf()
+                            st_crs(ces_3_poly) <- 3310 # the crs is incorrectly defined in the data returned by the api - have to reset it
+                            ces_3_poly <- st_transform(ces_3_poly, crs = 4326) # transform back to lat/lon coordinates
+                        # check
+                            # plot(ces_3_poly$geometry, border = 'blue', col = 'grey')
+                            # plot(rb_boundary()$geometry, lwd = 3, add = TRUE)
+                            # plot(rb_boundary_simplify() %>% select(geometry), border = 'red', add = TRUE)
+                        # revise column names
+                            ces_3_poly <- ces_3_poly %>% select(-CES2018_Rn)
+                            col_names_original <- names(ces_3_poly)
+                            col_names_new <- read_csv('data_prepared/ces_names.csv')
+                            col_names_original_df <- as.data.frame(x = col_names_original)
+                            col_names_original_df <- col_names_original_df %>% left_join(col_names_new, by = c('col_names_original' = 'id'))
+                            col_names_original_df$name[nrow(col_names_original_df)] <- 'geometry'
+                            names(ces_3_poly) <- col_names_original_df$name
+                            names(ces_3_poly) <- make_clean_names(names(ces_3_poly), 'parsed')
+                            return(ces_3_poly)
+                })
+                
+            # 303d polygons
+                impaired_303d_poly <- reactive({
+                    # get data
+                        impaired_303d_poly <- read_rds('data_prepared/impaired_303d_poly.RDS')
+                    # filter for 303d polygons in the region containing the selected city
+                        impaired_poly_filter <- st_intersects(x = impaired_303d_poly,
+                                                              y = rb_boundary(),
+                                                              sparse = FALSE)
+                        impaired_303d_poly <- impaired_303d_poly[impaired_poly_filter,]
+                        return(impaired_303d_poly)
+                })
+                
+            # 303d lines
+                impaired_303d_lines <- reactive({
+                    # get data
+                        impaired_303d_lines <- read_rds('data_prepared/impaired_303d_lines_simplify_R1removed.RDS')
+                    # filter out records with empty geometries
+                        impaired_303d_lines <- impaired_303d_lines %>% filter(!is.na(st_dimension(.)))
+                    # filter for 303d lines in the region containing the selected city
+                        impaired_lines_filter <- st_intersects(x = impaired_303d_lines,
+                                                               y = rb_boundary(),
+                                                               sparse = FALSE)
+                        impaired_303d_lines <- impaired_303d_lines[impaired_lines_filter,]
+                        return(impaired_303d_lines)
+                })
+                
+            # CalEPA regulated sites
+                cal_epa_sites <- reactive({
+                    if (length(input$site_type_1) > 0) {    
+                        # get CalEPA sites data from the geoserver api
+                            # get the coordinates of the simplified rb boundary containing the selected city and convert to geojson
+                                rb_boundary_simplify_geojson <- rb_boundary_simplify() %>% sf_geojson()
+                            # extract coordinates
+                                rb_boundary_coordinates <- rb_boundary_simplify_geojson %>%
+                                    str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
+                                            end = nchar(rb_boundary_simplify_geojson)-7)
+                            # format the coordinates for the api
+                                rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\],\\[', replacement = '|')
+                                rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = ',', replacement = '%20')
+                                rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\|', replacement = ',%20')
+                            # construct and make the api call
+                                calepa_sites_typenames <- list('CIWQS' = 'calepa:mv_fac_from_ciwqs',
+                                                          'GeoTracker' = 'calepa:mv_fac_from_geotracker',
+                                                          'SMARTS' = 'calepa:mv_fac_from_smarts'
+                                )
+                                counter_sites <- 0
+                                for (site_type in input$site_type_1) {
+                                    counter_sites <- counter_sites + 1
+                                    # url <- calepa_sites_typenames[[site_type]]
+                                    url_sites_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
+                                                               'ows?service=WFS&version=1.0.0',
+                                                               '&request=GetFeature',
+                                                               '&typeName=', calepa_sites_typenames[[site_type]], # 'calepa:mv_fac_from_ciwqs', # calepa:mv_fac_from_geotracker # calepa:mv_fac_from_smarts
+                                                               '&outputFormat=application%2Fjson',
+                                                               '&CQL_FILTER=INTERSECTS(fac_point,POLYGON((',
+                                                               rb_boundary_coordinates,
+                                                               ')))')
+                                    api_output <- readr::read_lines(url_sites_api)
+                                    json_list <- jsonlite::fromJSON(api_output)
+                                    df_api_result <- json_list$features
+                                    df_api_result <- df_api_result %>% mutate('data_source' = site_type)
+                                    # reformat the data frame (some of it is nested)
+                                    df_api_result <- bind_cols(df_api_result %>% select(id, data_source),
+                                                               df_api_result$geometry,
+                                                               df_api_result$properties)
+                                    if (counter_sites == 1) {
+                                        cal_epa_sites <- df_api_result
+                                    } else {
+                                        cal_epa_sites <- bind_rows(cal_epa_sites, df_api_result)
+                                    }
+                                }
+                            # get the violation and enforcement record counts and join to the sites data frame
+                                violations_count <- read_rds("data_prepared/cal_epa_sites_violations_count.RDS")
+                                enforcement_count <- read_rds("data_prepared/cal_epa_sites_enforcement_count.RDS")
+                                # join the violation and enforcement record counts to the sites data frame
+                                    cal_epa_sites <- cal_epa_sites %>% left_join(violations_count, by = c('site_id' = 'SiteID'))
+                                    cal_epa_sites <- cal_epa_sites %>% left_join(enforcement_count, by = c('site_id' = 'SiteID'))
+                                    # replace NAs with zeros for the counts
+                                        cal_epa_sites <- cal_epa_sites %>% mutate(violations_records = case_when(is.na(violations_records) ~ 0L,
+                                                                                                               TRUE ~ violations_records),
+                                                                                  enforcement_records = case_when(is.na(enforcement_records) ~ 0L,
+                                                                                                               TRUE ~ enforcement_records))
+                            # Create an sf object from the sites data
+                                cal_epa_sites <- st_as_sf(cal_epa_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
+                                                          coords = c('longitude', 'latitude'),
+                                                          crs = 4326,
+                                                          agr = 'constant')
+                            # # filter for sites in the region containing the selected city -- now done in the API call
+                            #     sites_filter <- st_intersects(x = cal_epa_sites,
+                            #                                   y = rb_boundary(),
+                            #                                   sparse = FALSE)
+                            #     cal_epa_sites <- cal_epa_sites[sites_filter, ]
+                            # return the object
+                                return(cal_epa_sites)
+                        }
+                })
+                
     # MAP 1 -----------------------------------------------------------------------------------------------------------------#
     output$map1 <- renderLeaflet({
-        # filter for the selected redline polygons (by city)
-        if (input$city_selected_1 == 'All') {
-            redline_selected_1 <- redline_polygons
-        } else {
-            redline_selected_1 <- redline_polygons %>% filter(city == input$city_selected_1)
-        }
-        
         # get the bounds of the redline polygons for the selected city
-            bounds_1 <- attributes(st_geometry(redline_selected_1))$bbox
-        
-        # # get the regional board boundary containing the selected city
-        #     rb_boundary <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
-        #         filter(RB_OFF == cities_regions[[input$city_selected_1]])
-            
-            # Get Regional Board Office Areas from WB GIS SERVICES (GEOJSON)
-            #url_rb_office_areas <- 'http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson'
-            url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=UPPER(rb_off)%20like%20'%25",
-                                          cities_regions[[input$city_selected_1]],
-                                          "%25'&outFields=*&outSR=4326&f=geojson") 
-            rb_boundary <- read_lines(url_rb_office_areas) %>% 
-                geojson_sf() #%>% 
-                #filter(RB_OFF == cities_regions[[input$city_selected_1]])
+            bounds_1 <- attributes(st_geometry(redline_polygons %>% filter(city == input$city_selected_1)))$bbox
 
-        
         # create the new (empty) map
             l_map1 <- leaflet()
+            
+            l_map1 <- l_map1 %>% addMapPane("ces_polygons", zIndex = 410) %>% 
+                addMapPane("redline_polygons", zIndex = 420) %>% 
+                addMapPane("303d_lines", zIndex = 430) %>% 
+                addMapPane("303d_polygons", zIndex = 440) %>% 
+                addMapPane("region_polygon", zIndex = 450) %>% 
+                addMapPane('serviceareas_polygon', zIndex = 460) %>% 
+                addMapPane('calepa_points', zIndex = 470)
         
         # Basemap Options
             basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap') 
@@ -235,123 +382,18 @@ server <- function(input, output) {
                                            round(bounds_1[[1]],4)-0.01, '],[',
                                            round(bounds_1[[4]],4)+0.01, ', ',
                                            round(bounds_1[[3]],4)+0.01, ']]); }'))))
-        
-        # Add Selected RedLine Polygons (without (much?) fill)
-            # if (input$city_selected_1 == 'All') {
-            #     redline_selected_1 <- redline_polygons
-            # } else {
-                redline_selected_1 <- redline_polygons # %>% filter(city == input$city_selected_1)
-            #}
-            l_map1 <- l_map1 %>% addPolygons(data = redline_selected_1 %>% filter(holc_grade %in% input$rating_selected_1),
-                                             color = 'black', # "#444444",
-                                             weight = 1.0,
-                                             smoothFactor = 1.0,
-                                             opacity = 1.0,
-                                             # fill = FALSE,
-                                             fillOpacity = 0, # input$redline_fill_1,
-                                             fillColor = 'lightgrey',
-                                             # fillColor = ~redline_leaflet_pal(holc_grade),
-                                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                                             popup = ~paste0('<b>', '<u>', 'Redline Polygon', '</u>', '</b>','<br/>',
-                                                             '<b>', 'City: ', '</b>', city, '<br/>',
-                                                             '<b>', 'Name: ', '</b>', name, '<br/>',
-                                                             '<b>', 'Grade (A-D): ', '</b>', holc_grade),
-                                             group = 'Redlined Areas')
 
-        # Add the CalEnvironScreen Polygons (just for the region containing the selected city)
-            # get data
-                ces_3_poly <- read_rds('data_prepared/ces_3_poly.RDS')
-            # filter for polygons in the region containing the selected city
-                impaired_ces3_filter <- st_intersects(x = ces_3_poly,
-                                                      y = rb_boundary,
-                                                      sparse = FALSE)
-                ces_3_poly <- ces_3_poly[impaired_ces3_filter,]
-            # create the color palette for the CES polygons
-                parameter <- ces_choices %>% filter(name == input$ces_parameter) %>% pull(ces_variable)
-                ces_pal_domain <- as.data.frame(ces_3_poly) %>% select(parameter) %>% pull(parameter)
-                # create a new column in the ces data frame called fill.variable, with the selected parameter data
-                    ces_3_poly <- ces_3_poly %>% mutate(fill_variable = ces_pal_domain)
-                # create the pallete
-                    ces_pal_color <- 'RdYlGn' # 'YlOrBr' #'Blues' #'Greys'
-                    ces_leaflet_pal <- colorNumeric(
-                        palette = ces_pal_color,
-                        domain = ces_pal_domain,
-                        reverse = TRUE
-                    )
-            # add polygons
-                l_map1 <- l_map1 %>% addPolygons(data = ces_3_poly, # ces_3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
-                                                 color = 'grey', # "#444444", 
-                                                 weight = 0.5, 
-                                                 smoothFactor = 1.0,
-                                                 opacity = 0.8, 
-                                                 fillOpacity = 0.8,
-                                                 # fillColor = ~colorNumeric('YlOrBr', Poll_pctl)(Poll_pctl), # view RColorBrewer palettes with: RColorBrewer::display.brewer.all()
-                                                 fillColor = ~ces_leaflet_pal(fill_variable),
-                                                 # fillColor = 'green',
-                                                 highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#,bringToFront = TRUE
-                                                 popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 Tract', '</u>','</b>','<br/>',
-                                                                 '<b>', 'Census Tract: ', '</b>', Census_Tract,'<br/>',
-                                                                 '<b>', 'Location: ', '</b>', Nearby_City,', ', California_County, ' County, ', ZIP,'<br/>',
-                                                                 '<b>', 'Population (2010): ', '</b>', Population_2010,'<br/>',
-                                                                 
-                                                                 '<b>', '<u>', 'Overall Score: ','</u>', '</b>','<br/>',
-                                                                 '<b>', 'CES Score: ', '</b>', CES_3_Score,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'CES Percentile: ', '</b>', CES_3_Percentile,'<br/>',
-                                                                 
-                                                                 '<b>', '<u>','Water-Related Environmental/Health Scores (Percentiles): ', '</u>', '</b>','<br/>',
-                                                                 '<b>', 'Drinking Water: ', '</b>', Drinking_Water_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Impaired Waterbodies: ', '</b>', Imp_Water_Bodies_Percentile,'<br/>',
-                                                                 '<b>', 'Pollution Burden: ', '</b>', Pollution_Burden_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Pesticides: ', '</b>', Pesticides_Percentile,'<br/>',
-                                                                 '<b>', 'Toxic Releases: ', '</b>', Tox_Releases_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Cleanup Sites: ', '</b>', Cleanups_Percentile,'<br/>',
-                                                                 '<b>', 'Groundwater Threats: ', '</b>', Ground_Water_Threats_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Solid Waste: ', '</b>', Solid_Waste_Percentile,'<br/>',
-                                                                 '<b>', 'Hazardous Waste Generators: ', '</b>', Haz_Waste_Percentile,'<br/>',
-                                                                 
-                                                                 '<b>', '<u>','Other Environmental Scores (Percentiles): ', '</u>', '</b>','<br/>',
-                                                                 '<b>', 'Ozone: ', '</b>', Ozone_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'PM 2.5: ', PM_2_5_Percentile,'<br/>',
-                                                                 '<b>', 'Diesel PM: ', Diesel_PM_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Traffic Percentile: ', Traffic_Percentile,'<br/>',
-                                                                 
-                                                                 '<b>', '<u>','Public Health Scores (Percentiles): ', '</u>','</b>','<br/>',
-                                                                 '<b>', 'Asthma: ', '</b>', Asthma_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Low Birth Weight: ', '</b>', Low_Birth_Weight_Percentile,'<br/>',
-                                                                 '<b>', 'Cardiovascular Disease: ', '</b>', Cardiovascular_Disease_Percentile,'<br/>',
-                                                                 
-                                                                 '<b>', '<u>','Socioeconomic Scores (Percentiles): ', '</u>','</b>','<br/>',
-                                                                 '<b>', 'Education: ', '</b>', Education_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Linguistic Isolation: ', '</b>', Linguistic_Isolation_Percentile,'<br/>',
-                                                                 '<b>', 'Poverty: ', '</b>', Poverty_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Unemployment: ', '</b>', Unemployment_Percentile,'<br/>',
-                                                                 '<b>', 'Housing Burden: ', '</b>', Housing_Burden_Percentile,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Population Characteristics: ', '</b>', Population_Characteristics_Percentile,'<br/>',
-                                                                 
-                                                                 '<b>', '<u>','Demographics (% of Population): ', '</u>','</b>','<br/>',
-                                                                 '<b>', 'Children (Age <=10) : ', '</b>', Children_10_percent,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Age 11-64: ', '</b>', Pop_11_64_years_percent,'<br/>',
-                                                                 '<b>', 'Elderly (Age >65): ', '</b>', Elderly_65_percent,'<br/>',
-                                                                 '<b>', 'Hispanic: ', '</b>', Hispanic_percent,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'White: ', '</b>', White_percent,'<br/>',
-                                                                 '<b>', 'African American: ', '</b>', African_American_percent,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Native American: ', '</b>', Native_American_percent,'<br/>',
-                                                                 '<b>', 'Asian American: ', '</b>', Asian_American_percent,'&ensp;','|', '&ensp;',
-                                                                 '<b>', 'Other: ', '</b>', Other_percent
-                                                 ),
-                                                 # # popupOptions = popupOptions(textsize = '15px'),
-                                                 group = 'CalEnviroScreen')
-                
         # Add the 303d polygons
-            # get data
-                impaired_303d_poly <- read_rds('data_prepared/impaired_303d_poly.RDS')
-            # filter for 303d polygons in the region containing the selected city
-                impaired_poly_filter <- st_intersects(x = impaired_303d_poly,
-                                                      y = rb_boundary,
-                                                      sparse = FALSE)
-                impaired_303d_poly <- impaired_303d_poly[impaired_poly_filter,]
+        #     # get data
+        #         impaired_303d_poly <- read_rds('data_prepared/impaired_303d_poly.RDS')
+        #     # filter for 303d polygons in the region containing the selected city
+        #         impaired_poly_filter <- st_intersects(x = impaired_303d_poly,
+        #                                               y = rb_boundary(),
+        #                                               sparse = FALSE)
+        #         impaired_303d_poly <- impaired_303d_poly[impaired_poly_filter,]
             # add polygons
-                l_map1 <- l_map1 %>% addPolygons(data = impaired_303d_poly,
+                l_map1 <- l_map1 %>% addPolygons(data = impaired_303d_poly(),
+                                                 options = pathOptions(pane = "303d_polygons"),
                                                  color = 'darkblue',
                                                  weight = 0.5,
                                                  opacity = 0.8,
@@ -368,19 +410,20 @@ server <- function(input, output) {
                                                                  '<b>', 'Listing Comments: ', '</b>', comments, '<br/>',
                                                                  '<b>', 'Potential Sources: ', '</b>', sources),
                                                  group = '303d Listed Waters')
-                
+
         # Add the 303d lines
-            # get data
-                impaired_303d_lines <- read_rds('data_prepared/impaired_303d_lines_simplify_R1removed.RDS')
-            # filter out records with empty geometries
-                impaired_303d_lines <- impaired_303d_lines %>% filter(!is.na(st_dimension(.)))
-            # filter for 303d lines in the region containing the selected city
-                impaired_lines_filter <- st_intersects(x = impaired_303d_lines,
-                                                       y = rb_boundary %>% filter(RB_OFF == cities_regions[[input$city_selected_1]]),
-                                                       sparse = FALSE)
-                impaired_303d_lines <- impaired_303d_lines[impaired_lines_filter,]
+            # # get data
+            #     impaired_303d_lines <- read_rds('data_prepared/impaired_303d_lines_simplify_R1removed.RDS')
+            # # filter out records with empty geometries
+            #     impaired_303d_lines <- impaired_303d_lines %>% filter(!is.na(st_dimension(.)))
+            # # filter for 303d lines in the region containing the selected city
+            #     impaired_lines_filter <- st_intersects(x = impaired_303d_lines,
+            #                                            y = rb_boundary() %>% filter(RB_OFF == cities_regions[[input$city_selected_1]]),
+            #                                            sparse = FALSE)
+            #     impaired_303d_lines <- impaired_303d_lines[impaired_lines_filter,]
             # add polylines
-                l_map1 <- l_map1 %>% addPolylines(data = impaired_303d_lines, 
+                l_map1 <- l_map1 %>% addPolylines(data = impaired_303d_lines(), 
+                                                  options = pathOptions(pane = "303d_lines"),
                                                   color = 'blue',
                                                   weight = 2.0, 
                                                   opacity = 1.0, 
@@ -396,112 +439,11 @@ server <- function(input, output) {
                                                                   '<b>', 'Listing Comments: ', '</b>', comments,  '<br/>',
                                                                   '<b>', 'Potential Sources: ', '</b>', sources),
                                                   group = '303d Listed Waters')
-                
-                
-        # Add the CalEPA regulated sites  
-            if (length(input$site_type_1) > 0) {
-                # get CalEPA sites data
-                    calepa_sites_urls <- list('CIWQS' = 'https://services.calepa.ca.gov/geoserver/calepa/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=calepa:mv_fac_from_ciwqs&outputFormat=application%2Fjson',
-                                              'GeoTracker' = 'https://services.calepa.ca.gov/geoserver/calepa/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=calepa:mv_fac_from_geotracker&outputFormat=application%2Fjson',
-                                              'SMARTS' = 'https://services.calepa.ca.gov/geoserver/calepa/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=calepa:mv_fac_from_smarts&outputFormat=application%2Fjson'
-                    )
-                        if (length(input$site_type_1) > 0) {
-                            counter_sites <- 0
-                            for (site_type in input$site_type_1) {
-                                counter_sites <- counter_sites + 1
-                                url <- calepa_sites_urls[[site_type]]
-                                api_output <- readr::read_lines(url)
-                                json_list <- jsonlite::fromJSON(api_output)
-                                df_api_result <- json_list$features
-                                df_api_result <- df_api_result %>% mutate('data_source' = site_type)
-                                # reformat the data frame (some of it is nested)
-                                df_api_result <- bind_cols(df_api_result %>% select(id, data_source), 
-                                                           df_api_result$geometry,
-                                                           df_api_result$properties)
-                                if (counter_sites == 1) {
-                                    cal_epa_sites <- df_api_result
-                                } else {
-                                    cal_epa_sites <- bind_rows(cal_epa_sites, df_api_result)
-                                }
-                            }}
-                # get the violation and enforcement record counts and join to the sites data frame
-                    violations_count <- read_rds("data_prepared/cal_epa_sites_violations_count.RDS")
-                    enforcement_count <- read_rds("data_prepared/cal_epa_sites_enforcement_count.RDS")
-                    # join the violation and enforcement record counts to the sites data frame
-                        cal_epa_sites <- cal_epa_sites %>% left_join(violations_count, by = c('site_id' = 'SiteID'))
-                        cal_epa_sites <- cal_epa_sites %>% left_join(enforcement_count, by = c('site_id' = 'SiteID'))
-                        # replace NAs with zeros for the counts
-                            cal_epa_sites <- cal_epa_sites %>% mutate(violations_records = case_when(is.na(violations_records) ~ 0L,
-                                                                                                   TRUE ~ violations_records),
-                                                                      enforcement_records = case_when(is.na(enforcement_records) ~ 0L,
-                                                                                                   TRUE ~ enforcement_records))
-                # Create an sf object from the sites data
-                    cal_epa_sites <- st_as_sf(cal_epa_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
-                                              coords = c('longitude', 'latitude'),
-                                              crs = 4326,
-                                              agr = 'constant')
-                # filter for sites in the region containing the selected city
-                    sites_filter <- st_intersects(x = cal_epa_sites,
-                                                  y = rb_boundary,
-                                                  sparse = FALSE)
-                    cal_epa_sites <- cal_epa_sites[sites_filter, ]      
-                # if the option is selected, filter for sites with violations and/or enforcement actions
-                    if ('Violations' %in% input$show_violations_enforcement) {
-                        # cal_epa_sites <- cal_epa_sites %>% filter(SiteID %in% cal_epa_sites_violations$SiteID)
-                        cal_epa_sites <- cal_epa_sites %>% filter(violations_records > 0)
-                    }
-                    if ('Enforcement Actions' %in% input$show_violations_enforcement) {
-                        # cal_epa_sites <- cal_epa_sites %>% filter(SiteID %in% cal_epa_sites_enforcement$SiteID)
-                        cal_epa_sites <- cal_epa_sites %>% filter(enforcement_records > 0)
-                    }
-                    # # get the site types
-                    #     cal_epa_sites_programs <- read_rds("data_prepared/cal_epa_sites_programs.RDS")
-                    #     # get the site types for the selected sites
-                    #         distinct_site_types <- cal_epa_sites_programs %>% filter(SiteID %in% cal_epa_sites$site_id) %>% distinct(EI_Description)
-                    #     # filter the list for just the site types selected
-                    #         cal_epa_sites_programs_filter <- cal_epa_sites_programs_filter %>% filter(EI_Description %in% input$site_type_1)
-                    #     # select the sites in the filtered programs list
-                    #         cal_epa_sites <- cal_epa_sites %>% filter(SiteID %in% cal_epa_sites_programs_filter$SiteID)
-                # add selected sites to the map
-                    l_map1 <- l_map1 %>% addCircleMarkers(data = cal_epa_sites,
-                                                          radius = 4,
-                                                          stroke = TRUE, weight = 0.5, color = 'black', opacity = 1,
-                                                          fill = TRUE, fillOpacity = 1, fillColor = 'black', # 'grey', # ~wqi.leaflet.pal(WQI),
-                                                          # clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier = 2),# freezeAtZoom = 13, maxClusterRadius = 10),#,#singleMarkerMode = TRUE),
-                                                          popup = ~paste0('<b>', '<u>', 'CalEPA Regulated Site', '</u>','</b>','<br/>',
-                                                                          # '<b>', '<u>', 'Site Information:', '</u>', '</b>','<br/>',
-                                                                          '<b>', 'Name: ', '</b>', facility_name,'<br/>',
-                                                                          '<b>', 'ID: ', '</b>', site_id,'<br/>',
-                                                                          '<b>', 'Address: ', '</b>', address, '<br/>',
-                                                                          '<b>', 'City: ', '</b>', city, '<br/>',
-                                                                          #'<b>', 'County: ', '</b>', County,'<br/>',
-                                                                          '<b>', 'Zip Code: ', '</b>', zip_code, '<br/>',
-                                                                          '<b>', 'Source: ', '</b>', data_source, '<br/>',
-                                                                          '<b>', 'Violations / Enforcement Actions:', '</b>','<br/>',
-                                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Violation Records: ', '</b>', violations_records, '<br/>', # chr(149),
-                                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcement_records # chr(149),
-                                                                          ),
-                                                          group = 'CalEPA Regulated Sites') 
-                }
-                               
-        # # add the county boundary
-        # l_map1 <- l_map1 %>% addPolygons(data = counties_poly %>% filter(CNTY_NAME %in% cities_counties[[input$city_selected_1]]),
-        #                                  color = 'black', # "#444444",
-        #                                  weight = 1.0,
-        #                                  smoothFactor = 1.0,
-        #                                  opacity = 1.0,
-        #                                  fill = FALSE,
-        #                                  # fillOpacity = 0.5,
-        #                                  # fillColor = 'lightblue',
-        #                                  # fillColor = ~redline_leaflet_pal(holc_grade),
-        #                                  highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-        #                                  popup = ~paste0('<b>', '<u>', 'County Boundary', '</u>', '</b>','<br/>',
-        #                                                  '<b>', 'County: ', '</b>', CNTY_NAME),
-        #                                  group = 'County Boundary'
-        #                                  )
+
         
         # add the region boundary
-            l_map1 <- l_map1 %>% addPolygons(data = rb_boundary,
+            l_map1 <- l_map1 %>% addPolygons(data = rb_boundary(),
+                                             options = pathOptions(pane = "region_polygon"),
                                              color = 'black', # "#444444",
                                              weight = 1.0,
                                              smoothFactor = 1.0,
@@ -517,17 +459,43 @@ server <- function(input, output) {
                                              group = 'Regional Board Boundary'
             )
         
-        # add the service area providers
-            # get data
-                service_areas <- read_rds("data_prepared/service_areas_simplify.RDS")
-            # filter for polygons in the region containing the selected city
-                service_areas_filter <- st_intersects(x = service_areas,
-                                                      y = rb_boundary,
-                                                      sparse = FALSE)
-                service_areas <- service_areas[service_areas_filter,]
+        # add the drinking water provider service areas
+            # # get data from saved file
+            #     service_areas <- read_rds("data_prepared/service_areas_simplify.RDS")
+            # # filter for polygons in the region containing the selected city
+            #     service_areas_filter <- st_intersects(x = service_areas,
+            #                                           y = rb_boundary(),
+            #                                           sparse = FALSE)
+            #     service_areas <- service_areas[service_areas_filter,]
+                
+            # get data from the waterboard web services
+                # extract the coordinates of the simplified rb boundary and encode as url
+                    rb_boundary_simplify_geojson <- rb_boundary_simplify() %>% sf_geojson()
+                    rb_boundary_coordinates <- rb_boundary_simplify_geojson %>% 
+                        str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4, 
+                                end = nchar(rb_boundary_simplify_geojson)-7) %>% 
+                        url_encode()
+                # construct the api call and get the data
+                    service_url <- 'https://gispublic.waterboards.ca.gov/portalserver/rest/services/Hosted/California_Drinking_Water_Service_Areas/FeatureServer/0/'
+                    url_polygon_filter_serviceboundaries <- paste0(service_url,
+                                                                   'query?where=1%3D1', 
+                                                                   '&outFields=*',
+                                                                   '&geometry=%7B%22rings','%22','%3A','%5B','%5B','%5B',
+                                                                   rb_boundary_coordinates,
+                                                                   '%5D','%5D','%5D','%7D',
+                                                                   '&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRel',
+                                                                   'Intersects', # 'Contains', 'Intersects'
+                                                                   '&f=geojson')
+                    service_areas <- read_lines(url_polygon_filter_serviceboundaries) %>% geojson_sf() 
+                    # check
+                        # plot(rb_boundary() %>% select(geometry), lwd = 3, reset = FALSE) 
+                        # plot(service_areas$geometry, border = 'blue', add = TRUE)
+                        # plot(rb_boundary_simplify() %>% select(geometry), border = 'red', add = TRUE)
+                
             # add polygons
                 l_map1 <- l_map1 %>% 
                     addPolygons(data = service_areas,
+                                options = pathOptions(pane = "serviceareas_polygon"),
                                 color = 'black', # "#444444", 
                                 weight = 0.5, 
                                 smoothFactor = 1.0,
@@ -535,13 +503,13 @@ server <- function(input, output) {
                                 fillOpacity = 0.5,
                                 fillColor = 'lightblue',
                                 highlightOptions = highlightOptions(color = "white", weight = 2),
-                                popup = ~paste0('<b>', '<u>','Water Provider Service Area Boundary', '</u>','</b>','<br/>',
+                                popup = ~paste0('<b>', '<u>','Drinking Water Provider Service Area Boundary', '</u>','</b>','<br/>',
                                                 '<b>', 'PWSID: ', '</b>', pwsid,'<br/>',
                                                 '<b>', 'Name: ', '</b>',  name,'<br/>',
                                                 '<b>', 'County: ', '</b>', d_prin_cnt,'<br/>',
-                                                '<b>', 'Population: ', '</b>', d_populati,'<br/>',
-                                                '<b>', 'Verified: ', '</b>', verified_s), 
-                                group = 'Provider Service Areas'
+                                                '<b>', 'Population: ', '</b>', d_populati,'<br/>'),
+                                                #'<b>', 'Verified: ', '</b>', verified_s), # verified_status
+                                group = 'Drinking Water Provider Service Areas'
                     )
         
         # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
@@ -555,17 +523,6 @@ server <- function(input, output) {
                                              lat = mean(c(input$map1_bounds$north, input$map1_bounds$south)), 
                                              zoom = input$map1_zoom)                                
             })
-        
-        # add the legend
-                l_map1 <- l_map1 %>% 
-                    addLegend(position = 'bottomright', 
-                              pal = ces_leaflet_pal, 
-                              values = ces_3_poly$fill_variable, 
-                              opacity = 1, 
-                              layerId = 'ces_legend', 
-                              bins = 4, 
-                              group = 'Legend',
-                              title = paste0('CalEnviroScreen'))
 
         # Add controls to select the basemap and layers
             l_map1 <- l_map1 %>% addLayersControl(baseGroups = basemap_options,
@@ -573,33 +530,174 @@ server <- function(input, output) {
                                                                     'Redlined Areas', 
                                                                     '303d Listed Waters', 
                                                                     'CalEPA Regulated Sites',
-                                                                    'Provider Service Areas',
+                                                                    'Drinking Water Provider Service Areas',
                                                                     'Regional Board Boundary',
                                                                     'Legend'),
                                                   options = layersControlOptions(collapsed = TRUE,
                                                                                  autoZIndex = TRUE))
         # Hide some groups by default (can be turned on with the layers control box on the map)
-            l_map1 <- l_map1 %>% hideGroup(c('Provider Service Areas', 'Redlined Areas')) 
+            l_map1 <- l_map1 %>% hideGroup(c('Drinking Water Provider Service Areas', 'Redlined Areas')) 
                 
         # output the map object
             l_map1
     })
     
-    
-    
+    # Use a separate observer to recreate some parts of the map as they are updated, without re-drawing the entire map ----
+        # redlined areas
+            observe({
+                leafletProxy('map1') %>%
+                    clearGroup('Redlined Areas') %>% 
+                    addPolygons(data = redline_polygons %>% filter(holc_grade %in% input$rating_selected_1),
+                                options = pathOptions(pane = "redline_polygons"),
+                                color = 'black', # "#444444",
+                                weight = 2.0,
+                                smoothFactor = 1.0,
+                                opacity = 1.0,
+                                # fill = FALSE,
+                                fillOpacity = 0, # input$redline_fill_1,
+                                fillColor = 'lightgrey',
+                                # fillColor = ~redline_leaflet_pal(holc_grade),
+                                highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                                popup = ~paste0('<b>', '<u>', 'Redline Polygon', '</u>', '</b>','<br/>',
+                                                '<b>', 'City: ', '</b>', city, '<br/>',
+                                                '<b>', 'Name: ', '</b>', name, '<br/>',
+                                                '<b>', 'Grade (A-D): ', '</b>', holc_grade),
+                                group = 'Redlined Areas'
+                                )
+            })
+        
+        # CalEPA sites
+            observe({
+                if (length(input$site_type_1) > 0) {
+                    cal_epa_sites <- cal_epa_sites()
+                    # if the option is selected, filter for sites with violations and/or enforcement actions
+                        if ('Violations' %in% input$show_violations_enforcement) {
+                            cal_epa_sites <- cal_epa_sites %>% filter(violations_records > 0)
+                        }
+                        if ('Enforcement Actions' %in% input$show_violations_enforcement) {
+                            cal_epa_sites <- cal_epa_sites %>% filter(enforcement_records > 0)
+                        }
+                    leafletProxy('map1') %>%
+                        clearGroup('CalEPA Regulated Sites') %>% 
+                        addCircleMarkers(data = cal_epa_sites,
+                                         options = pathOptions(pane = "calepa_points"),
+                                         radius = 4,
+                                         stroke = TRUE, weight = 0.5, color = 'black', opacity = 1,
+                                         fill = TRUE, fillOpacity = 1, fillColor = 'black', # 'grey', # ~wqi.leaflet.pal(WQI),
+                                         # clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier = 2),# freezeAtZoom = 13, maxClusterRadius = 10),#,#singleMarkerMode = TRUE),
+                                         popup = ~paste0('<b>', '<u>', 'CalEPA Regulated Site', '</u>','</b>','<br/>',
+                                                         # '<b>', '<u>', 'Site Information:', '</u>', '</b>','<br/>',
+                                                         '<b>', 'Name: ', '</b>', facility_name,'<br/>',
+                                                         '<b>', 'ID: ', '</b>', site_id,'<br/>',
+                                                         '<b>', 'Address: ', '</b>', address, '<br/>',
+                                                         '<b>', 'City: ', '</b>', city, '<br/>',
+                                                         #'<b>', 'County: ', '</b>', County,'<br/>',
+                                                         '<b>', 'Zip Code: ', '</b>', zip_code, '<br/>',
+                                                         '<b>', 'Source: ', '</b>', data_source, '<br/>',
+                                                         '<b>', 'Violations / Enforcement Actions:', '</b>','<br/>',
+                                                         '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Violation Records: ', '</b>', violations_records, '<br/>', # chr(149),
+                                                         '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcement_records # chr(149),
+                                         ),
+                                         group = 'CalEPA Regulated Sites') 
+                }
+            })
+            
+        # CalEnvironScreen Polygons (just for the region containing the selected city)
+            observe({
+                # create the color palette for the CES polygons
+                    parameter <- ces_choices %>% filter(name == input$ces_parameter) %>% pull(ces_variable)
+                    ces_pal_domain <- as.data.frame(ces_3_poly()) %>% select(parameter) %>% pull(parameter)
+                    # create the palette
+                        ces_pal_color <- 'RdYlGn' # 'YlOrBr' #'Blues' #'Greys'
+                        ces_leaflet_pal <- colorNumeric(
+                            palette = ces_pal_color,
+                            domain = ces_pal_domain,
+                            reverse = TRUE
+                        )
+                # get the dataset
+                    ces_3_poly <- ces_3_poly() %>% mutate(fill_variable = ces_pal_domain)
+                # add polygons
+                    leafletProxy('map1') %>%
+                        clearGroup('CalEnviroScreen') %>% 
+                        addPolygons(data = ces_3_poly, # ces_3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
+                                    options = pathOptions(pane = "ces_polygons"),
+                                    color = 'grey', # "#444444", 
+                                    weight = 0.5, 
+                                    smoothFactor = 1.0,
+                                    opacity = 0.8, 
+                                    fillOpacity = 0.8,
+                                    # fillColor = ~colorNumeric('YlOrBr', Poll_pctl)(Poll_pctl), # view RColorBrewer palettes with: RColorBrewer::display.brewer.all()
+                                    fillColor = ~ces_leaflet_pal(fill_variable),
+                                    # fillColor = 'green',
+                                    highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#,bringToFront = TRUE
+                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 Tract', '</u>','</b>','<br/>',
+                                                    '<b>', 'Census Tract: ', '</b>', Census_Tract,'<br/>',
+                                                    '<b>', 'Location: ', '</b>', Nearby_City,', ', California_County, ' County, ', ZIP,'<br/>',
+                                                    '<b>', 'Population (2010): ', '</b>', Population_2010,'<br/>',
+                                                    
+                                                    '<b>', '<u>', 'Overall Score: ','</u>', '</b>','<br/>',
+                                                    '<b>', 'CES Score: ', '</b>', CES_3_Score,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'CES Percentile: ', '</b>', CES_3_Percentile,'<br/>',
+                                                    
+                                                    '<b>', '<u>','Water-Related Environmental/Health Scores (Percentiles): ', '</u>', '</b>','<br/>',
+                                                    '<b>', 'Drinking Water: ', '</b>', Drinking_Water_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Impaired Waterbodies: ', '</b>', Imp_Water_Bodies_Percentile,'<br/>',
+                                                    '<b>', 'Pollution Burden: ', '</b>', Pollution_Burden_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Pesticides: ', '</b>', Pesticides_Percentile,'<br/>',
+                                                    '<b>', 'Toxic Releases: ', '</b>', Tox_Releases_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Cleanup Sites: ', '</b>', Cleanups_Percentile,'<br/>',
+                                                    '<b>', 'Groundwater Threats: ', '</b>', Ground_Water_Threats_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Solid Waste: ', '</b>', Solid_Waste_Percentile,'<br/>',
+                                                    '<b>', 'Hazardous Waste Generators: ', '</b>', Haz_Waste_Percentile,'<br/>',
+                                                    
+                                                    '<b>', '<u>','Other Environmental Scores (Percentiles): ', '</u>', '</b>','<br/>',
+                                                    '<b>', 'Ozone: ', '</b>', Ozone_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'PM 2.5: ', PM_2_5_Percentile,'<br/>',
+                                                    '<b>', 'Diesel PM: ', Diesel_PM_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Traffic Percentile: ', Traffic_Percentile,'<br/>',
+                                                    
+                                                    '<b>', '<u>','Public Health Scores (Percentiles): ', '</u>','</b>','<br/>',
+                                                    '<b>', 'Asthma: ', '</b>', Asthma_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Low Birth Weight: ', '</b>', Low_Birth_Weight_Percentile,'<br/>',
+                                                    '<b>', 'Cardiovascular Disease: ', '</b>', Cardiovascular_Disease_Percentile,'<br/>',
+                                                    
+                                                    '<b>', '<u>','Socioeconomic Scores (Percentiles): ', '</u>','</b>','<br/>',
+                                                    '<b>', 'Education: ', '</b>', Education_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Linguistic Isolation: ', '</b>', Linguistic_Isolation_Percentile,'<br/>',
+                                                    '<b>', 'Poverty: ', '</b>', Poverty_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Unemployment: ', '</b>', Unemployment_Percentile,'<br/>',
+                                                    '<b>', 'Housing Burden: ', '</b>', Housing_Burden_Percentile,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Population Characteristics: ', '</b>', Population_Characteristics_Percentile,'<br/>',
+                                                    
+                                                    '<b>', '<u>','Demographics (% of Population): ', '</u>','</b>','<br/>',
+                                                    '<b>', 'Children (Age <=10) : ', '</b>', Children_10_percent,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Age 11-64: ', '</b>', Pop_11_64_years_percent,'<br/>',
+                                                    '<b>', 'Elderly (Age >65): ', '</b>', Elderly_65_percent,'<br/>',
+                                                    '<b>', 'Hispanic: ', '</b>', Hispanic_percent,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'White: ', '</b>', White_percent,'<br/>',
+                                                    '<b>', 'African American: ', '</b>', African_American_percent,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Native American: ', '</b>', Native_American_percent,'<br/>',
+                                                    '<b>', 'Asian American: ', '</b>', Asian_American_percent,'&ensp;','|', '&ensp;',
+                                                    '<b>', 'Other: ', '</b>', Other_percent
+                                    ),
+                                    # # popupOptions = popupOptions(textsize = '15px'),
+                                    group = 'CalEnviroScreen') %>% 
+                        clearControls() %>%
+                        addLegend(position = 'bottomright',
+                                  pal = ces_leaflet_pal,
+                                  values = ces_3_poly$fill_variable,
+                                  opacity = 1,
+                                  layerId = 'ces_legend',
+                                  bins = 4,
+                                  group = 'Legend',
+                                  title = paste0('CalEnviroScreen'))
+            })
+
+        
     
     
     # MAP 2 -----------------------------------------------------------------------------------------------------------------#    
     output$map2 <- renderLeaflet({
-        # # filter for the selected redline polygons (by city)
-        # if (input$city_selected_1 == 'All') {
-        #     redline_selected_2 <- redline_polygons
-        # } else {
-        #     redline_selected_2 <- redline_polygons %>% filter(city == input$city_selected_1)
-        # }
-        # Don't filter (show redline polygons for all cities)
-            redline_selected_2 <- redline_polygons
-        
         # get the bounds of the redline polygons for the selected city
             bounds_2 <- attributes(st_geometry(redline_polygons %>% filter(city == input$city_selected_1)))$bbox
         
@@ -631,24 +729,6 @@ server <- function(input, output) {
             redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
                                                domain = redline_polygons$holc_grade, 
                                                levels = c('A', 'B', 'C', 'D'))
-        
-        # Add Selected RedLine Polygons
-            l_map2 <- l_map2 %>% addPolygons(data = redline_selected_2 %>% filter(holc_grade %in% input$rating_selected_1),
-                                             color = 'black', # "#444444",
-                                             weight = 1.0,
-                                             smoothFactor = 1.0,
-                                             opacity = 1.0,
-                                             # fill = FALSE,
-                                             fillOpacity = 1.0,
-                                             # fillColor = 'lightblue',
-                                             fillColor = ~redline_leaflet_pal(holc_grade),
-                                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                                             popup = ~paste0('<b>', '<u>', 'Redline Polygon', '</u>', '</b>','<br/>',
-                                                             '<b>', 'City: ', '</b>', city, '<br/>',
-                                                             '<b>', 'Name: ', '</b>', name, '<br/>',
-                                                             '<b>', 'Grade (A-D): ', '</b>', holc_grade),
-                                             group = 'Redlined Areas'
-            )
         
         # add the legend
             l_map2 <- l_map2 %>% 
@@ -682,105 +762,33 @@ server <- function(input, output) {
     })
     
     
-    # MAP 3 -----------------------------------------------------------------------------------------------------------------#
-    # output$map3 <- renderLeaflet({
-    #     # filter for the selected redline polygons (by city)
-    #     if (input$city_selected_3 == 'All') {
-    #         redline_selected_3 <- redline_polygons
-    #     } else {
-    #         redline_selected_3 <- redline_polygons %>% filter(city == input$city_selected_3)
-    #     }
-    #     
-    #     # get the bounds of the redline polygons for the selected city
-    #     bounds_3 <- attributes(st_geometry(redline_selected_3))$bbox
-    #     
-    #     l_map3 <- leaflet()
-    #     
-    #     # Basemap Options
-    #     basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap') 
-    #     for (provider in basemap_options) {
-    #         l_map3 <- l_map3 %>% addProviderTiles(provider, group = provider)
-    #     }
-    #     
-    #     # add the min-map window
-    #     l_map3 <- l_map3 %>% addMiniMap(tiles = basemap_options[[1]], toggleDisplay = TRUE, position = "bottomleft")
-    #     
-    #     # code to make the basemap/min-map selector work (copied from: https://rstudio.github.io/leaflet/morefeatures.html)
-    #     l_map3 <- l_map3 %>% onRender(
-    #         "function(el, x) {
-    #             var myMap = this;
-    #             myMap.on('baselayerchange',
-    #             function (e) {
-    #             myMap.minimap.changeLayer(L.tileLayer.provider(e.name));
-    #             })
-    #             }"
-    #     )
-    #     
-    #     # create a button to re-center the map
-    #     l_map3 <- l_map3 %>% addEasyButton(easyButton(
-    #         icon="fa-globe", title="Center Map on Selected City",
-    #         onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
-    #                                    round(bounds_3[[2]],4)-0.01, ', ',
-    #                                    round(bounds_3[[1]],4)-0.01, '],[',
-    #                                    round(bounds_3[[4]],4)+0.01, ', ',
-    #                                    round(bounds_3[[3]],4)+0.01, ']]); }'))))
-    #     
-    #     # Create the color palette for the Redline scores
-    #     redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), 
-    #                                        domain = redline_polygons$holc_grade, 
-    #                                        levels = c('A', 'B', 'C', 'D'))
-    #     
-    #     # Add Selected RedLine Polygons
-    #     l_map3 <- l_map3 %>% addPolygons(data = redline_selected_3 %>% filter(holc_grade %in% input$rating_selected_3),
-    #                            color = 'black', # "#444444",
-    #                            weight = 2.0,
-    #                            smoothFactor = 1.0,
-    #                            opacity = 1.0,
-    #                            # fill = FALSE,
-    #                            fillOpacity = 0.5,
-    #                            # fillColor = 'lightblue',
-    #                            fillColor = ~redline_leaflet_pal(holc_grade),
-    #                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-    #                            popup = ~paste0('<b>', '<u>', 'Redline Polygon', '</u>', '</b>','<br/>',
-    #                                            '<b>', 'City: ', '</b>', city, '<br/>',
-    #                                            '<b>', 'Name: ', '</b>', name, '<br/>',
-    #                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade),
-    #                            group = 'Redlined Areas'
-    #     )
-    #     
-    #     # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
-    #     isolate(if (is.null(input$map3_bounds)) {
-    #         l_map3 <- l_map3 %>% fitBounds(lng1 = bounds_3[[1]], 
-    #                                        lat1 = bounds_3[[2]], 
-    #                                        lng2 = bounds_3[[3]], 
-    #                                        lat2 = bounds_3[[4]])
-    #     } else { # maintain the current view
-    #         l_map3 <- l_map3 %>% setView(lng = mean(c(input$map3_bounds$west, input$map3_bounds$east)), 
-    #                                      lat = mean(c(input$map3_bounds$north, input$map3_bounds$south)), 
-    #                                      zoom = input$map3_zoom)                                
-    #     })
-    #     
-    #     # add the legend
-    #     l_map3 <- l_map3 %>% 
-    #         addLegend(position = 'bottomright', 
-    #                   pal = redline_leaflet_pal, 
-    #                   values = c('A', 'B', 'C', 'D'), 
-    #                   opacity = 1, 
-    #                   layerId = 'redline_legend', 
-    #                   group = 'Legend', 
-    #                   title = paste0('Redlined Areas'))
-    #     
-    #     # Add controls to select the basemap and layers
-    #     l_map3 <- l_map3 %>% addLayersControl(baseGroups = basemap_options,
-    #                                           overlayGroups = c('Redlined Areas', 'Legend'),
-    #                                           options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
-    #     
-    #     
-    #     # output the map object
-    #     l_map3
-    # })
-
-
+    # Use a separate observer to recreate some parts of Map 2 as they are updated, without re-drawing the entire map
+        # redline polygons
+            observe({
+                input$city_selected_1 # to re-draw polygons when city is changed
+                # Create the color palette for the Redline scores
+                redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+                                                   domain = redline_polygons$holc_grade, 
+                                                   levels = c('A', 'B', 'C', 'D'))
+                leafletProxy("map2") %>% 
+                    clearShapes() %>% 
+                    addPolygons(data = redline_polygons %>% filter(holc_grade %in% input$rating_selected_1),
+                                color = 'black', # "#444444",
+                                weight = 1.0,
+                                smoothFactor = 1.0,
+                                opacity = 1.0,
+                                # fill = FALSE,
+                                fillOpacity = 1.0,
+                                # fillColor = 'lightblue',
+                                fillColor = ~redline_leaflet_pal(holc_grade),
+                                highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                                popup = ~paste0('<b>', '<u>', 'Redline Polygon', '</u>', '</b>','<br/>',
+                                                '<b>', 'City: ', '</b>', city, '<br/>',
+                                                '<b>', 'Name: ', '</b>', name, '<br/>',
+                                                '<b>', 'Grade (A-D): ', '</b>', holc_grade),
+                                group = 'Redlined Areas'
+                    )
+            })
 
 
 # Helper functions ---------------------------------------------------------------------------------------------------------#
@@ -833,22 +841,6 @@ server <- function(input, output) {
     #                           coords_2$north)
     #         }
     #     })
-
-    # # Center map 3 on change in city selection
-    # observeEvent(input$city_selected_3, {
-    #     if (input$city_selected_3 == 'All') {
-    #         redline_selected_3 <- redline_polygons
-    #     } else {
-    #         redline_selected_3 <- redline_polygons %>% filter(city == input$city_selected_3)
-    #     }
-    #     bounds_3 <- attributes(st_geometry(redline_selected_3))$bbox
-    #     # update map to appropriate bounds
-    #     leafletProxy(mapId = 'map3') %>% 
-    #         fitBounds(lng1 = bounds_3[[1]]-0.01, 
-    #                   lat1 = bounds_3[[2]]-0.01, 
-    #                   lng2 = bounds_3[[3]]+0.01, 
-    #                   lat2 = bounds_3[[4]]+0.01)
-    # })
     
 }
 
