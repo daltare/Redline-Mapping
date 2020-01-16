@@ -112,9 +112,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                              '(California State Water Resources Control Board)'
                      ),   
                      tags$li(tags$a(href = 'https://services.calepa.ca.gov/geoserver/', 'CalEPA Regulated Sites '), 
-                             '(CalEPA Geoserver) | Web-service available ',
-                             tags$a(href = 'https://services.calepa.ca.gov/geoserver/', 'here'), 
-                             ' (click on the "Layer Preview" link, layer names: "calepa:mv_fac_from_ciwqs", "calepa:mv_fac_from_smarts", "calepa:mv_fac_from_geotracker")', 
+                             '(CalEPA Geoserver) | Web-service (click on the "Layer Preview" link, layer names: "calepa:mv_fac_from_ciwqs", "calepa:mv_fac_from_smarts", "calepa:mv_fac_from_geotracker")', 
                      ),
                      tags$li(tags$a(href = 'https://siteportal.calepa.ca.gov/nsite/map/export',
                                     'CalEPA Regulated Sites Violations and Enforcement Actions'), 
@@ -122,7 +120,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                      ),
                      tags$li(tags$a(href = 'https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c',
                                     'California Drinking Water Service Areas'), 
-                             '(California State Water Resources Control Board\'s Map Services) | Use the "Service URL" link'
+                             '(California State Water Resources Control Board\'s Map Services) | For web-service, use the "Service URL" link'
                      ),
                      tags$li(tags$a(href = 'http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0',
                                     'California State Water Board Regional Board Office Boundaries'), 
