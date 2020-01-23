@@ -26,6 +26,14 @@
     # List of the CES parameter choices to plot
         ces_choices <- read_rds('data_prepared/ces_3_names.RDS') %>% 
             filter(grepl(pattern = 'Percentile$', x = .$name))
+        
+    # List of programs types to select
+        program_types <- read_rds('data_prepared/cal_epa_sites_programs.RDS')
+        program_types_distinct <- program_types %>% 
+            select(EI_Description) %>% 
+            distinct() %>% 
+            arrange(EI_Description) %>% 
+            pull(EI_Description)
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------- #       
 # ----------------------------------------------------------------------------------------------------------------------------------------------- #
@@ -46,21 +54,51 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                 label = 'Select CalEnviroScreen (CES) Parameter:', 
                                 choices = ces_choices$name, 
                                 selected = ces_choices$name[1]),
-                    checkboxGroupInput(inputId = 'rating_selected_1',
-                                       label = 'Select HOLC Rating:',
-                                       choices = list('A (Best)' = 'A',
-                                                      'B (Still Desirable)' = 'B',
-                                                      'C (Definitely Declining)' = 'C',
-                                                      'D (Hazardous)' = 'D'),
-                                       selected = c('A','B','C','D')),
-                    checkboxGroupInput(inputId = 'site_type_1', 
-                                       label = 'Select CalEPA Regulated Site Types:', 
-                                       choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
-                                       selected = NULL),
-                    checkboxGroupInput(inputId = 'show_violations_enforcement',
-                                       label = 'Filter For CalEPA Regulated Sites With:',
-                                       choices = c('Violations', 'Enforcement Actions'),
-                                       selected = NULL),
+                    # checkboxGroupInput(inputId = 'rating_selected_1',
+                    #                    label = 'Select HOLC Rating:',
+                    #                    choices = list('A (Best)' = 'A',
+                    #                                   'B (Still Desirable)' = 'B',
+                    #                                   'C (Definitely Declining)' = 'C',
+                    #                                   'D (Hazardous)' = 'D'),
+                    #                    selected = c('A','B','C','D')),
+                    selectInput(inputId = 'rating_selected_1',
+                                label = 'Select HOLC Rating:',
+                                choices = list('A (Best)' = 'A',
+                                               'B (Still Desirable)' = 'B',
+                                               'C (Definitely Declining)' = 'C',
+                                               'D (Hazardous)' = 'D'),
+                                selected = c('A','B','C','D'),
+                                multiple = TRUE),
+                    # checkboxGroupInput(inputId = 'site_type_1', 
+                    #                    label = 'Select CalEPA Regulated Site Types:', 
+                    #                    choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
+                    #                    selected = NULL),
+                    selectInput(inputId = 'site_type_1', 
+                                label = 'Select CalEPA Regulated Site Types:', 
+                                choices = c('California Integrated Water Quality System (CIWQS)', 
+                                            'GeoTracker', 
+                                            'Storm Water Multiple Application and Report Tracking System (SMARTS)',
+                                            'Chemical Hazards - Fire',
+                                            'Chemical Hazards - Reactivity',
+                                            'Chemical Hazards - Sudden Release of Pressure',
+                                            'California Environmental Reporting System (CERS)',
+                                            'EnviroStor Cleanup (ENVSTORCLN)',
+                                            'EnviroStor Hazardous Waste (ENVSTORHAZ)',
+                                            'National Emissions Inventory System (EIS)',
+                                            'Toxic Release Inventory (TRI)'
+                                ),
+                                selected = NULL, 
+                                multiple = TRUE),
+                    # checkboxGroupInput(inputId = 'show_violations_enforcement',
+                    #                    label = 'Filter For CalEPA Regulated Sites With:',
+                    #                    choices = c('Violations', 'Enforcement Actions'),
+                    #                    selected = NULL),
+                    selectInput(inputId = 'show_violations_enforcement',
+                                label = 'Filter For CalEPA Regulated Sites With Violations and/or Enforcement Actions:',
+                                choices = c('Violations', 'Enforcement Actions'),
+                                selected = NULL, 
+                                multiple = TRUE),
+                    uiOutput('program_type_1'),
                     hr(style="border: 1px solid darkgrey"),
                     p(tags$b('NOTE:'), 'Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off.')
                 ),
@@ -143,7 +181,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
 
 # Define server logic ----
 server <- function(input, output) {
-
+    
     # create list of which region each city is in (for filtering related datasets)
         cities_regions <- list('Fresno' = '5F',
                                'Los Angeles' = '4',
@@ -166,176 +204,199 @@ server <- function(input, output) {
                                        '7' = '0.004',
                                        '8' = '0.007',
                                        '9' = '0.006')
-
         
-        # get reactive values (to isolate from each other and prevent map from completely rebuilding when an input is changed)
-            # regional board boundary containing the selected city
-                rb_boundary <- reactive({
-                    # Get Regional Board Office Areas from WB GIS Services (GEOJSON) - note that this filters for just the regional board containing the selected city
-                    url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=UPPER(rb_off)%20like%20'%25",
-                                                  cities_regions[[input$city_selected_1]],
-                                                  "%25'&outFields=*&outSR=4326&f=geojson") 
-                    rb_boundary <- read_lines(url_rb_office_areas) %>% 
-                        geojson_sf()
-                    return(rb_boundary)
-                    
-                    # # get the regional board boundary containing the selected city from a saved file (old method - not used)
-                    #     rb_boundary <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
-                    #         filter(RB_OFF == cities_regions[[input$city_selected_1]])
-                })
+    # get reactive values (to isolate from each other and prevent map from completely rebuilding when an input is changed)
+        # regional board boundary containing the selected city
+            rb_boundary <- reactive({
+                # Get Regional Board Office Areas from WB GIS Services (GEOJSON) - note that this filters for just the regional board containing the selected city
+                url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=UPPER(rb_off)%20like%20'%25",
+                                              cities_regions[[input$city_selected_1]],
+                                              "%25'&outFields=*&outSR=4326&f=geojson") 
+                rb_boundary <- read_lines(url_rb_office_areas) %>% 
+                    geojson_sf()
+                return(rb_boundary)
                 
-            # create a simplified version of the regional board boundary for use in api filtering
-                rb_boundary_simplify <- reactive({
-                    # simplify and convert rb boundary to geojson
-                        rb_boundary() %>% 
-                            ms_simplify(keep = as.numeric(
-                                simplification_regions[[cities_regions[[input$city_selected_1]]]])) 
-                })
-                
-                
-            # CalEnvironScreen Polygons (just for the region containing the selected city)
-                ces_3_poly <- reactive({
-                    # # get data
-                    #     ces_3_poly <- read_rds('data_prepared/ces_3_poly.RDS')
-                    # get data from API
-                        # transform to rb boundary to coordinate system used in web service
-                            rb_boundary_simplify_transform <- st_transform(rb_boundary_simplify(), 3310)
-                        # convert to geojson
-                            rb_boundary_simplify_transform_geojson <- rb_boundary_simplify_transform %>% sf_geojson()
-                        # get coordinates
-                            rb_boundary_coordinates <- rb_boundary_simplify_transform_geojson %>%
+                # # get the regional board boundary containing the selected city from a saved file (old method - not used)
+                #     rb_boundary <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
+                #         filter(RB_OFF == cities_regions[[input$city_selected_1]])
+            })
+            
+        # create a simplified version of the regional board boundary for use in api filtering
+            rb_boundary_simplify <- reactive({
+                # simplify and convert rb boundary to geojson
+                    rb_boundary() %>% 
+                        ms_simplify(keep = as.numeric(
+                            simplification_regions[[cities_regions[[input$city_selected_1]]]])) 
+            })
+            
+            
+        # CalEnvironScreen Polygons (just for the region containing the selected city)
+            ces_3_poly <- reactive({
+                # # get data
+                #     ces_3_poly <- read_rds('data_prepared/ces_3_poly.RDS')
+                # get data from API
+                    # transform to rb boundary to coordinate system used in web service
+                        rb_boundary_simplify_transform <- st_transform(rb_boundary_simplify(), 3310)
+                    # convert to geojson
+                        rb_boundary_simplify_transform_geojson <- rb_boundary_simplify_transform %>% sf_geojson()
+                    # get coordinates
+                        rb_boundary_coordinates <- rb_boundary_simplify_transform_geojson %>%
+                            str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
+                                    end = nchar(rb_boundary_simplify_transform_geojson)-7)
+                    # format the coordinates for the api
+                        rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\],\\[', replacement = '|')
+                        rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = ',', replacement = '%20')
+                        rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\|', replacement = ',%20')
+                    # construct api call - NOTE -- for more info see: https://docs.geoserver.org/stable/en/user/tutorials/cql/cql_tutorial.html
+                        url_ces3_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
+                                               'ows?service=WFS&version=1.0.0',
+                                               '&request=GetFeature',
+                                               '&typeName=calepa:CES3June2018Update',
+                                               '&outputFormat=application%2Fjson',
+                                               '&CQL_FILTER=INTERSECTS(the_geom,POLYGON((',
+                                               rb_boundary_coordinates,
+                                               ')))')
+                    # make api call
+                        ces_3_poly <- read_lines(url_ces3_api) %>% geojson_sf()
+                        st_crs(ces_3_poly) <- 3310 # the crs is incorrectly defined in the data returned by the api - have to reset it
+                        ces_3_poly <- st_transform(ces_3_poly, crs = 4326) # transform back to lat/lon coordinates
+                    # check
+                        # plot(ces_3_poly$geometry, border = 'blue', col = 'grey')
+                        # plot(rb_boundary()$geometry, lwd = 3, add = TRUE)
+                        # plot(rb_boundary_simplify() %>% select(geometry), border = 'red', add = TRUE)
+                    # revise column names
+                        ces_3_poly <- ces_3_poly %>% select(-CES2018_Rn)
+                        col_names_original <- names(ces_3_poly)
+                        col_names_new <- read_csv('data_prepared/ces_names.csv')
+                        col_names_original_df <- as.data.frame(x = col_names_original)
+                        col_names_original_df <- col_names_original_df %>% left_join(col_names_new, by = c('col_names_original' = 'id'))
+                        col_names_original_df$name[nrow(col_names_original_df)] <- 'geometry'
+                        names(ces_3_poly) <- col_names_original_df$name
+                        names(ces_3_poly) <- make_clean_names(names(ces_3_poly), 'parsed')
+                        return(ces_3_poly)
+            })
+            
+        # 303d polygons
+            impaired_303d_poly <- reactive({
+                # get data
+                    impaired_303d_poly <- read_rds('data_prepared/impaired_303d_poly.RDS')
+                # filter for 303d polygons in the region containing the selected city
+                    impaired_poly_filter <- st_intersects(x = impaired_303d_poly,
+                                                          y = rb_boundary(),
+                                                          sparse = FALSE)
+                    impaired_303d_poly <- impaired_303d_poly[impaired_poly_filter,]
+                    return(impaired_303d_poly)
+            })
+            
+        # 303d lines
+            impaired_303d_lines <- reactive({
+                # get data
+                    impaired_303d_lines <- read_rds('data_prepared/impaired_303d_lines_simplify_R1removed.RDS')
+                # filter out records with empty geometries
+                    impaired_303d_lines <- impaired_303d_lines %>% filter(!is.na(st_dimension(.)))
+                # filter for 303d lines in the region containing the selected city
+                    impaired_lines_filter <- st_intersects(x = impaired_303d_lines,
+                                                           y = rb_boundary(),
+                                                           sparse = FALSE)
+                    impaired_303d_lines <- impaired_303d_lines[impaired_lines_filter,]
+                    return(impaired_303d_lines)
+            })
+            
+        # CalEPA regulated sites
+            cal_epa_sites <- reactive({
+                if (length(input$site_type_1) > 0) {    
+                    # get CalEPA sites data from the geoserver api
+                        # get the coordinates of the simplified rb boundary containing the selected city and convert to geojson
+                            rb_boundary_simplify_geojson <- rb_boundary_simplify() %>% sf_geojson()
+                        # extract coordinates
+                            rb_boundary_coordinates <- rb_boundary_simplify_geojson %>%
                                 str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
-                                        end = nchar(rb_boundary_simplify_transform_geojson)-7)
+                                        end = nchar(rb_boundary_simplify_geojson)-7)
                         # format the coordinates for the api
                             rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\],\\[', replacement = '|')
                             rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = ',', replacement = '%20')
                             rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\|', replacement = ',%20')
-                        # construct api call - NOTE -- for more info see: https://docs.geoserver.org/stable/en/user/tutorials/cql/cql_tutorial.html
-                            url_ces3_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
-                                                   'ows?service=WFS&version=1.0.0',
-                                                   '&request=GetFeature',
-                                                   '&typeName=calepa:CES3June2018Update',
-                                                   '&outputFormat=application%2Fjson',
-                                                   '&CQL_FILTER=INTERSECTS(the_geom,POLYGON((',
-                                                   rb_boundary_coordinates,
-                                                   ')))')
-                        # make api call
-                            ces_3_poly <- read_lines(url_ces3_api) %>% geojson_sf()
-                            st_crs(ces_3_poly) <- 3310 # the crs is incorrectly defined in the data returned by the api - have to reset it
-                            ces_3_poly <- st_transform(ces_3_poly, crs = 4326) # transform back to lat/lon coordinates
-                        # check
-                            # plot(ces_3_poly$geometry, border = 'blue', col = 'grey')
-                            # plot(rb_boundary()$geometry, lwd = 3, add = TRUE)
-                            # plot(rb_boundary_simplify() %>% select(geometry), border = 'red', add = TRUE)
-                        # revise column names
-                            ces_3_poly <- ces_3_poly %>% select(-CES2018_Rn)
-                            col_names_original <- names(ces_3_poly)
-                            col_names_new <- read_csv('data_prepared/ces_names.csv')
-                            col_names_original_df <- as.data.frame(x = col_names_original)
-                            col_names_original_df <- col_names_original_df %>% left_join(col_names_new, by = c('col_names_original' = 'id'))
-                            col_names_original_df$name[nrow(col_names_original_df)] <- 'geometry'
-                            names(ces_3_poly) <- col_names_original_df$name
-                            names(ces_3_poly) <- make_clean_names(names(ces_3_poly), 'parsed')
-                            return(ces_3_poly)
-                })
-                
-            # 303d polygons
-                impaired_303d_poly <- reactive({
-                    # get data
-                        impaired_303d_poly <- read_rds('data_prepared/impaired_303d_poly.RDS')
-                    # filter for 303d polygons in the region containing the selected city
-                        impaired_poly_filter <- st_intersects(x = impaired_303d_poly,
-                                                              y = rb_boundary(),
-                                                              sparse = FALSE)
-                        impaired_303d_poly <- impaired_303d_poly[impaired_poly_filter,]
-                        return(impaired_303d_poly)
-                })
-                
-            # 303d lines
-                impaired_303d_lines <- reactive({
-                    # get data
-                        impaired_303d_lines <- read_rds('data_prepared/impaired_303d_lines_simplify_R1removed.RDS')
-                    # filter out records with empty geometries
-                        impaired_303d_lines <- impaired_303d_lines %>% filter(!is.na(st_dimension(.)))
-                    # filter for 303d lines in the region containing the selected city
-                        impaired_lines_filter <- st_intersects(x = impaired_303d_lines,
-                                                               y = rb_boundary(),
-                                                               sparse = FALSE)
-                        impaired_303d_lines <- impaired_303d_lines[impaired_lines_filter,]
-                        return(impaired_303d_lines)
-                })
-                
-            # CalEPA regulated sites
-                cal_epa_sites <- reactive({
-                    if (length(input$site_type_1) > 0) {    
-                        # get CalEPA sites data from the geoserver api
-                            # get the coordinates of the simplified rb boundary containing the selected city and convert to geojson
-                                rb_boundary_simplify_geojson <- rb_boundary_simplify() %>% sf_geojson()
-                            # extract coordinates
-                                rb_boundary_coordinates <- rb_boundary_simplify_geojson %>%
-                                    str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
-                                            end = nchar(rb_boundary_simplify_geojson)-7)
-                            # format the coordinates for the api
-                                rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\],\\[', replacement = '|')
-                                rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = ',', replacement = '%20')
-                                rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\|', replacement = ',%20')
-                            # construct and make the api call
-                                calepa_sites_typenames <- list('CIWQS' = 'calepa:mv_fac_from_ciwqs',
-                                                          'GeoTracker' = 'calepa:mv_fac_from_geotracker',
-                                                          'SMARTS' = 'calepa:mv_fac_from_smarts'
-                                )
-                                counter_sites <- 0
-                                for (site_type in input$site_type_1) {
-                                    counter_sites <- counter_sites + 1
-                                    # url <- calepa_sites_typenames[[site_type]]
-                                    url_sites_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
-                                                               'ows?service=WFS&version=1.0.0',
-                                                               '&request=GetFeature',
-                                                               '&typeName=', calepa_sites_typenames[[site_type]], # 'calepa:mv_fac_from_ciwqs', # calepa:mv_fac_from_geotracker # calepa:mv_fac_from_smarts
-                                                               '&outputFormat=application%2Fjson',
-                                                               '&CQL_FILTER=INTERSECTS(fac_point,POLYGON((',
-                                                               rb_boundary_coordinates,
-                                                               ')))')
-                                    api_output <- readr::read_lines(url_sites_api)
-                                    json_list <- jsonlite::fromJSON(api_output)
-                                    df_api_result <- json_list$features
-                                    df_api_result <- df_api_result %>% mutate('data_source' = site_type)
-                                    # reformat the data frame (some of it is nested)
-                                    df_api_result <- bind_cols(df_api_result %>% select(id, data_source),
-                                                               df_api_result$geometry,
-                                                               df_api_result$properties)
-                                    if (counter_sites == 1) {
-                                        cal_epa_sites <- df_api_result
-                                    } else {
-                                        cal_epa_sites <- bind_rows(cal_epa_sites, df_api_result)
-                                    }
+                        # construct and make the api call
+                            calepa_sites_typenames <- list('California Integrated Water Quality System (CIWQS)' = 'calepa:mv_fac_from_ciwqs',
+                                                           'GeoTracker' = 'calepa:mv_fac_from_geotracker',
+                                                           'Storm Water Multiple Application and Report Tracking System (SMARTS)' = 'calepa:mv_fac_from_smarts',
+                                                           'Chemical Hazards - Fire' = 'calepa:mv_fac_chem_summary_fire',
+                                                           'Chemical Hazards - Reactivity' = 'calepa:mv_fac_chem_summary_reactive',
+                                                           'Chemical Hazards - Sudden Release of Pressure' = 'calepa:mv_fac_chem_summary_sudden_rel',
+                                                           'California Environmental Reporting System (CERS)' = 'calepa:mv_fac_from_cers',
+                                                           'EnviroStor Cleanup (ENVSTORCLN)' = 'calepa:mv_fac_from_envstorcln',
+                                                           'EnviroStor Hazardous Waste (ENVSTORHAZ)' = 'calepa:mv_fac_from_envstorhaz',
+                                                           'National Emissions Inventory System (EIS)' = 'calepa:mv_fac_from_frs',
+                                                           'Toxic Release Inventory (TRI)' = 'calepa:mv_fac_from_tri'
+                            )
+                            counter_sites <- 0
+                            for (site_type in input$site_type_1) {
+                                counter_sites <- counter_sites + 1
+                                # url <- calepa_sites_typenames[[site_type]]
+                                url_sites_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
+                                                           'ows?service=WFS&version=1.0.0',
+                                                           '&request=GetFeature',
+                                                           '&typeName=', calepa_sites_typenames[[site_type]], # 'calepa:mv_fac_from_ciwqs', # calepa:mv_fac_from_geotracker # calepa:mv_fac_from_smarts
+                                                           '&outputFormat=application%2Fjson',
+                                                           '&CQL_FILTER=INTERSECTS(fac_point,POLYGON((',
+                                                           rb_boundary_coordinates,
+                                                           ')))')
+                                api_output <- readr::read_lines(url_sites_api)
+                                json_list <- jsonlite::fromJSON(api_output)
+                                df_api_result <- json_list$features
+                                df_api_result <- df_api_result %>% mutate('data_source' = site_type)
+                                # reformat the data frame (some of it is nested)
+                                df_api_result <- bind_cols(df_api_result %>% select(id, data_source),
+                                                           df_api_result$geometry,
+                                                           df_api_result$properties)
+                                if (counter_sites == 1) {
+                                    cal_epa_sites <- df_api_result
+                                } else {
+                                    cal_epa_sites <- bind_rows(cal_epa_sites, df_api_result)
                                 }
-                            # get the violation and enforcement record counts and join to the sites data frame
-                                violations_count <- read_rds("data_prepared/cal_epa_sites_violations_count.RDS")
-                                enforcement_count <- read_rds("data_prepared/cal_epa_sites_enforcement_count.RDS")
-                                # join the violation and enforcement record counts to the sites data frame
-                                    cal_epa_sites <- cal_epa_sites %>% left_join(violations_count, by = c('site_id' = 'SiteID'))
-                                    cal_epa_sites <- cal_epa_sites %>% left_join(enforcement_count, by = c('site_id' = 'SiteID'))
-                                    # replace NAs with zeros for the counts
-                                        cal_epa_sites <- cal_epa_sites %>% mutate(violations_records = case_when(is.na(violations_records) ~ 0L,
-                                                                                                               TRUE ~ violations_records),
-                                                                                  enforcement_records = case_when(is.na(enforcement_records) ~ 0L,
-                                                                                                               TRUE ~ enforcement_records))
-                            # Create an sf object from the sites data
-                                cal_epa_sites <- st_as_sf(cal_epa_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
-                                                          coords = c('longitude', 'latitude'),
-                                                          crs = 4326,
-                                                          agr = 'constant')
-                            # # filter for sites in the region containing the selected city -- now done in the API call
-                            #     sites_filter <- st_intersects(x = cal_epa_sites,
-                            #                                   y = rb_boundary(),
-                            #                                   sparse = FALSE)
-                            #     cal_epa_sites <- cal_epa_sites[sites_filter, ]
-                            # return the object
-                                return(cal_epa_sites)
-                        }
-                })
-                
+                            }
+                        # get the violation and enforcement record counts and join to the sites data frame
+                            violations_count <- read_rds("data_prepared/cal_epa_sites_violations_count.RDS")
+                            enforcement_count <- read_rds("data_prepared/cal_epa_sites_enforcement_count.RDS")
+                            # join the violation and enforcement record counts to the sites data frame
+                                cal_epa_sites <- cal_epa_sites %>% left_join(violations_count, by = c('site_id' = 'SiteID'))
+                                cal_epa_sites <- cal_epa_sites %>% left_join(enforcement_count, by = c('site_id' = 'SiteID'))
+                                # replace NAs with zeros for the counts
+                                    cal_epa_sites <- cal_epa_sites %>% mutate(violations_records = case_when(is.na(violations_records) ~ 0L,
+                                                                                                           TRUE ~ violations_records),
+                                                                              enforcement_records = case_when(is.na(enforcement_records) ~ 0L,
+                                                                                                           TRUE ~ enforcement_records))
+                        # Create an sf object from the sites data
+                            cal_epa_sites <- st_as_sf(cal_epa_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
+                                                      coords = c('longitude', 'latitude'),
+                                                      crs = 4326,
+                                                      agr = 'constant')
+                        # # filter for sites in the region containing the selected city -- now done in the API call
+                        #     sites_filter <- st_intersects(x = cal_epa_sites,
+                        #                                   y = rb_boundary(),
+                        #                                   sparse = FALSE)
+                        #     cal_epa_sites <- cal_epa_sites[sites_filter, ]
+                        # return the object
+                            return(cal_epa_sites)
+                    }
+            })
+        
+        # create a dynamic input for program type
+            output$program_type_1 <- renderUI({
+                selectInput(inputId = 'program_type_1',
+                            label = 'Filter CalEPA Regulated Sites By Program Type:',
+                            multiple = TRUE,
+                            choices = if (length(input$site_type_1) > 0) {
+                                program_types %>% 
+                                    filter(SiteID %in% cal_epa_sites()$site_id) %>% 
+                                    select(EI_Description) %>% 
+                                    pull(EI_Description)
+                            } else {
+                                NULL
+                            }
+                )
+            })
+
     # MAP 1 -----------------------------------------------------------------------------------------------------------------#
     output$map1 <- renderLeaflet({
         # get the bounds of the redline polygons for the selected city
@@ -575,6 +636,11 @@ server <- function(input, output) {
                         if ('Enforcement Actions' %in% input$show_violations_enforcement) {
                             cal_epa_sites <- cal_epa_sites %>% filter(enforcement_records > 0)
                         }
+                    # if program type filters are selected, filter for the selected program types
+                        if (!is.null(input$program_type_1)) {
+                            program_types_filter <- program_types %>% filter(EI_Description %in% input$program_type_1)
+                            cal_epa_sites <- cal_epa_sites %>% filter(site_id %in% program_types_filter$SiteID)
+                        }
                     leafletProxy('map1') %>%
                         clearGroup('CalEPA Regulated Sites') %>% 
                         addCircleMarkers(data = cal_epa_sites,
@@ -597,6 +663,9 @@ server <- function(input, output) {
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcement_records # chr(149),
                                          ),
                                          group = 'CalEPA Regulated Sites') 
+                } else {
+                    leafletProxy('map1') %>%
+                        clearGroup('CalEPA Regulated Sites')
                 }
             })
             
