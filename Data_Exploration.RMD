@@ -1,0 +1,54 @@
+---
+title: "Untitled"
+author: "Dave"
+date: "2/7/2020"
+output: html_document
+# output: 
+#   html_document:  
+#     code_folding: hide
+#     toc: TRUE
+#     toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## Load Packages and Data
+Load the data into R.
+
+```{r load libraries}
+    # General data analysis and transformation
+        library(readr)
+        library(readxl)
+        library(dplyr)
+        library(janitor)
+        # library(gtools)
+        library(stringr)
+    # API-related
+        library(jsonlite)
+        library(urltools)
+    # Mapping and GIS operations
+        library(sf)
+        library(leaflet)
+        library(htmlwidgets)
+        library(geojsonsf)
+        library(rmapshaper)
+    # workflow
+        library(here)
+        
+```
+
+```{r load data}
+    # Redline Polygons
+        redline_polygons <- read_rds(here('data_prepared', 'redline_polygons.RDS'))
+            st_crs(redline_polygons)
+
+    # CES 3 Polygons
+        ces_3_poly <- read_sf(here('data_raw', 'CalEnviroScreen3', 'CESJune2018Update_SHP','CES3June2018Update.shp'))
+            st_crs(ces_3_poly)
+            
+    # Transform both to UTM Zone 10N
+        redline_polygons <- redline_polygons %>% st_transform(crs = 26910)
+        ces_3_poly <- ces_3_poly %>% st_transform(crs = 26910)
+```

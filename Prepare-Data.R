@@ -61,6 +61,8 @@
                                                                          city == 'SanJose' ~ 'San Jose',
                                                                          TRUE ~ city))
         redline_polygons <- st_as_sf(redline_polygons)
+        st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]])
+        
     # save to RDS file
         saveRDS(object = redline_polygons, file = 'data_prepared/redline_polygons.RDS')
 
