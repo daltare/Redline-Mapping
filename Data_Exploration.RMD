@@ -1,23 +1,24 @@
 ---
-title: "Untitled"
-author: "Dave"
-date: "2/7/2020"
-output: html_document
-# output: 
-#   html_document:  
-#     code_folding: hide
-#     toc: TRUE
-#     toc_float: TRUE
+title: "Redlining Analysis"
+# author: "David"
+date: "*Updated: `r format(Sys.Date())`*"
+# output: html_document
+output:
+  html_document:
+    code_folding: hide
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 5
 ---
+## Introduction
+This document attempts to do some quantitative geospatial analysis to look at correlations between redline mapping and indicators of water quality, public health, and facility information.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```{r setup, include=FALSE, echo=FALSE}
+    knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error = FALSE)
 ```
 
-## Load Packages and Data
-Load the data into R.
 
-```{r load libraries}
+```{r load packages and data}
     # General data analysis and transformation
         library(readr)
         library(readxl)
@@ -25,6 +26,7 @@ Load the data into R.
         library(janitor)
         # library(gtools)
         library(stringr)
+        library(units)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -34,21 +36,292 @@ Load the data into R.
         library(htmlwidgets)
         library(geojsonsf)
         library(rmapshaper)
+        library(tmap)
+        library(tmaptools)
+        library(ceramic)
     # workflow
         library(here)
-        
-```
+    # plotting
+        library(ggplot2)
+        library(forcats)
 
-```{r load data}
-    # Redline Polygons
-        redline_polygons <- read_rds(here('data_prepared', 'redline_polygons.RDS'))
-            st_crs(redline_polygons)
-
-    # CES 3 Polygons
-        ces_3_poly <- read_sf(here('data_raw', 'CalEnviroScreen3', 'CESJune2018Update_SHP','CES3June2018Update.shp'))
-            st_crs(ces_3_poly)
+    # load data
+        # Redline Polygons
+            redline_polygons <- read_rds(here('data_prepared', 'redline_polygons.RDS'))
+                # st_crs(redline_polygons) # to check the reference system
+    
+        # CES 3 Polygons
+            ces_3_poly <- read_sf(here('data_raw', 'CalEnviroScreen3', 'CESJune2018Update_SHP','CES3June2018Update.shp'))
+                # st_crs(ces_3_poly) # to check the reference system
+                
+        # Transform both to UTM Zone 10N
+            redline_polygons <- redline_polygons %>% st_transform(crs = 26910)
+            ces_3_poly <- ces_3_poly %>% st_transform(crs = 26910)
             
-    # Transform both to UTM Zone 10N
-        redline_polygons <- redline_polygons %>% st_transform(crs = 26910)
-        ces_3_poly <- ces_3_poly %>% st_transform(crs = 26910)
+    # create a map to check that the data loaded correctly
+        # tm_shape(ces_3_poly) + tm_borders() + tm_shape(redline_polygons) + tm_borders(col = 'red')
 ```
+
+
+## Area Weighted Average CES Percentiles
+This looks at the area weighed average CES percentile by HOLC rating for a given city and statewide.  
+  
+The CES polygons and the Redline polygons have different coverages, as shown in the figure below. The left pane shows the HOLC rated areas, the center pane shows the CES scores (at the census tract level) with the Redlined areas superimposed on top, and the right pane shows the overlapping portions of the CES polygons and the redlined areas (labels represent HOLC rating).
+```{r CES3-Redline Intersection in Sacramento, fig.cap='**Figure 1. HOLC rated areas and CES Scores in Sacramento.**'}
+    # get a basemap (See: https://github.com/mtennekes/tmap/issues/185)
+        Sys.setenv(MAPBOX_API_KEY = "pk.eyJ1IjoiZGFsdGFyZSIsImEiOiJjazZqcm5ocHgwMG84M2tteGc5eWd4YXNmIn0.nHiYenoq-wFWwH3V4vtPXA")
+        background <- cc_location(ces_3_poly %>% filter(City == 'Sacramento'), verbose = FALSE)
+        
+    # create map
+        map_redline <- tm_shape(background) + 
+            tm_rgb(alpha = 0.5) + 
+            tm_shape(redline_polygons %>% filter(city == 'Sacramento'), is.master = TRUE) + 
+            tm_polygons('holc_grade', palette = c('green', 'blue', 'yellow', 'red'), title = 'HOLC Grade') + 
+            tm_layout(legend.bg.color = 'white', legend.bg.alpha = 0.7, legend.frame = TRUE)
+        # map_redline
+
+    # get the intersection of the CES polygons and redline polygons
+        ces3_redline_intersection <- st_intersection(ces_3_poly, redline_polygons)
+
+    # inspect
+        # glimpse(ces3_redline_intersection)
+
+    # plot the CES polygons
+        map_ces <- tm_shape(background) + 
+            tm_rgb(alpha = 0.5) + 
+            tm_shape(ces_3_poly %>% filter(City == 'Sacramento' | City == 'West Sacramento')) + 
+            tm_polygons(col = 'CIscoreP', title = 'CES Percentile', border.alpha = 1) + 
+            tm_shape(ces3_redline_intersection %>% filter(city == 'Sacramento'), is.master = TRUE) +
+            tm_borders(lwd = 0, alpha = 0) +
+            tm_shape(redline_polygons %>% filter(city == 'Sacramento')) +
+            tm_borders(lwd = 2, col = 'black') +
+            # tm_text('holc_grade', size = 0.5) + 
+            tm_layout(legend.bg.color = 'white', legend.bg.alpha = 0.7, legend.frame = TRUE)
+        # map_ces
+    
+    # plot the overlap
+        map_overlap <- tm_shape(background) + 
+            tm_rgb(alpha = 0.5) + 
+            tm_shape(ces_3_poly %>% filter(City == 'Sacramento')) + 
+            tm_borders(lwd = 1) + 
+            tm_shape(ces3_redline_intersection %>% filter(city == 'Sacramento'), is.master = TRUE) + 
+            tm_polygons(col = 'CIscoreP', title = 'CES Percentile', border.alpha = 0) + 
+            tm_shape(redline_polygons %>% filter(city == 'Sacramento')) + 
+            tm_borders(lwd = 2, col = 'black') + 
+            tm_text('holc_grade', size = 0.5) + 
+            tm_layout(legend.bg.color = 'white', legend.bg.alpha = 0.7, legend.frame = TRUE)
+        #map_overlap
+        
+        tmap_arrange(map_redline, map_ces, map_overlap, nrow = 1)
+```
+
+To better see the CES scores by HOLC grade, try separating the HOLC grades into separate panes.
+```{r facet plot, fig.cap='**Figure 2. CES Scores for Redlined Areas in Sacramento, by HOLC rating class.**'}
+    # map
+        map_facets <- tm_shape(ces_3_poly %>% filter(City == 'Sacramento')) + 
+            tm_borders(lwd = 1) + 
+            tm_shape(background) + 
+            tm_rgb(alpha = 0.5) +
+            tm_shape(ces3_redline_intersection %>% filter(city == 'Sacramento'), is.master = TRUE) +
+            # tm_shape(ces3_redline_intersection %>% filter(city == 'Sacramento')) + 
+            tm_facets(by = 'holc_grade', free.coords = FALSE) + 
+            tm_polygons(col = 'CIscoreP', title = 'CES Percentile', border.alpha = 0) #+ 
+            # tm_shape(redline_polygons %>% filter(city == 'Sacramento')) + tm_facets(by = 'holc_grade') +
+            # tm_borders(lwd = 2, col = 'black')  +
+            # tm_text('holc_grade', size = 0.5) +
+            #tm_legend(bg.color= 'white', frame = TRUE)
+        
+        map_facets
+
+
+# tm_facets(by="province")
+```
+
+### Area Weighted Averages By City
+Compute the area weighted average scores by HOLC grade for each city.
+```{r Area Weighed Average By City}
+    # add the area of each polygon to the data frame
+        ces3_redline_intersection <- ces3_redline_intersection %>% mutate(area = st_area(.))
+            # glimpse(ces3_redline_intersection)
+        
+    # group by city and holc rating, then compute the weighted average score for each
+        ces3_redline_grouped <- ces3_redline_intersection %>% 
+            st_drop_geometry() %>%
+            mutate(area_x_score = area * CIscoreP) %>% 
+            group_by(city, holc_grade) %>% 
+            summarize(total_area = sum(area), area_x_score_total = sum(area_x_score)) %>% 
+            mutate(weighted_score = area_x_score_total / total_area) %>% 
+            drop_units()
+            
+            # glimpse(ces3_redline_grouped)
+            
+    # plot the results by city and holc rating
+        g_city <- ggplot(ces3_redline_grouped) + 
+            aes(x = fct_reorder(city, weighted_score), y = weighted_score, fill = fct_rev(holc_grade)) + 
+            geom_bar(stat = 'identity', position = 'dodge') + 
+            scale_fill_manual(values = rev(c('green', 'blue', 'yellow', 'red'))) + 
+            guides(fill = guide_legend(reverse = TRUE)) +
+            labs(fill = 'HOLC Rating', x = NULL, y = "Area Weighted Average Score By City") + 
+            coord_flip()
+        g_city
+        
+    # # plot the results by city and holc rating -- faceting
+    #     g_city <- ggplot(ces3_redline_grouped) + 
+    #         aes(x = fct_reorder(city, weighted_score), y = weighted_score, fill = fct_rev(holc_grade)) + 
+    #         geom_bar(stat = 'identity', position = 'dodge') + 
+    #         scale_fill_manual(values = rev(c('green', 'blue', 'yellow', 'red'))) + 
+    #         guides(fill = guide_legend(reverse = TRUE)) +
+    #         labs(fill = 'HOLC Rating', x = NULL, y = "Area Weighted Average Score By City") + 
+    #         coord_flip()
+    #         
+    #     g_city
+        
+        
+
+```
+
+
+### Statewide Area Weighted Averages
+Compute the statewide area weighted average by HOLC grade.
+```{r Statewide Area Weighed Average, fig.height=1.5}
+    # compute weighted average score for all redlined areas statewide by holc rating
+        ces3_redline_grouped_statewide <- ces3_redline_grouped %>% 
+            group_by(holc_grade) %>% 
+            summarize(statewide_area = sum(total_area), 
+                      statewide_area_x_score = sum(area_x_score_total)) %>% 
+            mutate(statewide_weighted_score = statewide_area_x_score / statewide_area) %>% 
+            drop_units()
+        
+        # glimpse(ces3_redline_grouped_statewide)
+        
+    # plot the statewide results by holc rating
+        g_statewide <- ggplot(ces3_redline_grouped_statewide) + 
+            aes(x = fct_rev(holc_grade), y = statewide_weighted_score, fill = holc_grade) + 
+            geom_bar(stat = 'identity') + ylim(0,100) +
+            scale_fill_manual(values = c('green', 'blue', 'yellow', 'red')) + 
+            labs(fill = 'HOLC Rating', x = 'Statewide', y = "Area Weighted Average Score") + 
+            theme(axis.title.y = element_text(angle = 0, vjust = 0.5, hjust = 0), 
+                  axis.text.y = element_blank(), 
+                  axis.ticks.y = element_blank()) +
+            coord_flip()
+        g_statewide
+```
+
+```{r city plus statewide, eval=FALSE, include=FALSE, }
+    # ces3_redline_grouped_both <- ces3_redline_grouped %>% 
+    #         group_by(holc_grade) %>% 
+    #         summarize(total_area = sum(total_area), 
+    #                   area_x_score_total = sum(area_x_score_total)) %>% 
+    #         mutate(weighted_score = area_x_score_total / total_area) %>% 
+    #         mutate(city = '**Statewide**') %>% 
+    #         drop_units()
+    # 
+    # ces3_redline_grouped_both <- bind_rows(ces3_redline_grouped, ces3_redline_grouped_both)
+    # 
+    # # plot the results by city and holc rating, and include statewide summary
+    #     g_both <- ggplot(ces3_redline_grouped_both) + 
+    #         aes(x = fct_relevel(fct_reorder(city, weighted_score), c('**Statewide**'), after = 0), y = weighted_score, fill = fct_rev(holc_grade)) + 
+    #         geom_bar(stat = 'identity', position = 'dodge') + 
+    #         scale_fill_manual(values = rev(c('green', 'blue', 'yellow', 'red'))) + 
+    #         guides(fill = guide_legend(reverse = TRUE)) +
+    #         labs(fill = 'HOLC Rating', x = NULL, y = "Area Weighted Average Score By City") + 
+    #         coord_flip()
+    #         
+    #     g_both
+```
+
+## Facility Density and Violation Rates
+Compute the density of regulated facilities by HOLC grade for each city and statewide.
+```{r}
+    # import data
+        facilities_programs <- read_rds(here('data_prepared', 'cal_epa_sites_programs.RDS'))
+        violations_count <- read_rds(here('data_prepared', 'cal_epa_sites_violations_count.RDS'))
+        enforcement_count <- read_rds(here('data_prepared', 'cal_epa_sites_enforcement_count.RDS'))
+
+    # get CalEPA sites data from the geoserver api
+        # construct and make the api call
+            calepa_sites_typenames <- list('California Integrated Water Quality System (CIWQS)' = 'calepa:mv_fac_from_ciwqs',
+                                           'GeoTracker' = 'calepa:mv_fac_from_geotracker',
+                                           'Storm Water Multiple Application and Report Tracking System (SMARTS)' = 'calepa:mv_fac_from_smarts',
+                                           'Chemical Hazards - Fire' = 'calepa:mv_fac_chem_summary_fire',
+                                           'Chemical Hazards - Reactivity' = 'calepa:mv_fac_chem_summary_reactive',
+                                           'Chemical Hazards - Sudden Release of Pressure' = 'calepa:mv_fac_chem_summary_sudden_rel',
+                                           'California Environmental Reporting System (CERS)' = 'calepa:mv_fac_from_cers',
+                                           'EnviroStor Cleanup (ENVSTORCLN)' = 'calepa:mv_fac_from_envstorcln',
+                                           'EnviroStor Hazardous Waste (ENVSTORHAZ)' = 'calepa:mv_fac_from_envstorhaz',
+                                           'National Emissions Inventory System (EIS)' = 'calepa:mv_fac_from_frs',
+                                           'Toxic Release Inventory (TRI)' = 'calepa:mv_fac_from_tri'
+                                           )
+            site_types_get <- c('California Integrated Water Quality System (CIWQS)', 'GeoTracker', 'Storm Water Multiple Application and Report Tracking System (SMARTS)')
+            counter_sites <- 0
+            for (site_type in site_types_get) {
+                counter_sites <- counter_sites + 1
+                url_sites_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
+                                           'ows?service=WFS&version=1.0.0',
+                                           '&request=GetFeature',
+                                           '&typeName=', calepa_sites_typenames[[site_type]],
+                                           '&outputFormat=application%2Fjson')
+    
+                api_output <- readr::read_lines(url_sites_api)
+                json_list <- jsonlite::fromJSON(api_output)
+                df_api_result <- json_list$features
+                df_api_result <- df_api_result %>% mutate('data_source' = site_type)
+                # reformat the data frame (some of it is nested)
+                    df_api_result <- bind_cols(df_api_result %>% select(id, data_source),
+                                               df_api_result$geometry,
+                                               df_api_result$properties)
+                if (counter_sites == 1) {
+                    cal_epa_sites <- df_api_result
+                } else {
+                    cal_epa_sites <- bind_rows(cal_epa_sites, df_api_result)
+                }
+            }
+            
+            # join the violation and enforcement record counts to the sites data frame
+                cal_epa_sites <- cal_epa_sites %>% left_join(violations_count, by = c('site_id' = 'SiteID'))
+                cal_epa_sites <- cal_epa_sites %>% left_join(enforcement_count, by = c('site_id' = 'SiteID'))
+            # replace NAs with zeros for the counts
+                cal_epa_sites <- cal_epa_sites %>% mutate(violations_records = case_when(is.na(violations_records) ~ 0L,
+                                                                                       TRUE ~ violations_records),
+                                                          enforcement_records = case_when(is.na(enforcement_records) ~ 0L,
+                                                                                       TRUE ~ enforcement_records))
+            # Create an sf object from the sites data
+                cal_epa_sites <- st_as_sf(cal_epa_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
+                                          coords = c('longitude', 'latitude'),
+                                          crs = 4326,
+                                          agr = 'constant')
+            # Transform to UTM Zone 10N
+                cal_epa_sites <- cal_epa_sites %>% st_transform(crs = 26910) 
+                
+            # shorten the 'data_source' field
+                cal_epa_sites <- cal_epa_sites %>% 
+                    mutate(data_source = case_when(data_source == 'California Integrated Water Quality System (CIWQS)' ~ 'CIWQS',
+                                                   data_source == 'GeoTracker' ~ 'GeoTracker',
+                                                   data_source == 'Storm Water Multiple Application and Report Tracking System (SMARTS)' ~ 'SMARTS',
+                                                   TRUE ~ data_source))
+                
+            # map sacramento
+                tm_shape(ces3_redline_intersection %>% filter(city == 'Sacramento'), is.master = TRUE) +
+                    tm_borders() +
+                    tm_shape(cal_epa_sites %>% filter(city == 'SACRAMENTO')) + 
+                    # tm_dots(col = 'data_source', size = 0.2, pal = 'viridis', border.col = 'black', border.lwd = 1) + 
+                    tm_symbols(col = 'data_source', size = 0.2, border.col = 'black', border.lwd = 1, alpha = 1, pal = 'viridis') +
+                    # pal = scales::hue_pal()(3)) +
+                    # c('red', 'green', 'blue')) + 
+                    tm_layout(legend.bg.color = 'white', legend.bg.alpha = 0.9, legend.frame = TRUE)
+                
+            # filter for sites within a redline polygon
+                cal_epa_sites_int <- st_intersection(cal_epa_sites, redline_polygons)
+                # plot
+                tm_shape(ces3_redline_intersection %>% filter(city == 'Sacramento'), is.master = TRUE) +
+                    tm_borders() +
+                    tm_shape(cal_epa_sites_int %>% filter(city == 'SACRAMENTO')) + 
+                    # tm_dots(col = 'data_source', size = 0.2, pal = 'viridis', border.col = 'black', border.lwd = 1) + 
+                    tm_symbols(col = 'data_source', size = 0.2, border.col = 'black', border.lwd = 1, alpha = 1, pal = 'viridis') +
+                    # pal = scales::hue_pal()(3)) +
+                    # c('red', 'green', 'blue')) + 
+                    tm_layout(legend.bg.color = 'white', legend.bg.alpha = 0.9, legend.frame = TRUE)
+
+            
+```
+
