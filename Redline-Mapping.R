@@ -17,8 +17,8 @@
         library(htmlwidgets)
         library(geojsonsf)
         library(rmapshaper)
-        
-        
+
+
 # Read data into R ------------------------------------------------------------------------------------------------------------------
     # Redline Polygons
         redline_polygons <- read_rds('data_prepared/redline_polygons.RDS')
@@ -172,10 +172,17 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                        ' and the ', 
                        tags$a(href = 'https://shiny.rstudio.com/',
                               'Shiny'),
-                       ' R package. Source code is available here: '),
-                     tags$li(tags$a(href = 'https://github.com/daltare/Redline-Mapping',
-                                    'Github Site')
-                     )
+                       ' R package. Source code is available on the GitHub site here: ',
+                     tags$a(href = 'https://github.com/daltare/Redline-Mapping',
+                                    'https://github.com/daltare/Redline-Mapping')),
+                 #br(),
+                 # Contact Information
+                 h3('Contact Information'),
+                 p('If you have any questions or comments about the application, please contact David Altare at: ', 
+                   tags$a(href = 'mailto:david.altare@waterboards.ca.gov',
+                                    'david.altare@waterboards.ca.gov')),
+                 p('You can also report any bugs in the application by submitting an issue on the GitHub site (please also 
+                   send an email message to be sure we see the issue).')
         )
 )
 
