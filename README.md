@@ -4,6 +4,7 @@ NOTE: the raw datasets used to develop inputs to this application are in the `da
 
 For more information on the history around Redline mapping and other studies of its effects, see:
 - [Mapping Inequality: Redlining in New Deal America (University of Richmond)](https://dsl.richmond.edu/panorama/redlining/#text=intro)
+- [Interactive Redlining Map Zooms In On America's History Of Discrimination (NPR)](https://www.npr.org/sections/thetwo-way/2016/10/19/498536077/interactive-redlining-map-zooms-in-on-americas-history-of-discrimination)
 - [How Redlining’s Racist Effects Lasted for Decades (New York Times)](https://www.nytimes.com/2017/08/24/upshot/how-redlinings-racist-effects-lasted-for-decades.html)
 - [The Effects of the 1930s HOLC “Redlining” Maps (Federal Reserve Bank of Chicago)](https://www.chicagofed.org/publications/working-papers/2017/wp2017-12)
 - [Redlining was banned 50 years ago. It’s still hurting minorities today. (Washington Post)](https://www.washingtonpost.com/news/wonk/wp/2018/03/28/redlining-was-banned-50-years-ago-its-still-hurting-minorities-today/)

@@ -106,10 +106,11 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                 mainPanel(
                   fluidRow(
                       column(6, 
-                             tags$h4('Environmental / Public Health Indicators & Regulated Facilities:'), 
+                             #tags$h4('Environmental / Public Health Indicators & Regulated Facilities:'),
+                             tags$h4('CalEPA Data:'),
                              leafletOutput(outputId = 'map1', height = 800)),
                       column(6, 
-                             tags$h4('Redline Map:'),
+                             tags$h4('Redlined Areas:'),
                              leafletOutput(outputId = 'map2', height = 800))
                       )
                 )
@@ -125,6 +126,11 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                     'Mapping Inequality: Redlining in New Deal America'), 
                              '(University of Richmond)',
                      ),
+                     tags$li(tags$a(href = 'https://www.npr.org/sections/thetwo-way/2016/10/19/498536077/interactive-redlining-map-zooms-in-on-americas-history-of-discrimination',
+                                    "Interactive Redlining Map Zooms In On America's History Of Discrimination"), 
+                             '(NPR)',
+                     ),
+                    
                      tags$li(tags$a(href = 'https://www.nytimes.com/2017/08/24/upshot/how-redlinings-racist-effects-lasted-for-decades.html',
                                     'How Redlining’s Racist Effects Lasted for Decades'), 
                              '(New York Times)',
