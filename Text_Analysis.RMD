@@ -1,0 +1,561 @@
+---
+title: "Redlining Text Analysis"
+# author: "David"
+date: "Updated: `r Sys.Date()`"
+# output: html_document
+output:
+  html_document:
+    code_folding: show
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error = FALSE)
+# load libraries ----
+    library(here)
+    library(readr)
+    library(dplyr)
+    library(tidytext)
+    library(tidyr)
+    library(ggplot2)
+    library(wordcloud)
+    library(reshape2)
+    library(igraph)
+    library(ggraph)
+    library(widyr)
+```
+
+## Introduction
+tidytext instructions/example: https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html
+
+
+## Read Data
+Get data from the area description forms and combine data from several fields into one to be used in this analysis.
+```{r}
+# get data
+df_area_description_text <- read_csv(here('area-descriptions',
+                                          '_redline_combined_area-descriptions.csv'))
+
+# join the favorable and detrimental influences columns
+df_area_description_text <- df_area_description_text %>% 
+    mutate(area_description_all = paste(area_terrain,
+                                  area_favorable_influences, 
+                                  area_detrimental_influences, 
+                                  clarifying_remarks,
+                                  area_description,
+                                  sep = ' | ')) %>% 
+    select(city, holc_id, holc_grade, area_description_all)
+```
+
+## Format Data for Text Analysis
+Restructure as one-token-per-row format (i.e., one word per row), then remove some stop words and common place names.
+```{r}
+# restructure as one-token-per-row format (i.e., one word per row)
+tidy_all_influences <- df_area_description_text %>% 
+    unnest_tokens(output = word, input = area_description_all)
+
+# remove stop words and common place names
+cleaned_all_influences <- tidy_all_influences %>%
+    anti_join(get_stopwords()) %>% 
+    filter(!(word %in% c('na', 'san', 'francisco', 'los', 'angeles', 1:999999)))
+```
+
+## Analysis Part 1 - Individual Words: Counts, Sentiment Scores, and Wordclouds
+### Most Common Words
+#### Most common words by HOLC grade (top 10)
+```{r}
+# find the most common words
+top_by_grade <- cleaned_all_influences %>%
+    group_by(holc_grade) %>% 
+    count(word) %>% 
+    top_n(10, n)
+top_by_grade
+```
+
+
+### Sentiment Scores
+#### Most common positive words by HOLC grade (top 5)
+```{r}
+# most common positive words
+positive <- get_sentiments("bing") %>%
+    filter(sentiment == "positive")
+
+top_positive_by_grade <- tidy_all_influences %>%
+    semi_join(positive) %>%
+    group_by(holc_grade) %>%
+    count(word) %>% 
+    top_n(5, n)
+top_positive_by_grade
+```
+
+#### Most common negative words by HOLC grade (top 5)
+```{r}
+# most common negative words
+negative <- get_sentiments("bing") %>%
+    filter(sentiment == "negative")
+
+top_negative_by_grade <- tidy_all_influences %>%
+    semi_join(negative) %>%
+    group_by(holc_grade) %>%
+    count(word) %>% 
+    top_n(5, n)
+top_negative_by_grade
+```
+
+#### Overall positive and negative word summary
+```{r}
+bing <- get_sentiments("bing")
+
+# Most common positive and negative words
+bing_word_counts <- tidy_all_influences %>%
+    inner_join(bing) %>%
+    count(word, sentiment, sort = TRUE)
+
+bing_word_counts
+
+bing_word_counts %>%
+    filter(n > 50) %>%
+    mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+    mutate(word = reorder(word, n)) %>%
+    ggplot(aes(word, n, fill = sentiment)) +
+    geom_col() +
+    coord_flip() +
+    labs(y = "Contribution to sentiment (count)")
+```
+
+#### Sentiment by HOLC and city
+Find a sentiment score for each word, then count the number of positive and negative words by HOLC grade and city
+```{r}
+# examine how sentiment changes - find a sentiment score for each word using the same lexicon, then count the number of positive and negative words in defined groups
+
+holc_sentiment <- tidy_all_influences %>%
+    inner_join(bing) %>%
+    count(city, holc_grade, sentiment) %>%
+    spread(sentiment, n, fill = 0) %>%
+    mutate(sentiment = (positive) / (positive + negative))
+
+
+ggplot(holc_sentiment, aes(holc_grade, sentiment, fill = holc_grade)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    facet_wrap(~city, ncol = 2, scales = "free_x")
+```
+
+
+
+### Wordclouds
+#### Basic wordcloud
+```{r}
+# wordcloud
+cleaned_all_influences %>%
+    count(word) %>%
+    with(wordcloud(word, n, max.words = 100))
+```
+
+#### Wordcloud with sentiment
+```{r}
+# wordcloud with sentiment
+tidy_all_influences %>%
+    inner_join(bing) %>%
+    count(word, sentiment, sort = TRUE) %>%
+    acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+    comparison.cloud(colors = c("#F8766D", "#00BFC4"),
+                     max.words = 100)
+```
+
+
+```{r}
+# alternate grouping - just shows number of HOLC polygons by city
+# tidy_types <- df_area_description_text %>%
+#     unnest_tokens(output = text, input = area_description_all, token = 'paragraphs') %>%
+#     ungroup()
+# 
+# tidy_types %>% 
+#     group_by(city) %>% 
+#     summarise(count = n())
+```
+
+### Most Negative HOLC Grade by City
+Most negative holc grades by city, measured by ratio of negative words to total words
+```{r}
+# most negative holc grades by city (ratio of negative words to total words)
+bingnegative <- get_sentiments("bing") %>%
+    filter(sentiment == "negative")
+
+wordcounts <- tidy_all_influences %>%
+    group_by(city, holc_grade) %>%
+    summarize(words = n())
+
+tidy_all_influences %>%
+    semi_join(bingnegative) %>%
+    group_by(city, holc_grade) %>%
+    summarize(negativewords = n()) %>%
+    left_join(wordcounts, by = c("city", "holc_grade")) %>%
+    mutate(ratio = negativewords/words) %>%
+    top_n(2)
+```
+
+
+
+
+
+
+
+## Analysis Part 2 - N-grams: Network Graphs
+Groups of words appearing together.
+
+### Most common bigrams (top 10)
+```{r}
+## PART 2 ------------------------------
+# https://www.tidytextmining.com/ngrams.html
+# tokenizing by n-gram
+all_bigrams <- df_area_description_text %>% 
+    unnest_tokens(output = bigram, input = area_description_all, token = "ngrams", n = 2)
+
+# count / filter
+all_bigrams %>%
+    count(bigram, sort = TRUE) %>% 
+    head(n = 10)
+```
+
+#### Clean up bigrams (top 10)
+```{r}
+# remove cases where either is a stop-word
+bigrams_separated <- all_bigrams %>%
+    separate(bigram, c("word1", "word2"), sep = " ")
+
+bigrams_filtered <- bigrams_separated %>%
+    filter(!word1 %in% c(stop_words$word, 'na', 'san', 'francisco', 'los', 'angeles', 1:999999)) %>%
+    filter(!word2 %in% c(stop_words$word, 'na', 'san', 'francisco', 'los', 'angeles', 1:999999))
+
+# new bigram counts:
+bigram_counts <- bigrams_filtered %>% 
+    count(word1, word2, sort = TRUE)
+bigram_counts %>% head(n = 10)
+```
+
+#### Unite the bigrams and add HOLC ID info
+```{r}
+# unite
+bigrams_united <- bigrams_filtered %>%
+    unite(bigram, word1, word2, sep = " ")
+bigrams_united %>% head(n = 10)
+```
+
+### Trigrams
+10 most common tri-grams
+```{r}
+# trigrams
+df_area_description_text %>% 
+    select(city, holc_id, holc_grade, area_description_all) %>%
+    unnest_tokens(output = trigram, input = area_description_all, token = "ngrams", n = 3) %>% 
+    separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+    filter(!word1 %in% c(stop_words$word, 'na', 'san', 'francisco'),
+           !word2 %in% c(stop_words$word, 'na', 'san', 'francisco'),
+           !word3 %in% c(stop_words$word, 'na', 'san', 'francisco')) %>%
+    count(word1, word2, word3, sort = TRUE) %>% 
+    head(n = 10)
+
+```
+
+### TF IDF?
+```{r}
+# analyze bigrams
+    bigram_tf_idf <- bigrams_united %>%
+        count(holc_grade, bigram) %>%
+        bind_tf_idf(bigram, holc_grade, n) %>%
+        arrange(desc(tf_idf))
+    
+    bigram_tf_idf %>% 
+        head(n = 10)
+```
+
+
+### Network Graphs
+Arrange the words into a network, or "graph" (combination of connected nodes). A graph can be constructed from a tidy object since it has three variables:
+
+- from: the node an edge is coming from
+- to: the node an edge is going towards
+- weight: A numeric value associated with each edge
+
+#### Basic graph
+```{r}
+# Visualizing a network of bigrams with ggraph 
+    # filter for only relatively common combinations
+    bigram_graph <- bigram_counts %>%
+        filter(n > 20) %>%
+        graph_from_data_frame()
+
+    # make graph
+    set.seed(2017)
+    
+    ggraph(bigram_graph, layout = "fr") +
+        geom_edge_link() +
+        geom_node_point() +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1)
+```
+
+
+#### Revised graph
+```{r}
+# a few polishing operations to make a better looking graph
+    set.seed(2016)
+    
+    a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+    
+    ggraph(bigram_graph, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+#### Graphs by HOLC grade
+
+HOLC grade A
+```{r}
+# HOLC Grade A
+    bigram_graph_A <- bigrams_filtered %>% 
+        filter(holc_grade == 'A') %>% 
+        count(word1, word2, sort = TRUE) %>% 
+        filter(n > 5) %>%
+        graph_from_data_frame()
+
+# graph 
+    ggraph(bigram_graph_A, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+HOLC grade B
+```{r}
+    bigram_graph_B <- bigrams_filtered %>%
+        filter(holc_grade == 'B') %>% 
+        #filter(holc_grade == 'A' | holc_grade == 'B') %>% 
+        count(word1, word2, sort = TRUE) %>% 
+        filter(n > 5) %>%
+        graph_from_data_frame()
+# graph 
+    ggraph(bigram_graph_B, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+HOLC grade C
+```{r}
+    bigram_graph_C <- bigrams_filtered %>% 
+        filter(holc_grade == 'C') %>% 
+        count(word1, word2, sort = TRUE) %>% 
+        filter(n > 5) %>%
+        graph_from_data_frame()
+# graph 
+    ggraph(bigram_graph_C, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+HOLC grade D
+```{r}
+    bigram_graph_D <- bigrams_filtered %>% 
+        filter(holc_grade == 'D') %>% 
+        count(word1, word2, sort = TRUE) %>% 
+        filter(n > 5) %>%
+        graph_from_data_frame()
+# graph 
+    ggraph(bigram_graph_D, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+HOLC grade A and B
+```{r}
+    bigram_graph_A_B <- bigrams_filtered %>% 
+        filter(holc_grade == 'A' | holc_grade == 'B') %>% 
+        count(word1, word2, sort = TRUE) %>% 
+        filter(n > 5) %>%
+        graph_from_data_frame()
+# graph 
+    ggraph(bigram_graph_A_B, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+HOLC grade C and D
+```{r}
+    bigram_graph_C_D <- bigrams_filtered %>% 
+        filter(holc_grade == 'C' | holc_grade == 'D') %>% 
+        count(word1, word2, sort = TRUE) %>% 
+        filter(n > 5) %>%
+        graph_from_data_frame()
+# graph 
+    ggraph(bigram_graph_C_D, layout = "fr") +
+        geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                       arrow = a, end_cap = circle(.07, 'inches')) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+        theme_void()
+```
+
+
+### Count and correlate co-occuring pairs of words
+#### Most common co-occuring words (both occuring within a given HOLC ID)
+```{r}
+# Counting and correlating pairs of words within individual holc areas (summarize by grade?)
+    cleaned_all_influences <- cleaned_all_influences %>% 
+        mutate('city_id' = paste(city, holc_id, sep = '-'))
+    
+    
+    # count words co-occuring within sections
+    word_pairs <- cleaned_all_influences %>%
+        pairwise_count(word, city_id, sort = TRUE) %>% 
+        head(n = 10)
+```
+
+#### Words most often occuring with other words
+Example: oil (top 10)
+```{r}
+    # find the words that most often occur with other words
+    word_pairs %>% filter(item1 == 'oil') %>% 
+    head(n = 10)
+```
+
+Example: race (top 10)
+```{r}
+    # find the words that most often occur with other words
+    word_pairs %>% filter(item1 == 'race') %>% 
+    head(n = 10)
+```
+
+Example: infiltration (top 10)
+```{r}
+    # find the words that most often occur with other words
+    word_pairs %>% filter(item1 == 'infiltration') %>% 
+    head(n = 10)
+```
+
+### Pairwise Correlation
+Calculate correlation (ratio of co-occurence plus co-non-occurence vs overall occurence)
+#### word correlation with "racial" (showing top 10)
+```{r}
+# Pairwise correlation
+    # we need to filter for at least relatively common words first
+    word_cors <- cleaned_all_influences %>%
+        group_by(word) %>%
+        filter(n() >= 2) %>%
+        pairwise_cor(word, city_id, sort = TRUE)
+    
+    # find the words most correlated with another word using a filter operation
+    word_cors %>% filter(item1 == 'racial') %>% head(n = 10)
+```
+
+#### Correlation differences by holc grade
+
+Word correlation for HOLC grade A (top 10)
+```{r}
+word_cors_A <- cleaned_all_influences %>%
+    filter(holc_grade == 'A') %>% 
+    group_by(word) %>%
+    filter(n() >= 2) %>%
+    pairwise_cor(word, city_id, sort = TRUE) 
+word_cors_A %>% head(n = 10)
+```
+
+Word correlation for HOLC grade D (top 10)
+```{r}
+word_cors_D <- cleaned_all_influences %>%
+    filter(holc_grade == 'D') %>% 
+    group_by(word) %>%
+    filter(n() >= 2) %>%
+    pairwise_cor(word, city_id, sort = TRUE)
+word_cors_D %>% head(n = 10)
+```
+
+#### Correlations by HOLC grade for specific words
+Words correlated with "racial" for HOLC grades A and D
+```{r}
+word_cors_A %>% filter(item1 == 'racial') %>% head(n = 10)
+```
+
+```{r}
+word_cors_D %>% filter(item1 == 'racial') %>% head(n = 10)
+```
+
+Words correlated with "industry" for HOLC grades A and D
+```{r}
+word_cors_A %>% filter(item1 == 'industry') %>% head(n = 10)
+```
+
+```{r}
+word_cors_D %>% filter(item1 == 'industry') %>% head(n = 10)
+```
+
+#### Plot of correlations by HOLC grade for specific words 
+Top words correlated with "oil", "poor", "odors", and "industry".
+```{r}
+# plot
+word_cors %>%
+    filter(item1 %in% c("oil", "poor", "odors", "industry")) %>%
+    group_by(item1) %>%
+    top_n(6) %>%
+    ungroup() %>%
+    mutate(item2 = reorder(item2, correlation)) %>%
+    ggplot(aes(item2, correlation)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~ item1, scales = "free") +
+    coord_flip()
+```
+
+Top words correlated with "racial", "hazard", "proximity", and "encroachment".
+```{r}
+    word_cors %>%
+        filter(item1 %in% c("racial", "hazard", "proximity", "encroachment")) %>%
+        group_by(item1) %>%
+        top_n(6) %>%
+        ungroup() %>%
+        mutate(item2 = reorder(item2, correlation)) %>%
+        ggplot(aes(item2, correlation)) +
+        geom_bar(stat = "identity") +
+        facet_wrap(~ item1, scales = "free") +
+        coord_flip()
+```
+
+
+#### Visualize correlations and clusters of words with a graph
+Doesn't really work - dataset too big
+```{r}
+    # # visualize the correlations and clusters of words with a graph
+    # # DOESN'T REALLY WORK - DATASET TOO BIG
+    # 
+    # set.seed(2016)
+    # word_cors_20 <- cleaned_all_influences %>%
+    #     group_by(word) %>%
+    #     filter(n() >= 200) %>%
+    #     pairwise_cor(word, city_id, sort = TRUE)
+    # 
+    # word_cors_20 %>%
+    #     filter(correlation > .15) %>%
+    #     graph_from_data_frame() %>%
+    #     ggraph(layout = "fr") +
+    #     geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+    #     geom_node_point(color = "lightblue", size = 5) +
+    #     geom_node_text(aes(label = name), repel = TRUE) +
+    #     theme_void()
+```
+
