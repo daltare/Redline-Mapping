@@ -1,71 +1,71 @@
-id, name
-tract,Census Tract
-pop2010,Population (2010)
-California,California County
-ZIP,ZIP
-City,Nearby City
-Longitude,Longitude
-Latitude,Latitude
-CIscore,CES 3 Score
-CIscoreP,CES 3 Percentile
-ozone,Ozone
-ozoneP,Ozone Percentile
-pm,PM2.5
-pmP,PM 2.5 Percentile
-diesel,Diesel PM
-dieselP,Diesel PM Percentile
-drink,Drinking Water
-drinkP,Drinking Water Percentile
-pest,Pesticides
-pestP,Pesticides Percentile
-RSEIhaz,Tox Releases
-RSEIhazP,Tox Releases Percentile
-traffic,Traffic
-trafficP,Traffic Percentile
-cleanups,Cleanups
-cleanupsP,Cleanups Percentile
-gwthreats,Groundwater Threats
-gwthreatsP,GroundWater Threats Percentile
-haz,Haz Waste
-hazP,Haz Waste Percentile
-iwb,Imp Water Bodies
-iwbP,Imp Water Bodies Percentile
-swis,Solid Waste
-swisP,Solid Waste Percentile
-Pollution,Pollution Burden
-PollutionS,Pollution Burden Score
-PollutionP,Pollution Burden Percentile
-asthma,Asthma
-asthmaP,Asthma Percentile
-lbw,Low Birth Weight
-lbwP,Low Birth Weight Percentile
-cvd,Cardiovascular Disease
-cvdP,Cardiovascular Disease Percentile
-edu,Education
-eduP,Education Percentile
-ling,Linguistic Isolation
-lingP,Linguistic Isolation Percentile
-pov,Poverty
-povP,Poverty Percentile
-unemp,Unemployment
-unempP,Unemployment Percentile
-housingB,Housing Burden
-housingBP,Housing Burden Percentile
-PopChar,Population Characteristics
-PopCharSco,Population Characteristics Score
-PopCharP,Population Characteristics Percentile
-Children_u,Children < 10 (%)
-Pop_11_64_,Pop 11-64 years (%)
-Elderly_ov,Elderly > 65 (%)
-Hispanic_p,Hispanic (%)
-White_pct,White (%)
-African_Am,African American (%)
-Native_Ame,Native American (%)
-Asian_Amer,Asian American (%)
-Other_pct,Other (%)
-OBJECTID_1,OBJECTID_1
-CIdecile,CES Score decile
-CIvigintil,CES Score vigintile
-Shape_Leng,Shape_Leng
-Shape_Area,Shape_Area
-CES_3_0_Pe,CES Percentile Range
+id, name,group,subgroup,type
+tract,Census Tract,NA,NA,NA
+pop2010,Population (2010),NA,NA,NA
+California,California County,NA,NA,NA
+ZIP,ZIP,NA,NA,NA
+City,Nearby City,NA,NA,NA
+Longitude,Longitude,NA,NA,NA
+Latitude,Latitude,NA,NA,NA
+CIscore,CES 3 Score,overall,overall,score
+CIscoreP,CES 3 Percentile,overall,overall,percentile
+ozone,Ozone,pollution burden,exposures,score
+ozoneP,Ozone Percentile,pollution burden,exposures,percentile
+pm,PM2.5,pollution burden,exposures,score
+pmP,PM 2.5 Percentile,pollution burden,exposures,percentile
+diesel,Diesel PM,pollution burden,exposures,score
+dieselP,Diesel PM Percentile,pollution burden,exposures,percentile
+drink,Drinking Water,pollution burden,exposures,score
+drinkP,Drinking Water Percentile,pollution burden,exposures,percentile
+pest,Pesticides,pollution burden,exposures,score
+pestP,Pesticides Percentile,pollution burden,exposures,percentile
+RSEIhaz,Tox Releases,pollution burden,exposures,score
+RSEIhazP,Tox Releases Percentile,pollution burden,exposures,percentile
+traffic,Traffic,pollution burden,exposures,score
+trafficP,Traffic Percentile,pollution burden,exposures,percentile
+cleanups,Cleanups,pollution burden,environmental effects,score
+cleanupsP,Cleanups Percentile,pollution burden,environmental effects,percentile
+gwthreats,Groundwater Threats,pollution burden,environmental effects,score
+gwthreatsP,GroundWater Threats Percentile,pollution burden,environmental effects,percentile
+haz,Haz Waste,pollution burden,environmental effects,score
+hazP,Haz Waste Percentile,pollution burden,environmental effects,percentile
+iwb,Imp Water Bodies,pollution burden,environmental effects,score
+iwbP,Imp Water Bodies Percentile,pollution burden,environmental effects,percentile
+swis,Solid Waste,pollution burden,environmental effects,score
+swisP,Solid Waste Percentile,pollution burden,environmental effects,percentile
+Pollution,Pollution Burden,pollution burden,overall,score
+PollutionS,Pollution Burden Score,pollution burden,overall,score
+PollutionP,Pollution Burden Percentile,pollution burden,overall,percentile
+asthma,Asthma,population characteristics,sensitive populations,score
+asthmaP,Asthma Percentile,population characteristics,sensitive populations,percentile
+lbw,Low Birth Weight,population characteristics,sensitive populations,score
+lbwP,Low Birth Weight Percentile,population characteristics,sensitive populations,percentile
+cvd,Cardiovascular Disease,population characteristics,sensitive populations,score
+cvdP,Cardiovascular Disease Percentile,population characteristics,sensitive populations,percentile
+edu,Education,population characteristics,socioeconomic factors,score
+eduP,Education Percentile,population characteristics,socioeconomic factors,percentile
+ling,Linguistic Isolation,population characteristics,socioeconomic factors,score
+lingP,Linguistic Isolation Percentile,population characteristics,socioeconomic factors,percentile
+pov,Poverty,population characteristics,socioeconomic factors,score
+povP,Poverty Percentile,population characteristics,socioeconomic factors,percentile
+unemp,Unemployment,population characteristics,socioeconomic factors,score
+unempP,Unemployment Percentile,population characteristics,socioeconomic factors,percentile
+housingB,Housing Burden,population characteristics,socioeconomic factors,score
+housingBP,Housing Burden Percentile,population characteristics,socioeconomic factors,percentile
+PopChar,Population Characteristics,population characteristics,overall,score
+PopCharSco,Population Characteristics Score,population characteristics,overall,score
+PopCharP,Population Characteristics Percentile,population characteristics,overall,percentile
+Children_u,Children < 10 (%),demographic,demographic,percent
+Pop_11_64_,Pop 11-64 years (%),demographic,demographic,percent
+Elderly_ov,Elderly > 65 (%),demographic,demographic,percent
+Hispanic_p,Hispanic (%),demographic,demographic,percent
+White_pct,White (%),demographic,demographic,percent
+African_Am,African American (%),demographic,demographic,percent
+Native_Ame,Native American (%),demographic,demographic,percent
+Asian_Amer,Asian American (%),demographic,demographic,percent
+Other_pct,Other (%),demographic,demographic,percent
+OBJECTID_1,OBJECTID_1,NA,NA,NA
+CIdecile,CES Score decile,NA,NA,NA
+CIvigintil,CES Score vigintile,NA,NA,NA
+Shape_Leng,Shape_Leng,NA,NA,NA
+Shape_Area,Shape_Area,NA,NA,NA
+CES_3_0_Pe,CES Percentile Range,NA,NA,NA
