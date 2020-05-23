@@ -276,13 +276,19 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                     'CalEPA Regulatory Actions (Inspections, Violations, and Enforcement Actions)'), 
                              '(CalEPA Regulated Site Portal)'
                      ),
-                     tags$li(tags$a(href = 'https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c',
+                     tags$li(tags$a(href = 'https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc#overview',
                                     'California Drinking Water Service Areas'), 
-                             '(California State Water Resources Control Board\'s Map Services) | For web-service, use the "Service URL" link'
+                             '(California State Water Resources Control Board\'s Map Services) | For web-service, use the "Service URL" link',
+                             ' | Also available from the ' , 
+                             tags$a(href = 'https://gis.data.ca.gov/datasets/waterboards::california-drinking-water-system-area-boundaries',
+                                    'California State Geoportal')
                      ),
                      tags$li(tags$a(href = 'http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0',
                                     'California State Water Board Regional Board Office Boundaries'), 
-                             '(California State Water Resources Control Board\'s Map Services)'
+                             '(California State Water Resources Control Board\'s Map Services)', 
+                             ' | Also available from the ' , 
+                             tags$a(href = 'https://gis.data.ca.gov/datasets/waterboards::regional-board-offices',
+                                    'California State Geoportal')
                      ),
                  # Application Information
                      h3('Application Information'),
