@@ -287,7 +287,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                     'California State Water Board Regional Board Office Boundaries'), 
                              '(California State Water Resources Control Board\'s Map Services)', 
                              ' | Also available from the ' , 
-                             tags$a(href = 'https://gis.data.ca.gov/datasets/waterboards::regional-board-offices',
+                             tags$a(href = 'https://gis.data.ca.gov/datasets/waterboards::regional-board-boundaries',
                                     'California State Geoportal')
                      ),
                  # Application Information
