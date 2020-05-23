@@ -133,7 +133,7 @@
     # simplify
         ces3_poly_simplify <- ces3_poly %>% 
                 # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
-                ms_simplify(keep = 0.1, keep_shapes = TRUE, snap = TRUE)
+                ms_simplify(keep = 0.3, keep_shapes = TRUE, snap = TRUE)
         # check
             # pryr::object_size(ces3_poly_simplify)
             # pryr::object_size(ces3_poly)
