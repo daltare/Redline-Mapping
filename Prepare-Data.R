@@ -5,9 +5,15 @@
         library(dplyr)
         library(janitor)
         library(pryr)
+        library(skimr)
+        library(tidylog)
+        library(lubridate)
     # mapping and geospatial data analysis/transformation
         library(sf)
         library(rmapshaper)
+        library(geojsonsf)
+    # workflow
+        library(here)
 
 
 # Redlined cities -----------------------------------------------------------------------------------------------------------
@@ -36,14 +42,15 @@
                 temp <- tempfile()
                 download.file(url = redline_cities[[i]]$url,
                               destfile = temp)
-                unzip(zipfile = temp, exdir = paste0('./data_raw/RedlineMaps/', names(redline_cities[i])))
+                unzip(zipfile = temp, 
+                      exdir = here('data_raw', 
+                                   'Redline_Maps', 
+                                   names(redline_cities[i])))
             # read data into R
-                redline_poly_list[[i]] <- st_read(paste0('./data_raw/RedlineMaps/',
-                                                         names(redline_cities[i]),
-                                                         '/',
-                                                         'cartodb-query',
-                                                         '.shp')
-                                                  )
+                redline_poly_list[[i]] <- st_read(here('data_raw', 
+                                                       'Redline_Maps',
+                                                       names(redline_cities[i]),
+                                                       'cartodb-query.shp'))
                 redline_poly_list[[i]] <- redline_poly_list[[i]] %>% mutate('city' = names(redline_cities[i]))
         }
     # bind the redline polygons together into one data frame
@@ -61,80 +68,119 @@
                                                                          city == 'SanJose' ~ 'San Jose',
                                                                          TRUE ~ city))
         redline_polygons <- st_as_sf(redline_polygons)
-        st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]])
-        
-    # save to RDS file
-        saveRDS(object = redline_polygons, file = 'data_prepared/redline_polygons.RDS')
-
+        st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]]) # make sure the CRS is defined
+    # save to geopackage file
+        st_write(obj = redline_polygons, 
+                 here('data_prepared', 'redline_polygons.gpkg')) 
+    # simplify and save simplified version
+        # simplify
+            redline_polygons_simplify <- redline_polygons %>% 
+                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+        # save to geopackage file
+            st_write(obj = redline_polygons_simplify, 
+                     here('data_prepared', 
+                          'redline_polygons_simplified.gpkg'))
         
         
 
 # Regional Board Office Boundaries (from saved internal waterboard dataset)--------------------------------------------------
-        # NOTE: NO LONGER USED -- INSTEAD USING WATERBOARDS GIS WEB SERVICES (SEE APPLICATION SCRIPT): http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0
-        # # read data
-        #     rb_boundary <- st_read('data_raw/Regional_Board_Office_Boundaries_ModifiedR6_6A_6B/Regional_Board_Offices.shp') %>% 
-        #         st_transform(4326) 
-        # # save to RDS file
-        #     saveRDS(object = rb_boundary, file = 'data_prepared/Regional_Board_Offices.RDS')
+        # NOTE: may also use waterboards GIS web services (see application code file): http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0
+        # read data
+            url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=1=1",
+                                              "&outFields=*&outSR=4326&f=geojson") 
+            rb_boundary <- read_lines(url_rb_office_areas) %>% 
+                geojson_sf()
+            # st_crs(rb_boundary)
+        # write the raw data to geopackage file
+            st_write(obj = rb_boundary, 
+                     here('data_raw', 'RB_Office_Boundaries',
+                          'rb_office_boundaries.gpkg'))
+        # simplify
+            rb_boundary_simplify <- rb_boundary %>% 
+                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+        # save to geopackage file
+            st_write(obj = rb_boundary_simplify, 
+                     here('data_prepared', 
+                          'rb_boundary_simplified.gpkg'))
 
 
 
 
-# CalEnviroScreen -----------------------------------------------------------------------------------------------------------
-    # Source: https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30
-    # shapefile at: https://oehha.ca.gov/media/downloads/calenviroscreen/document/ces3shp.zip
-    # download the file 
+# # CalEnviroScreen -----------------------------------------------------------------------------------------------------------
+#     # Source: https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30
+#     # shapefile at: https://oehha.ca.gov/media/downloads/calenviroscreen/document/ces3shp.zip
+    # download the file
         temp <- tempfile()
         download.file(url = 'https://oehha.ca.gov/media/downloads/calenviroscreen/document/ces3shp.zip',
                       destfile = temp)
-        unzip(zipfile = temp, exdir = './data_raw/CalEnviroScreen3')
+        unzip(zipfile = temp,
+              exdir = here('data_raw',
+                           'CalEnviroScreen3'))
     # read data into R
-        ces_3_poly <- st_read('data_raw/CalEnviroScreen3/CESJune2018Update_SHP/CES3June2018Update.shp') %>% 
+        ces3_poly <- st_read(here('data_raw',
+                                   'CalEnviroScreen3',
+                                   'CESJune2018Update_SHP',
+                                   'CES3June2018Update.shp')) %>%
             st_transform(4326)
-    # fix some of the column names to make more readable
-        ces_3_names <- read_csv('data_raw/ces_names.csv') %>% # manually prepared this file to make more descriptive names for the fields
+    # revise column names
+        ces3_names <- read_csv('data_prepared/ces_names.csv') %>% # manually prepared this file to make more descriptive names for the fields
             mutate(ces_variable = make_clean_names(name, 'parsed'))
-        ces_3_names_cleaned <- c(ces_3_names %>% pull(ces_variable), 'geometry')
-        names(ces_3_poly) <- ces_3_names_cleaned
-    # save to RDS file
-        saveRDS(object = ces_3_poly, file = 'data_prepared/ces_3_poly.RDS')
-        saveRDS(object = ces_3_names, file = 'data_prepared/ces_3_names.RDS')
-    # # SIMPLIFY
-    #     ces_3_poly_simplify <- rmapshaper::ms_simplify(ces_3_poly)
-    #     # save to RDS file
-    #         saveRDS(object = ces_3_poly_simplify, file = 'data_prepared/ces_3_poly_simplify.RDS')
-
-        
-
+        ces3_names_cleaned <- c(ces3_names %>% pull(ces_variable), 'geometry')
+        names(ces3_poly) <- ces3_names_cleaned
+    # save to geopackage file
+        st_write(obj = ces3_poly, 
+                 here('data_prepared', 'ces3_poly.gpkg'))
+    # simplify
+        ces3_poly_simplify <- ces3_poly %>% 
+                # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+                ms_simplify(keep = 0.1, keep_shapes = TRUE, snap = TRUE)
+        # check
+            # pryr::object_size(ces3_poly_simplify)
+            # pryr::object_size(ces3_poly)
+            # mapview::mapview(ces3_poly_simplify %>% filter(Nearby_City == 'Sacramento'))
+    # save simplified version to geopackage file
+        st_write(obj = ces3_poly_simplify, 
+                 here('data_prepared', 'ces3_poly_simplified.gpkg'))
 
         
 # Water Supplier Service Areas ----------------------------------------------------------------------------------------------
-    # NOTE: NO LONGER USED -- INSTEAD USING WATERBOARDS GIS WEB SERVICES (SEE APPLICATION SCRIPT): https://gispublic.waterboards.ca.gov/portalserver/rest/services/Hosted/California_Drinking_Water_Service_Areas/FeatureServer/0/
-    # # File Source: https://gispublic.waterboards.ca.gov/portal/home/item.html?id=bb21fcee16ea4af2a8d57aa39447aa9c#overview
-    #     # NOTE: Followed link to 'Open in ArcGIS Desktop' and saved shapefile from there
-    # # read data
-    # service_areas <- st_read("data_raw/Service_Area_Boundaries/Service_Area_Boundaries_2019-12-13.shp") %>% 
-    #     st_transform(4326)
-    # # save to RDS file
-    #     # saveRDS(object = service_areas, file = 'data_prepared/Service_Area_Boundaries_2019-12-13.RDS')
-    # # SIMPLIFY
-    #     service_areas_simplify <- rmapshaper::ms_simplify(service_areas)
-    #     # save to RDS file
-    #         saveRDS(object = service_areas_simplify, file = 'data_prepared/service_areas_simplify.RDS')
-
+    # NOTE: may also use waterboards GIS web services (see application code file): 
+        # Available at: https://gispublic.waterboards.ca.gov/portalserver/rest/services/Drinking_Water/California_Drinking_Water_System_Area_Boundaries/FeatureServer/0/query?outFields=*&where=1%3D1
+        # See also: https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc#overview
+            # NOTE: at site above, can follow link to 'Open in ArcGIS Desktop' and save shapefile from there
+    # read data
+        service_areas_base_url <- 'https://gispublic.waterboards.ca.gov/portalserver/rest/services/Drinking_Water/California_Drinking_Water_System_Area_Boundaries/FeatureServer/0/'
+        service_areas_url <- paste0(service_areas_base_url,
+                                    'query?where=1%3D1', 
+                                    '&outFields=*',
+                                    '&outSR=4326',
+                                    '&f=geojson')
+        service_areas <- read_lines(service_areas_url) %>% geojson_sf()
+            # st_crs(service_areas)
+    # write the raw data to geopackage file
+        st_write(obj = service_areas, 
+                 here('data_raw', 'Drinking_Water_Service_Areas',
+                      'drinking_water_service_areas.gpkg'))
+    # simplify
+        service_areas_simplify <- service_areas %>% 
+            ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+    # save to geopackage file
+        st_write(obj = service_areas_simplify, 
+                 here('data_prepared', 
+                      'drinking_water_service_areas_simplified.gpkg'))
 
 
 
 # California Counties (from saved internal waterboard dataset) --------------------------------------------------------------
     # # read data into R
-    #     counties_poly <- st_read('data_raw/CA_Counties/WBGIS_Counties.shp') %>% 
+    #     counties_poly <- st_read(here('data_raw', 'CA_Counties', 'WBGIS_Counties.shp')) %>%
     #         st_transform(4326)
     # # save to RDS file
-    #     saveRDS(object = counties_poly, file = 'data_prepared/CA_Counties.RDS')
+    #     saveRDS(object = counties_poly, file = here('data_prepared', 'CA_Counties.RDS'))
     # # SIMPLIFY
     #     # counties_poly_simplify <- rmapshaper::ms_simplify(counties_poly)
     #     # save to RDS file
-    #         # saveRDS(object = counties_poly_simplify, file = 'data_prepared/CA_Counties_simplify.RDS')
+    #         # saveRDS(object = counties_poly_simplify, file = here('data_prepared', 'CA_Counties_simplify.RDS'))
 
 
 
@@ -144,44 +190,58 @@
         # download the files 
             temp <- tempfile()
             download.file(url = 'https://gispublic.waterboards.ca.gov/webmap/303d_2014_2016/files/IR_1416_Impaired_Polys.zip',
-                          destfile = temp, method = 'curl')
-            unzip(zipfile = temp, exdir = './data_raw/2014_2016_303d_Polygons_Final', junkpaths = TRUE)
+                          destfile = temp, 
+                          method = 'curl')
+            unzip(zipfile = temp, 
+                  exdir = here('data_raw', 
+                               '2014_2016_303d_Polygons_Final'), 
+                  junkpaths = TRUE)
         # Read the shapefile into R
-            impaired_303d_poly <- st_read('data_raw/2014_2016_303d_Polygons_Final/IR_1416_Impaired_Polys.shp') %>% 
+            impaired_303d_poly <- st_read(here('data_raw', 
+                                               '2014_2016_303d_Polygons_Final', 
+                                               'IR_1416_Impaired_Polys.shp')) %>% 
                 st_transform(4326)
         # clean names
             impaired_303d_poly <- clean_names(impaired_303d_poly)
-        # SIMPLIFY
-            #     # impaired_303d_poly_simplify <- rmapshaper::ms_simplify(impaired_303d_poly)
-            #     # save to RDS file
-            #         # saveRDS(object = impaired_303d_poly_simplify, file = 'data/impaired_303d_poly_simplify.RDS')
+        # simplify
+            impaired_303d_poly_simplified <- impaired_303d_poly %>% 
+                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
 
     # 303d Lines ---
         # download the files
             temp <- tempfile()
             download.file(url = 'https://gispublic.waterboards.ca.gov/webmap/303d_2014_2016/files/IR_1416_Impaired_Lines.zip',
                           destfile = temp, method = 'curl')
-            unzip(zipfile = temp, exdir = './data_raw/2014_2016_303d_Lines_Final', junkpaths = TRUE)
+            unzip(zipfile = temp, exdir = here('data_raw', 
+                                               '2014_2016_303d_Lines_Final'), 
+                  junkpaths = TRUE)
         # Read the shapefile into R
-            impaired_303d_lines <- st_read('data_raw/2014_2016_303d_Lines_Final/IR_1416_Impaired_Lines.shp') %>% 
+            impaired_303d_lines <- st_read(here('data_raw', 
+                                                '2014_2016_303d_Lines_Final', 
+                                                'IR_1416_Impaired_Lines.shp')) %>% 
                 st_transform(4326)
         # clean names
             impaired_303d_lines <- clean_names(impaired_303d_lines)
         # SIMPLIFY AND REMOVE REGION 1 LINES (TOO MUCH DATA USED FOR R1 LINES)
-            impaired_303d_lines_simplify <- rmapshaper::ms_simplify(impaired_303d_lines)
-            impaired_303d_lines_simplify_R1removed <- impaired_303d_lines_simplify %>% filter(region_num != 1)
+            impaired_303d_lines_R1removed <- impaired_303d_lines %>% 
+                filter(region_num != 1)
+            impaired_303d_lines_R1removed_simplify <- impaired_303d_lines_R1removed %>% 
+                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+            # impaired_303d_lines_simplify_R1removed <- impaired_303d_lines_simplify %>% filter(region_num != 1)
             # check file sizes
                 # pryr::object_size(impaired_303d_lines) # 91.3 MB
-                # pryr::object_size(impaired_303d_lines_simplify) # 40.6 MB
-                # pryr::object_size(impaired_303d_lines_simplify_R1removed) # 2.15 MB
+                # pryr::object_size(impaired_303d_lines_R1removed) # 6.67 MB
+                # pryr::object_size(impaired_303d_lines_R1removed_simplify) # 1.63 MB
 
     # 303d Waterbodies Pollutant Information (table) ---
         # access and transform the 303d tabular data
                 # download the files
                     download.file(url = 'https://gispublic.waterboards.ca.gov/webmap/303d_2014_2016/files/2014_2016_303d_SWRCB_Approved_List_no_sources_final.xls',
-                                  destfile = 'data_raw/2014_2016_303d_SWRCB_Approved_List_no_sources_final.xls',
+                                  destfile = here('data_raw', 
+                                                  '2014_2016_303d_SWRCB_Approved_List_no_sources_final.xls'),
                                   method = 'curl')
-                impaired_pollutants_1 <- read_excel('data_raw/2014_2016_303d_SWRCB_Approved_List_no_sources_final.xls',
+                impaired_pollutants_1 <- read_excel(here('data_raw', 
+                                                         '2014_2016_303d_SWRCB_Approved_List_no_sources_final.xls'),
                                                   sheet = '303(d) List no srcs')
                 impaired_pollutants_1 <- clean_names(impaired_pollutants_1)
                 # Create a column for comments that also includes the pollutant (only for rows where there is a comment)
@@ -207,10 +267,12 @@
             # access and transform the 303d tabular data
                 # download the files
                     download.file(url = 'https://gispublic.waterboards.ca.gov/webmap/303d_2014_2016/files/2014_2016_303d_SWRCB_Approved_List_with_sources_final.xls',
-                                  destfile = 'data_raw/2014_2016_303d_SWRCB_Approved_List_with_sources_final.xls',
+                                  destfile = here('data_raw', 
+                                                  '2014_2016_303d_SWRCB_Approved_List_with_sources_final.xls'),
                                   method = 'curl')
                 # read the data
-                    impaired_pollutants_2 <- read_excel('data_raw/2014_2016_303d_SWRCB_Approved_List_with_sources_final.xls',
+                    impaired_pollutants_2 <- read_excel(here('data_raw', 
+                                                             '2014_2016_303d_SWRCB_Approved_List_with_sources_final.xls'),
                                                       sheet = '303(d) List with srcs')
                     impaired_pollutants_2 <- clean_names(impaired_pollutants_2)
                 # Create a column for source that also includes the pollutant (only for rows where there is a source given)
@@ -240,7 +302,8 @@
                     impaired_ids_pollutant_2$pollutant_source[impaired_ids_pollutant_2$pollutant_source == 'NA'] <- NA
                 # for each ID in the list of WDIDs, append the list of sources for all pollutants associated with that ID (if any)
                     # initialize the new columns (this just helps to prevent a warning message in the next step)
-                        impaired_ids_source_2 <- impaired_ids_source_2 %>% mutate(pollutant = '', sources= '')
+                        impaired_ids_source_2 <- impaired_ids_source_2 %>% 
+                            mutate(pollutant = '', sources= '')
                     for (i in seq(nrow(impaired_ids_source_2))){
                         temp2 <- impaired_ids_pollutant_2 %>%
                             filter(wbid == impaired_ids_source_2$wbid[i])
@@ -251,44 +314,134 @@
                     }
 
     # join the pollution source info to the list of pollutants and comments
-            impaired_303d_list <- impaired_ids_1 %>% left_join(impaired_ids_source_2, by = c('wbid', 'pollutant'))
+            impaired_303d_list <- impaired_ids_1 %>% 
+                left_join(impaired_ids_source_2, by = c('wbid', 'pollutant'))
             # make blanks into NAs
                 impaired_303d_list$comments[impaired_303d_list$comments == ''] <- NA
                 impaired_303d_list$sources[impaired_303d_list$sources == ''] <- NA
 
     # join the 303d information to the polygons and lines shapefile datasets, by WBID
-        impaired_303d_poly <- st_as_sf(impaired_303d_poly %>% left_join(impaired_303d_list, by = 'wbid'))
-        impaired_303d_lines_simplify_R1removed <- st_as_sf(impaired_303d_lines_simplify_R1removed %>% left_join(impaired_303d_list, by = 'wbid'))
+        impaired_303d_poly_simplified <- st_as_sf(impaired_303d_poly_simplified %>% 
+                                           left_join(impaired_303d_list, by = 'wbid'))
+        impaired_303d_lines_R1removed_simplify <- st_as_sf(impaired_303d_lines_R1removed_simplify %>% 
+                                                               left_join(impaired_303d_list, by = 'wbid'))
 
-    # write 303d data to an RDS file
-        saveRDS(object = impaired_303d_poly, file = 'data_prepared/impaired_303d_poly.RDS')
-        saveRDS(object = impaired_303d_lines_simplify_R1removed, file = 'data_prepared/impaired_303d_lines_simplify_R1removed.RDS')
+    # write to geopackage
+        st_write(obj = impaired_303d_poly_simplified, 
+                 here('data_prepared', '303d_polygons_simplified.gpkg')) 
+        st_write(obj = impaired_303d_lines_R1removed_simplify, 
+                 here('data_prepared', '303d_lines_R1removed_simplified.gpkg'))
 
 
 
 
-# Regulated facilities info (source: https://siteportal.calepa.ca.gov/nsite/map/export) ---------------------------------
-    # Regulated Site Programs
-        cal_epa_sites_programs <- read_csv('data_raw/CalEPA_RegulatedSites/SiteEI.csv') %>%
-            select(-X10) %>%
-            select(SiteID, EI_Description) %>% 
-            distinct()
-        # write to RDS file
-            saveRDS(object = cal_epa_sites_programs, 
-                    file = 'data_prepared/cal_epa_sites_programs.RDS')
-    # Violations
-        cal_epa_sites_violations_count <- read_csv('data_raw/CalEPA_RegulatedSites/Violations.csv') %>% 
-            select(-X10) %>% 
-            group_by(SiteID) %>% 
-            summarize(violations_records = n())
-        # write to RDS file
-            saveRDS(object = cal_epa_sites_violations_count, 
-                    file = 'data_prepared/cal_epa_sites_violations_count.RDS')
-    # Enforcement Actions
-        cal_epa_sites_enforcement_count <- read_csv('data_raw/CalEPA_RegulatedSites/EA.csv') %>% 
-            select(-X13) %>% 
-            group_by(SiteID) %>% 
-            summarize(enforcement_records = n())
-        # write to RDS file
-            saveRDS(object = cal_epa_sites_enforcement_count, 
-                    file = 'data_prepared/cal_epa_sites_enforcement_count.RDS')
+# # Regulated facilities info (source: https://siteportal.calepa.ca.gov/nsite/map/export) ------------
+#     # Regulated Site Programs ----------------------------------------------------------------------
+#         cal_epa_sites_programs <- read_csv(here('data_raw',
+#                                                 'CalEPA_RegulatedSites',
+#                                                 'Site Regulated Programs.csv'), # SiteEI.csv
+#                                            guess_max = 100000) %>%
+#             select(-X10) %>%
+#             select(SiteID, EI_Description) %>%
+#             distinct() %>%
+#             {.}
+#         # write to RDS file
+#             saveRDS(object = cal_epa_sites_programs,
+#                     file = here('data_prepared' ,
+#                                 'cal_epa_sites_programs.RDS'))
+#     # Sites (NOT USED - SITES COME FROM THE CalEPA Geoserver) --------------------------------------
+        
+    # # Violations (count by either Year, Fiscal Year, or Year/Month) --------------------------------
+    #     cal_epa_sites_violations_count <- read_csv(here('data_raw', 
+    #                                                     'CalEPA_RegulatedSites', 
+    #                                                     'Violations.zip'), # 'Violations.csv'
+    #                                                guess_max = 100000) %>% 
+    #         select(-X10) %>% 
+    #         # mutate(ViolationYear = year(mdy(ViolationDate))) %>%
+    #         # group_by(SiteID, ViolationYear) %>%
+    #         # mutate(ViolationFiscalYear = if (month(mdy(ViolationDate)) <= 6) {
+    #         #     paste0(year(mdy(ViolationDate))-1, '-', year(mdy(ViolationDate)))} else {
+    #         #        paste0(year(mdy(ViolationDate)), '-', year(mdy(ViolationDate)) + 1)
+    #         #     }) %>%
+    #         # group_by(SiteID, ViolationFiscalYear) %>%
+    #         mutate(ViolationMonth = as.Date(paste(year(mdy(ViolationDate)), 
+    #                                       month(mdy(ViolationDate)), 
+    #                                       1, 
+    #                                       sep = '-'))) %>% 
+    #         group_by(SiteID, ViolationMonth) %>%
+    #         summarize(violations_count = n()) %>%
+    #         {.}
+    #     # write to RDS file
+    #         saveRDS(object = cal_epa_sites_violations_count, 
+    #                 file = here('data_prepared', 
+    #                             'cal_epa_sites_violations_count.RDS'))
+    # # Enforcement Actions (count by either Year, Fiscal Year, or Year/Month) -----------------------
+    #     cal_epa_sites_enforcement_count <- read_csv(here('data_raw', 
+    #                                                      'CalEPA_RegulatedSites', 
+    #                                                      'Enforcements.zip'), # EA.csv
+    #                                                 guess_max = 100000) %>% 
+    #         select(-X13) %>% 
+    #         # mutate(EnfActionYear = year(mdy(EnfActionDate))) %>%
+    #         # group_by(SiteID, EnfActionYear) %>%
+    #         # mutate(EnfActionFiscalYear = if (month(mdy(EnfActionDate)) <= 6) {
+    #         #     paste0(year(mdy(EnfActionDate))-1, '-', year(mdy(EnfActionDate)))} else {
+    #         #        paste0(year(mdy(EnfActionDate)), '-', year(mdy(EnfActionDate)) + 1)
+    #         #     }) %>%
+    #         # group_by(SiteID, EnfActionFiscalYear) %>%
+    #         mutate(EnfActionMonth = as.Date(paste(year(mdy(EnfActionDate)), 
+    #                                       month(mdy(EnfActionDate)), 
+    #                                       1, 
+    #                                       sep = '-'))) %>% 
+    #         group_by(SiteID, EnfActionMonth) %>%
+    #         summarize(enforcements_count = n()) %>% 
+    #         {.}
+    #     # write to RDS file
+    #         saveRDS(object = cal_epa_sites_enforcement_count, 
+    #                 file = here('data_prepared', 
+    #                             'cal_epa_sites_enforcement_count.RDS'))
+    # # Inspections (count by either Year, Fiscal Year, or Year/Month) -------------------------------
+    #     cal_epa_sites_inspections_count <- read_csv(here('data_raw', 
+    #                                                      'CalEPA_RegulatedSites', 
+    #                                                      'Evaluations.zip'), # EA.csv
+    #                                                 guess_max = 100000) %>% 
+    #         select(-X11) %>% 
+    #         # mutate(EvalYear = year(mdy(EvalDate))) %>%
+    #         # group_by(SiteID, EvalYear) %>%
+    #         # mutate(EvalFiscalYear = if (month(mdy(EvalDate)) <= 6) {
+    #         #     paste0(year(mdy(EvalDate))-1, '-', year(mdy(EvalDate)))} else {
+    #         #        paste0(year(mdy(EvalDate)), '-', year(mdy(EvalDate)) + 1)
+    #         #     }) %>%
+    #         # group_by(SiteID, EvalFiscalYear) %>%
+    #         mutate(EvalMonth = as.Date(paste(year(mdy(EvalDate)),
+    #                                       month(mdy(EvalDate)),
+    #                                       1,
+    #                                       sep = '-'))) %>%
+    #         group_by(SiteID, EvalMonth) %>%
+    #         summarize(inspections_count = n()) %>%
+    #         {.}
+    #     # write to RDS file
+    #         saveRDS(object = cal_epa_sites_inspections_count, 
+    #                 file = here('data_prepared', 
+    #                             'cal_epa_sites_inspections_count.RDS'))
+    #     # NOTE: Not all of the inspections are done by CalEPA agencies (as indicated in the 'EvalDivision' field)
+    #     # many done by city and county agencies - his helps to narrow down the list
+    #     # It looks like these are the only CalEPA relevant entries in the 'EvalDivision' field:
+    #     # c('California Environmental Protection Agency', 'Department of Toxic Substances Control', 'Water Boards')
+    #         # cal_epa_sites_inspections <- read_csv(here('data_raw',
+    #         #                                            'CalEPA_RegulatedSites',
+    #         #                                            'Evaluations.zip'),
+    #         #                                       guess_max = 100000) %>%
+    #         #     select(-X11)
+    #         # z <- tabyl(cal_epa_sites_inspections$EvalDivision)
+    #         # zz <- cal_epa_sites_inspections %>% distinct(EvalDivision)
+    #         # tf <- !grepl(pattern = paste('City', 'County', 'Fire', 'Del Norte', # to remove entires with 'City' 'County' 'Fire' or other specific city/county place names or non-CalEPA agencies in EvalDivision field
+    #         #                              'Healdsburg', 'Imperial', 'Livermore', 
+    #         #                              'Long Beach', 'Sunnyvale', 'Vernon',
+    #         #                              'OSHA',
+    #         #                              sep = '|'), 
+    #         #                x = cal_epa_sites_inspections %>% 
+    #         #                  distinct(EvalDivision) %>% 
+    #         #                  pull(EvalDivision))
+    #         # View(cal_epa_sites_inspections %>% # shows recoreds where 'EvalDivision' field doesn't contain any of the above words
+    #         #          distinct(EvalDivision) %>% 
+    #         #          filter(tf))
