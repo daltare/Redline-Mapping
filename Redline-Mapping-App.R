@@ -66,9 +66,9 @@
         #     slice(8:64) # rows 8 to 64
         
     # List of program types to select
-        program_types <- fread('data_prepared/calepa_regulatory_data/SiteEI.csv') %>%
-        # program_types <- read_csv('data_prepared/calepa_regulatory_data/SiteEI.csv') %>%
-        # program_types <- read_csv('data_prepared/calepa_regulatory_data/Site Regulated Programs.zip', guess_max = 100000) %>%
+        program_types <- fread('data_regulatory_actions/SiteEI.csv') %>%
+        # program_types <- read_csv('data_regulatory_actions/SiteEI.csv') %>%
+        # program_types <- read_csv('data_regulatory_actions/Site Regulated Programs.zip', guess_max = 100000) %>%
             clean_names() %>% 
             select(-dplyr::ends_with(as.character(0:9))) %>%
             select(site_id, ei_description) %>%
@@ -634,10 +634,10 @@ server <- function(input, output) {
     # get the inspections, violations, and enforcement actions for the selected period
         inspections_all <- reactive({
             withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
-            inspections_all_download <- fread('data_prepared/calepa_regulatory_data/Evaluations.csv') %>%
-            # inspections_all_download <- read_csv('data_prepared/calepa_regulatory_data/Evaluations.zip') %>% 
-            # inspections_all_download <- read_csv('data_prepared/calepa_regulatory_data/Evaluations.csv') %>%
-            # inspections_all_download <- vroom('data_prepared/calepa_regulatory_data/Evaluations.csv') %>% 
+            inspections_all_download <- fread('data_regulatory_actions/Evaluations.csv') %>%
+            # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.zip') %>% 
+            # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.csv') %>%
+            # inspections_all_download <- vroom('data_regulatory_actions/Evaluations.csv') %>% 
                 clean_names() %>%
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(eval_date = mdy(eval_date)) %>% 
@@ -654,10 +654,10 @@ server <- function(input, output) {
         # })
         violations_all <- reactive({
             withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
-            violations_all_download <- fread('data_prepared/calepa_regulatory_data/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
-            # violations_all_download <- read_csv('data_prepared/calepa_regulatory_data/Violations.zip') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
-            # violations_all_download <- read_csv('data_prepared/calepa_regulatory_data/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
-            # violations_all_download <- vroom('data_prepared/calepa_regulatory_data/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
+            violations_all_download <- fread('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
+            # violations_all_download <- read_csv('data_regulatory_actions/Violations.zip') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
+            # violations_all_download <- read_csv('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
+            # violations_all_download <- vroom('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(violation_date = mdy(violation_date)) %>% 
@@ -671,10 +671,10 @@ server <- function(input, output) {
         })
         enforcement_all <- reactive({
             withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
-            enforcement_all_download <- fread('data_prepared/calepa_regulatory_data/EA.csv') %>%
-            # enforcement_all_download <- read_csv('data_prepared/calepa_regulatory_data/Enforcements.zip') %>% 
-            # enforcement_all_download <- read_csv('data_prepared/calepa_regulatory_data/EA.csv') %>%
-            # enforcement_all_download <- vroom('data_prepared/calepa_regulatory_data/EA.csv') %>% 
+            enforcement_all_download <- fread('data_regulatory_actions/EA.csv') %>%
+            # enforcement_all_download <- read_csv('data_regulatory_actions/Enforcements.zip') %>% 
+            # enforcement_all_download <- read_csv('data_regulatory_actions/EA.csv') %>%
+            # enforcement_all_download <- vroom('data_regulatory_actions/EA.csv') %>% 
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(enf_action_date = mdy(enf_action_date)) %>% 
