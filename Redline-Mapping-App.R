@@ -3,8 +3,7 @@
         data_source_ces3 <- 'local' # CalEnviroScreen - getting from local source allows them to be simplified first
         data_source_rb_bounds <- 'local' # regional board boundaries
         data_source_service_areas <- 'local' # drinking water service areas
-        # other data sources that are always remote
-            # CalEPA regulated sites - could pull from local source, but would need to revise code to account for different site types
+        # NOTE: CalEPA regulated sites can be either local or remote, select in app
         # other data sources that are always local
             # 303d_lines # these are from local souce because there is pre-processing done to get pollutant info
             # 303d_polygons - these are from local souce because there is pre-processing done to get pollutant info
@@ -32,6 +31,7 @@
         library(janitor)
         library(data.table)
         library(tidyselect)
+        library(purrr)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -66,6 +66,21 @@
         # ces_choices <- read_rds('data_prepared/ces_3_names.RDS') %>% 
         #     # filter(grepl(pattern = 'Percentile$', x = .$name)) %>% 
         #     slice(8:64) # rows 8 to 64
+        
+    # CalEPA regulated sites
+        calepa_reg_sites <- fread('data_regulatory_actions/Site.csv') %>%
+        # calepa_reg_sites <- read_csv('data_regulatory_actions/Site.csv') %>%
+            tibble() %>% 
+            clean_names() %>% 
+            select(-dplyr::ends_with(as.character(0:9))) %>% 
+            rename(zip_code = zip) %>% 
+            mutate(state = 'ca', 
+                   data_source = 'CalEPA Regulated Site Portal',
+                   coordinates = Map(c, longitude, latitude)) # see: https://stackoverflow.com/a/46396386
+    # define choices for sources of CalEPA regulated site data
+        site_source_choices <- c('None',
+                                 'All Sites (Source: CalEPA Regulated Site Portal)', 
+                                 'Select By Type (Source: CalEPA Geoserver)')
         
     # List of program types to select
         program_types <- fread('data_regulatory_actions/SiteEI.csv') %>%
@@ -157,6 +172,10 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                     #                    label = 'Select CalEPA Regulated Site Types:', 
                     #                    choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
                     #                    selected = NULL),
+                    selectInput(inputId = 'sites_source', 
+                                label = 'Select Site Source/Filters:', 
+                                choices = site_source_choices, 
+                                selected = site_source_choices[1]),
                     selectInput(inputId = 'site_type_1', 
                                 label = 'Select Site Types:', 
                                 choices = c('California Integrated Water Quality System (CIWQS)', 
@@ -409,6 +428,11 @@ server <- function(input, output) {
         toggle(id = 'holc_city_sites_filter', 
                condition = input$holc_rating_sites_filter_on_off == TRUE)
       })
+    
+    observe({
+        toggle(id = 'site_type_1',
+               condition = input$sites_source == site_source_choices[3])
+      })
 
     # get reactive values (to isolate from each other and prevent map from completely rebuilding when an input is changed) 
         # regional board boundary containing the selected city ----
@@ -618,7 +642,19 @@ server <- function(input, output) {
 
         # Get the CalEPA regulated sites
             cal_epa_sites_raw <- reactive({
-                if (length(input$site_type_1) > 0) {    
+                if (input$sites_source == site_source_choices[2]) {
+                    # Create an sf object using the sites data from the saved flat file
+                    cal_epa_sites_raw_download <- st_as_sf(calepa_reg_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
+                                                           coords = c('longitude', 'latitude'),
+                                                           crs = 4326,
+                                                           agr = 'constant')
+                    # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
+                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
+                        # st_crs(cal_epa_sites_raw_download)
+                    # return the object
+                        return(cal_epa_sites_raw_download)
+                } else if (input$sites_source == site_source_choices[3] & 
+                           length(input$site_type_1) > 0) {    
                     withProgress(message = 'Getting Site Data', style = 'notification', value = 1, { # style = 'notification' 'old'
                     # })
                     # get CalEPA sites data from the geoserver api
@@ -678,6 +714,9 @@ server <- function(input, output) {
                                                          coords = c('longitude', 'latitude'),
                                                          crs = 4326,
                                                          agr = 'constant')
+                    # rename some columns to match the data from the regulated site portal
+                    cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
+                        rename(site_name = facility_name)
                     # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
                         cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
                         # st_crs(cal_epa_sites_raw_download)
@@ -874,7 +913,7 @@ server <- function(input, output) {
             selectInput(inputId = 'program_type_1',
                         label = '**Filter Sites By Program Type:**',
                         multiple = TRUE,
-                        choices = if (length(input$site_type_1) > 0) {
+                        choices = if (length(input$site_type_1) > 0 | input$sites_source == site_source_choices[3]) {
                             program_types %>%
                                 filter(site_id %in% (cal_epa_sites_filtered_0()$site_id)) %>%
                                 # st_drop_geometry() %>%
@@ -903,14 +942,17 @@ server <- function(input, output) {
             # })
         # revise the data frame
             summary_table_df <- reactive({ # eventReactive(input$site_type_1, {
-                if(length(input$site_type_1) == 0) { # | is.na(input$site_type_1) | is.null(input$site_type_1)) {
+                if(input$sites_source == site_source_choices[1]) { 
+                    shiny::showNotification("No data", type = "error")
+                    NULL
+                } else if (input$sites_source == site_source_choices[3] & length(input$site_type_1) == 0) {
                     shiny::showNotification("No data", type = "error")
                     NULL
                 } else {
-                    return(
+                    return( 
                         cal_epa_sites_filtered() %>% 
                             st_join(redline_polygons %>% select(-city)) %>% 
-                            select(site_id, facility_name, address,
+                            select(site_id, site_name, address,
                                    city, state, zip_code, 
                                    inspections_count, violations_count,
                                    enforcements_count, data_source, coordinates,
@@ -1239,7 +1281,7 @@ server <- function(input, output) {
         # CalEPA sites
             observe({
                 withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
-                if (length(input$site_type_1) > 0) {
+                if (length(input$site_type_1) > 0 | input$sites_source == site_source_choices[2]) {
                     cal_epa_sites <- cal_epa_sites_filtered() %>% 
                         st_transform(crs = geographic_crs) # have to convert to geographic coordinate system for leaflet
                     # # if the option is selected, filter for sites with violations and/or enforcement actions
@@ -1264,7 +1306,7 @@ server <- function(input, output) {
                                          # clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier = 2),# freezeAtZoom = 13, maxClusterRadius = 10),#,#singleMarkerMode = TRUE),
                                          popup = ~paste0('<b>', '<u>', 'CalEPA Regulated Site', '</u>','</b>','<br/>',
                                                          # '<b>', '<u>', 'Site Information:', '</u>', '</b>','<br/>',
-                                                         '<b>', 'Name: ', '</b>', facility_name,'<br/>',
+                                                         '<b>', 'Name: ', '</b>', site_name,'<br/>',
                                                          '<b>', 'ID: ', '</b>', site_id,'<br/>',
                                                          '<b>', 'Address: ', '</b>', address, '<br/>',
                                                          '<b>', 'City: ', '</b>', city, '<br/>',

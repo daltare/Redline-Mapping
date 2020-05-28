@@ -5,6 +5,7 @@
         library(dplyr)
         library(janitor)
         library(pryr)
+        # library(lobstr)
         library(skimr)
         library(tidylog)
         library(lubridate)
@@ -95,13 +96,18 @@
             st_write(obj = rb_boundary, 
                      here('data_raw', 'RB_Office_Boundaries',
                           'rb_office_boundaries.gpkg'))
+            object_size(rb_boundary)
         # simplify
             rb_boundary_simplify <- rb_boundary %>% 
-                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+                # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE) %>% 
+                ms_simplify(keep = 0.2, keep_shapes = TRUE, snap = TRUE) %>% 
+                {.}
+            object_size(rb_boundary_simplify)
         # save to geopackage file
             st_write(obj = rb_boundary_simplify, 
                      here('data_prepared', 
-                          'rb_boundary_simplified.gpkg'))
+                          'rb_boundary_simplified.gpkg'), 
+                     append = FALSE)
 
 
 
@@ -135,8 +141,8 @@
                 # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
                 ms_simplify(keep = 0.3, keep_shapes = TRUE, snap = TRUE)
         # check
-            # pryr::object_size(ces3_poly_simplify)
-            # pryr::object_size(ces3_poly)
+            # object_size(ces3_poly_simplify)
+            # object_size(ces3_poly)
             # mapview::mapview(ces3_poly_simplify %>% filter(Nearby_City == 'Sacramento'))
     # save simplified version to geopackage file
         st_write(obj = ces3_poly_simplify, 
@@ -161,13 +167,18 @@
         st_write(obj = service_areas, 
                  here('data_raw', 'Drinking_Water_Service_Areas',
                       'drinking_water_service_areas.gpkg'))
+        object_size(service_areas)
     # simplify
         service_areas_simplify <- service_areas %>% 
-            ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+            # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE) %>%
+            ms_simplify(keep = 0.2, keep_shapes = TRUE, snap = TRUE) %>%
+            {.}
+        object_size(service_areas_simplify)
     # save to geopackage file
         st_write(obj = service_areas_simplify, 
                  here('data_prepared', 
-                      'drinking_water_service_areas_simplified.gpkg'))
+                      'drinking_water_service_areas_simplified.gpkg'),
+                 append = FALSE)
 
 
 
@@ -201,11 +212,14 @@
                                                '2014_2016_303d_Polygons_Final', 
                                                'IR_1416_Impaired_Polys.shp')) %>% 
                 st_transform(4326)
+            object_size(impaired_303d_poly)
         # clean names
             impaired_303d_poly <- clean_names(impaired_303d_poly)
         # simplify
             impaired_303d_poly_simplified <- impaired_303d_poly %>% 
-                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+                # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+                ms_simplify(keep = 0.2, keep_shapes = TRUE, snap = TRUE)
+            object_size(impaired_303d_poly_simplified)
 
     # 303d Lines ---
         # download the files
@@ -225,13 +239,16 @@
         # SIMPLIFY AND REMOVE REGION 1 LINES (TOO MUCH DATA USED FOR R1 LINES)
             impaired_303d_lines_R1removed <- impaired_303d_lines %>% 
                 filter(region_num != 1)
+            object_size(impaired_303d_lines_R1removed)
             impaired_303d_lines_R1removed_simplify <- impaired_303d_lines_R1removed %>% 
-                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+                # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+                ms_simplify(keep = 0.2, keep_shapes = TRUE, snap = TRUE)
+            object_size(impaired_303d_lines_R1removed_simplify)
             # impaired_303d_lines_simplify_R1removed <- impaired_303d_lines_simplify %>% filter(region_num != 1)
             # check file sizes
-                # pryr::object_size(impaired_303d_lines) # 91.3 MB
-                # pryr::object_size(impaired_303d_lines_R1removed) # 6.67 MB
-                # pryr::object_size(impaired_303d_lines_R1removed_simplify) # 1.63 MB
+                # object_size(impaired_303d_lines) # 91.3 MB
+                # object_size(impaired_303d_lines_R1removed) # 6.67 MB
+                # object_size(impaired_303d_lines_R1removed_simplify) # 1.63 MB
 
     # 303d Waterbodies Pollutant Information (table) ---
         # access and transform the 303d tabular data
@@ -328,9 +345,11 @@
 
     # write to geopackage
         st_write(obj = impaired_303d_poly_simplified, 
-                 here('data_prepared', '303d_polygons_simplified.gpkg')) 
+                 here('data_prepared', '303d_polygons_simplified.gpkg'),
+                 append = FALSE) 
         st_write(obj = impaired_303d_lines_R1removed_simplify, 
-                 here('data_prepared', '303d_lines_R1removed_simplified.gpkg'))
+                 here('data_prepared', '303d_lines_R1removed_simplified.gpkg'),
+                 append = FALSE)
 
 
 
