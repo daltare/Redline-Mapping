@@ -363,7 +363,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                              '(CalEPA Geoserver) | Web-service (click on the "Layer Preview" link, layer names: "calepa:mv_fac_from_ciwqs", "calepa:mv_fac_from_smarts", "calepa:mv_fac_from_geotracker")', 
                      ),
                      tags$li(tags$a(href = 'https://siteportal.calepa.ca.gov/nsite/map/export',
-                                    'CalEPA Regulatory Actions (Inspections, Violations, and Enforcement Actions)'), 
+                                    'CalEPA Regulatory Actions (Regulated Sites, Site Program Types, Inspections, Violations, and Enforcement Actions)'), 
                              '(CalEPA Regulated Site Portal)'
                      ),
                      tags$li(tags$a(href = 'https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc#overview',

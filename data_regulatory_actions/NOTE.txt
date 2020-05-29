@@ -1,7 +1,8 @@
-NOTE: CalEPA regulatory data (inspections, violations, enforcement actions, and site program types) from the CalEPA Regulated Sites Portal goes in this folder (I haven't yet figured out a way to get an automated update of this data) -- the portal is at:
+NOTE: CalEPA site data and regulatory data (inspections, violations, enforcement actions, and site program types) from the CalEPA Regulated Sites Portal goes in this folder (I haven't yet figured out a way to get an automated update of this data) -- the portal is at:
 https://siteportal.calepa.ca.gov/nsite/map/export
 
 Manually download and unzip the following datasets to this folder:
+- Site (file = Site.csv)
 - Site Regulated Programs (file = SiteEI.csv )
 - Evaluations (file = Evaluations.csv) # this is the inspections data
 - Violations (file = Violations.csv)
