@@ -49,7 +49,8 @@
         library(DT)
         library(shinyWidgets)
         library(shinyjs)
-    
+
+
 # Read some static data into R ------------------------------------------------------------------------------------------------------------------
     # HOLC (Redline) Polygons
         # redline_polygons <- read_rds('data_prepared/redline_polygons.RDS')
@@ -75,8 +76,11 @@
             select(-dplyr::ends_with(as.character(0:9))) %>% 
             rename(zip_code = zip) %>% 
             mutate(state = 'ca', 
-                   data_source = 'CalEPA Regulated Site Portal',
-                   coordinates = Map(c, longitude, latitude)) # see: https://stackoverflow.com/a/46396386
+                   data_source = 'CalEPA Regulated Site Portal') %>% 
+            # mutate(coordinates = Map(c, longitude, latitude)) %>%  # see: https://stackoverflow.com/a/46396386
+            arrange(site_id) %>% 
+            # slice(1:50000) %>% 
+            {.}
     # define choices for sources of CalEPA regulated site data
         site_source_choices <- c('None',
                                  'All Sites (Source: CalEPA Regulated Site Portal)', 
@@ -86,6 +90,7 @@
         program_types <- fread('data_regulatory_actions/SiteEI.csv') %>%
         # program_types <- read_csv('data_regulatory_actions/SiteEI.csv') %>%
         # program_types <- read_csv('data_regulatory_actions/Site Regulated Programs.zip', guess_max = 100000) %>%
+            tibble() %>% 
             clean_names() %>% 
             select(-dplyr::ends_with(as.character(0:9))) %>%
             select(site_id, ei_description) %>%
@@ -103,6 +108,7 @@
                 # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.zip') %>% 
                 # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.csv') %>%
                 # inspections_all_download <- vroom('data_regulatory_actions/Evaluations.csv') %>% 
+                tibble() %>% 
                 clean_names() %>%
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(eval_date = mdy(eval_date)) %>% 
@@ -112,6 +118,7 @@
                 # violations_all_download <- read_csv('data_regulatory_actions/Violations.zip') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
                 # violations_all_download <- read_csv('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
                 # violations_all_download <- vroom('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
+                tibble() %>%
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(violation_date = mdy(violation_date)) %>% 
@@ -121,6 +128,7 @@
                 # enforcement_all_download <- read_csv('data_regulatory_actions/Enforcements.zip') %>% 
                 # enforcement_all_download <- read_csv('data_regulatory_actions/EA.csv') %>%
                 # enforcement_all_download <- vroom('data_regulatory_actions/EA.csv') %>% 
+                tibble() %>%
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(enf_action_date = mdy(enf_action_date)) %>% 
@@ -173,7 +181,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                     #                    choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
                     #                    selected = NULL),
                     selectInput(inputId = 'sites_source', 
-                                label = 'Select Site Source/Filters:', 
+                                label = 'Site Selection Options:', 
                                 choices = site_source_choices, 
                                 selected = site_source_choices[1]),
                     selectInput(inputId = 'site_type_1', 
@@ -293,6 +301,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                   ),
                   fluidRow(
                       hr(),
+                      downloadButton('download_summary', 'Download Data', class = "buttonstyle"),
                       DT::dataTableOutput('summary_table')
                   )
                   )
@@ -647,7 +656,8 @@ server <- function(input, output) {
                     cal_epa_sites_raw_download <- st_as_sf(calepa_reg_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
                                                            coords = c('longitude', 'latitude'),
                                                            crs = 4326,
-                                                           agr = 'constant')
+                                                           # agr = 'constant',
+                                                           remove = FALSE)
                     # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
                         cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
                         # st_crs(cal_epa_sites_raw_download)
@@ -713,7 +723,8 @@ server <- function(input, output) {
                     cal_epa_sites_raw_download <- st_as_sf(cal_epa_sites_raw_download %>% filter(!is.na(latitude) & !is.na(longitude)),
                                                          coords = c('longitude', 'latitude'),
                                                          crs = 4326,
-                                                         agr = 'constant')
+                                                         # agr = 'constant',
+                                                         remove = FALSE)
                     # rename some columns to match the data from the regulated site portal
                     cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
                         rename(site_name = facility_name)
@@ -749,7 +760,7 @@ server <- function(input, output) {
                 return(end_date)
             })
             
-    # get the inspections, violations, and enforcement actions for the selected period
+    # summarize the inspections, violations, and enforcement actions for the selected period
         inspections_summary <- reactive({
             withProgress(message = 'Summarizing Data...', 
                          style = 'notification', 
@@ -757,9 +768,10 @@ server <- function(input, output) {
                          {
                              return(
                                  inspections_all_download %>% 
-                                     filter(eval_date >= start_date(), 
-                                            eval_date <= end_date()) %>%
-                                     filter(site_id %in% cal_epa_sites_raw()) %>%
+                                     # filter(eval_date >= start_date(),
+                                     #        eval_date <= end_date()) %>%
+                                     filter(site_id %in% (cal_epa_sites_raw() %>% 
+                                                              pull(site_id))) %>%
                                      group_by(site_id) %>%
                                      summarize(inspections_count = n()) %>%
                                      {.}
@@ -781,9 +793,10 @@ server <- function(input, output) {
                          {
                              return(
                                  violations_all_download %>% 
-                                     filter(violation_date >= start_date(), 
-                                            violation_date <= end_date()) %>% 
-                                     filter(site_id %in% cal_epa_sites_raw()) %>%
+                                     filter(violation_date >= start_date(),
+                                            violation_date <= end_date()) %>%
+                                     filter(site_id %in% (cal_epa_sites_raw() %>% 
+                                                              pull(site_id))) %>%
                                      group_by(site_id) %>%
                                      summarize(violations_count = n()) %>%
                                      {.}
@@ -797,9 +810,10 @@ server <- function(input, output) {
                          {
                              return(
                                  enforcement_all_download %>% 
-                                     filter(enf_action_date >= start_date(), 
-                                            enf_action_date <= end_date()) %>% 
-                                     filter(site_id %in% cal_epa_sites_raw()) %>% 
+                                     filter(enf_action_date >= start_date(),
+                                            enf_action_date <= end_date()) %>%
+                                     filter(site_id %in% (cal_epa_sites_raw() %>% 
+                                                              pull(site_id))) %>%
                                      group_by(site_id) %>%
                                      summarize(enforcements_count = n()) %>%
                                      {.}
@@ -955,17 +969,18 @@ server <- function(input, output) {
                             select(site_id, site_name, address,
                                    city, state, zip_code, 
                                    inspections_count, violations_count,
-                                   enforcements_count, data_source, coordinates,
+                                   enforcements_count, data_source, 
+                                   latitude, longitude,
                                    holc_grade) %>% 
                             # rename(!!paste0('inspections_', col_name_custom()) := 'inspections_count') %>% 
                             st_drop_geometry() %>% 
-                            mutate(filter_start_date = if (is.na(input$sites_date_range[1]) | # this adds a new column showing the start date filter
+                            mutate(reg_action_filter_start_date = if (is.na(input$sites_date_range[1]) | # this adds a new column showing the start date filter
                                                            is.null(input$sites_date_range[1])) {
                                 NA
                                 } else {
                                     input$sites_date_range[1]
                                     },
-                                filter_end_date = if (is.na(input$sites_date_range[2]) | # this adds a new column showing the end date filter
+                                reg_action_filter_end_date = if (is.na(input$sites_date_range[2]) | # this adds a new column showing the end date filter
                                                       is.null(input$sites_date_range[2])) {
                                     NA
                                     } else {
@@ -1000,26 +1015,58 @@ server <- function(input, output) {
             output$summary_table = DT::renderDataTable(
                 summary_table_df(),
                 extensions = c('Buttons', 'Scroller'),
-                options = list(dom = 'Bfrtip', 
-                               buttons = list('colvis', list(
-                                   extend = 'collection',
-                                   buttons = list(list(extend='csv', filename = paste0('Filtered_Regulatory_Actions_Summary_', Sys.time())),
-                                                  list(extend='excel', title = NULL, filename = paste0('Filtered_Regulatory_Actions_Summary_', Sys.time()))
-                                   ),
-                                   text = 'Download Data' )),
+                options = list(dom = 'Bfrtip',
+                               buttons = list('colvis'#, 
+                                              # list(
+                                              #     extend = 'collection',
+                                              #     buttons = list(list(extend='csv',
+                                              #                         filename = paste0('Filtered_Regulatory_Actions_Summary_',
+                                              #                                           str_replace_all(
+                                              #                                               string = str_replace(string =  as.character(Sys.time()),
+                                              #                                                                    pattern = ' ',
+                                              #                                                                    replacement = '_'),
+                                              #                                               pattern = ':',
+                                              #                                               replacement = '-'))),
+                                              #                    list(extend='excel',
+                                              #                         title = NULL,
+                                              #                         filename = paste0('Filtered_Regulatory_Actions_Summary_',
+                                              #                                           str_replace_all(
+                                              #                                               string = str_replace(string =  as.character(Sys.time()),
+                                              #                                                                    pattern = ' ',
+                                              #                                                                    replacement = '_'),
+                                              #                                               pattern = ':',
+                                              #                                               replacement = '-')))
+                                              #     ),
+                                              #     text = 'Download Data')
+                                              ),
                                scrollX = TRUE,
-                               scrollY = 250, 
-                               scroller = TRUE, 
+                               scrollY = 250,
+                               scroller = TRUE,
                                deferRender = TRUE),
                 class = 'cell-border stripe',
-                server = TRUE,
+                server = TRUE, ## NOTE: TRUE may not allow for download of the full file
                 rownames = FALSE
             )
+            
+        # button to download summary data
+            output$download_summary <- downloadHandler(
+                filename = paste0('RegActionSummary_',
+                                  Sys.Date(),
+                                  '.csv'), 
+                content = function(con) {
+                    write_csv(summary_table_df(), 
+                              con)
+                },
+                contentType = 'text/csv'
+            )
+
             
         # buttons to download all supporting regulatory data
             #sites_list <- summary_table_df()$site_id
             output$downloadInspections <- downloadHandler(
-                filename = 'Supporting_Inspection_Data.csv', 
+                filename = paste0('RegActionSummary_InspectionData_', 
+                                  Sys.Date(), 
+                                  '.csv'), 
                 content = function(con) {
                     write_csv(inspections_all_download %>% 
                                   filter(eval_date >= start_date(), 
@@ -1030,7 +1077,9 @@ server <- function(input, output) {
                 contentType = 'text/csv'
             )
             output$downloadViolations <- downloadHandler(
-                filename = 'Supporting_Violation_Data.csv', 
+                filename = paste0('RegActionSummary_ViolationData_', 
+                                  Sys.Date(), 
+                                  '.csv'), 
                 content = function(con) {
                     write_csv(violations_all_download %>% 
                                   filter(violation_date >= start_date(), 
@@ -1041,7 +1090,9 @@ server <- function(input, output) {
                 contentType = 'text/csv'
             )
             output$downloadEnforcements <- downloadHandler(
-                filename = 'Supporting_Enforcement_Data.csv', 
+                filename = paste0('RegActionSummary_EnforcementData_', 
+                                  Sys.Date(), 
+                                  '.csv'), 
                 content = function(con) {
                     write_csv(enforcement_all_download %>% 
                                   filter(enf_action_date >= start_date(), 
