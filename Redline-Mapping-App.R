@@ -81,6 +81,9 @@
             arrange(site_id) %>% 
             # slice(1:50000) %>% 
             {.}
+            # check (NOTE: no missing coordinate data in the flat file)
+                # range(calepa_reg_sites$latitude)
+                # range(calepa_reg_sites$longitude)
     # define choices for sources of CalEPA regulated site data
         site_source_choices <- c('None',
                                  'All Sites (Source: CalEPA Regulated Site Portal)', 
@@ -277,36 +280,41 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                 ),
                 # Main panel for displaying outputs 
                 mainPanel(
-                  fluidRow(
-                      p(tags$b('NOTE:'), 'Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off.'),
-                      p('Tabular data for the selected sites is available to view/download below the maps.'),
-                      column(6, 
-                             #tags$h4('Environmental / Public Health Indicators & Regulated Facilities:'),
-                             tags$h4('CalEPA Data:'),
-                             leafletOutput(outputId = 'map1', height = 800) %>% withSpinner(color="#0dc5c1")),
-                      column(6, 
-                             tags$h4('HOLC Rated (Redlined) Areas:'),
-                             leafletOutput(outputId = 'map2', height = 800)%>% withSpinner(color="#0dc5c1"))
-                      ),
-                  fluidRow(
-                      hr(style="border: 3px solid darkgrey"),
-                      h4('Tabular Data For Selected Sites & Regulatory Actions:')
-                      ),
-                  fluidRow(
-                      div(style="display:inline-block;vertical-align:top;",
-                          p('Download all supporting regulatory data: ', style = 'display:inline'), HTML('&emsp;'),
-                          downloadButton('downloadInspections', 'Inspection Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;'),
-                          downloadButton('downloadViolations', 'Violation Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;'),
-                          downloadButton('downloadEnforcements', 'Enforcement Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;')
-                  ),
-                  fluidRow(
-                      hr(),
-                      downloadButton('download_summary', 'Download Data', class = "buttonstyle"),
-                      DT::dataTableOutput('summary_table')
-                  )
-                  )
+                    fluidRow(
+                        p(tags$b('NOTE:'), 
+                          paste('Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off.', 
+                                'Tabular data for the selected sites is available to view/download below the maps.')
+                        ),
+                        column(6, 
+                               #tags$h4('Environmental / Public Health Indicators & Regulated Facilities:'),
+                               tags$h4('CalEPA Data:'),
+                               leafletOutput(outputId = 'map1', height = 700) %>% withSpinner(color="#0dc5c1")),
+                        column(6, 
+                               tags$h4('HOLC Rated (Redlined) Areas:'),
+                               leafletOutput(outputId = 'map2', height = 700) %>% withSpinner(color="#0dc5c1"))
+                    ),
+                    fluidRow(
+                        hr(style="border: 3px solid darkgrey"),
+                        h4('Tabular Data For Selected Sites & Regulatory Actions:')
+                    ),
+                    fluidRow(
+                        div(style="display:inline-block;vertical-align:top;",
+                            p('Download all supporting regulatory data: ', style = 'display:inline'), HTML('&emsp;'),
+                            downloadButton('downloadInspections', 'Inspection Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;'),
+                            downloadButton('downloadViolations', 'Violation Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;'),
+                            downloadButton('downloadEnforcements', 'Enforcement Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;')
+                        )
+                    ),
+                    fluidRow(
+                        hr(),
+                        div(style="display:inline-block;vertical-align:top;",
+                            p('Download data in the table below: ', style = 'display:inline'), HTML('&emsp;'),  
+                            downloadButton('download_summary', 'Download Data', class = "buttonstyle"), HTML('&emsp;')
+                        ),
+                        DT::dataTableOutput('summary_table')
+                    )
                 )
-            )
+            ),
         ),
     # Analysis Tab ----
     tabPanel('Redline-CES Analysis',
@@ -768,8 +776,8 @@ server <- function(input, output) {
                          {
                              return(
                                  inspections_all_download %>% 
-                                     # filter(eval_date >= start_date(),
-                                     #        eval_date <= end_date()) %>%
+                                     filter(eval_date >= start_date(),
+                                            eval_date <= end_date()) %>%
                                      filter(site_id %in% (cal_epa_sites_raw() %>% 
                                                               pull(site_id))) %>%
                                      group_by(site_id) %>%
@@ -963,17 +971,35 @@ server <- function(input, output) {
                     shiny::showNotification("No data", type = "error")
                     NULL
                 } else {
+                    parameter <- ces_choices %>% 
+                        filter(name == input$ces_parameter) %>% 
+                        pull(ces_variable)
+                    ces3_poly_join <- ces3_poly() %>% # create a df with the ces3 polygons, with just the selected ces score
+                        select(all_of(parameter)) %>% 
+                        rename(ces3_polygon_score := !!parameter) # rename the field to use a consistent name (the ces measure/parameter will be reported in a separate field)
+                #     parameter <- ces_choices %>% filter(name == input$ces_parameter) %>% pull(ces_variable)
+                #     ces_pal_domain <- as.data.frame(ces3_poly() %>% st_drop_geometry()) %>% 
+                #         select(all_of(parameter)) %>% 
+                #         pull(all_of(parameter))
+                # # get the dataset
+                #     ces3_poly <- ces3_poly() %>% 
+                #         st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
+                #         mutate(fill_variable = ces_pal_domain)
                     return( 
                         cal_epa_sites_filtered() %>% 
                             st_join(redline_polygons %>% select(-city)) %>% 
+                            st_join(ces3_poly_join) %>%
                             select(site_id, site_name, address,
                                    city, state, zip_code, 
                                    inspections_count, violations_count,
                                    enforcements_count, data_source, 
                                    latitude, longitude,
-                                   holc_grade) %>% 
+                                   holc_grade, 
+                                   ces3_polygon_score
+                                   ) %>% 
                             # rename(!!paste0('inspections_', col_name_custom()) := 'inspections_count') %>% 
-                            st_drop_geometry() %>% 
+                            st_drop_geometry() %>%
+                            mutate(ces3_measure = input$ces_parameter) %>% 
                             mutate(reg_action_filter_start_date = if (is.na(input$sites_date_range[1]) | # this adds a new column showing the start date filter
                                                            is.null(input$sites_date_range[1])) {
                                 NA
@@ -992,6 +1018,10 @@ server <- function(input, output) {
                                         )
                                         }) %>% 
                             rename(holc_polygon_grade = holc_grade) %>% 
+                            # for cases where there are multiple joins on the CES data (overlapping polygons)
+                            filter(ces3_polygon_score >= input$ces_range_filter[1] & # first re-filter for sites within the selected range
+                                       ces3_polygon_score <= input$ces_range_filter[2]) %>% 
+                            filter(!duplicated(site_id)) %>%  # if duplicates still remain, just keep the first one
                             {.}
                     )
                 }
@@ -1355,6 +1385,8 @@ server <- function(input, output) {
                                          stroke = TRUE, weight = 0.5, color = 'black', opacity = 1,
                                          fill = TRUE, fillOpacity = 1, fillColor = 'black', # 'grey', # ~wqi.leaflet.pal(WQI),
                                          # clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier = 2),# freezeAtZoom = 13, maxClusterRadius = 10),#,#singleMarkerMode = TRUE),
+                                         clusterOptions = markerClusterOptions(disableClusteringAtZoom = 13, 
+                                                                               maxClusterRadius = 60),
                                          popup = ~paste0('<b>', '<u>', 'CalEPA Regulated Site', '</u>','</b>','<br/>',
                                                          # '<b>', '<u>', 'Site Information:', '</u>', '</b>','<br/>',
                                                          '<b>', 'Name: ', '</b>', site_name,'<br/>',

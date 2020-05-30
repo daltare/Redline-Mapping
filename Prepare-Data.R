@@ -126,27 +126,38 @@
         ces3_poly <- st_read(here('data_raw',
                                    'CalEnviroScreen3',
                                    'CESJune2018Update_SHP',
-                                   'CES3June2018Update.shp')) %>%
-            st_transform(4326)
+                                   'CES3June2018Update.shp')) #%>%
+            #st_transform(4326)
+            st_crs(ces3_poly)
+        # Fix self-intersecting polygons
+        if (sum(!st_is_valid(ces3_poly)) > 0) {
+            ces3_poly <- sf::st_buffer(ces3_poly, dist = 0)
+        }
     # revise column names
         ces3_names <- read_csv('data_prepared/ces_names.csv') %>% # manually prepared this file to make more descriptive names for the fields
             mutate(ces_variable = make_clean_names(name, 'parsed'))
         ces3_names_cleaned <- c(ces3_names %>% pull(ces_variable), 'geometry')
         names(ces3_poly) <- ces3_names_cleaned
     # save to geopackage file
-        st_write(obj = ces3_poly, 
-                 here('data_prepared', 'ces3_poly.gpkg'))
+        st_write(obj = ces3_poly %>% st_transform(4326), 
+                 here('data_prepared', 'ces3_poly.gpkg'),
+                 append = FALSE)
     # simplify
         ces3_poly_simplify <- ces3_poly %>% 
                 # ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
-                ms_simplify(keep = 0.3, keep_shapes = TRUE, snap = TRUE)
+                ms_simplify(keep = 0.3)#, keep_shapes = TRUE, snap = TRUE)
+        # Fix self-intersecting polygons
+        if (sum(!st_is_valid(ces3_poly_simplify)) > 0) {
+            ces3_poly_simplify <- sf::st_buffer(ces3_poly_simplify, dist = 0)
+        }
         # check
             # object_size(ces3_poly_simplify)
             # object_size(ces3_poly)
             # mapview::mapview(ces3_poly_simplify %>% filter(Nearby_City == 'Sacramento'))
     # save simplified version to geopackage file
-        st_write(obj = ces3_poly_simplify, 
-                 here('data_prepared', 'ces3_poly_simplified.gpkg'))
+        st_write(obj = ces3_poly_simplify %>% st_transform(4326), 
+                 here('data_prepared', 'ces3_poly_simplified.gpkg'),
+                 append = FALSE)
 
         
 # Water Supplier Service Areas ----------------------------------------------------------------------------------------------
