@@ -16,4 +16,6 @@ Evaluations.csv
 SiteEI.csv
 Violations.csv
 Site.csv
+Coordinates.csv
 inspections_check/
+API_Sites_With_Missing_Coordinates.R

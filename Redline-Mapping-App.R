@@ -774,16 +774,20 @@ server <- function(input, output) {
                          style = 'notification', 
                          value = 1, 
                          {
-                             return(
-                                 inspections_all_download %>% 
-                                     filter(eval_date >= start_date(),
-                                            eval_date <= end_date()) %>%
-                                     filter(site_id %in% (cal_epa_sites_raw() %>% 
-                                                              pull(site_id))) %>%
-                                     group_by(site_id) %>%
-                                     summarize(inspections_count = n()) %>%
-                                     {.}
-                             )
+                             if (nrow(cal_epa_sites_raw()) > 0) {
+                                 return(
+                                     inspections_all_download %>% 
+                                         filter(eval_date >= start_date(),
+                                                eval_date <= end_date()) %>%
+                                         filter(site_id %in% (cal_epa_sites_raw() %>% 
+                                                                  pull(site_id))) %>%
+                                         group_by(site_id) %>%
+                                         summarize(inspections_count = n()) %>%
+                                         {.}
+                                 )
+                             } else {
+                                 return(tibble())
+                             }
                          })
         })
         # inspection_types <- reactive({
@@ -799,16 +803,20 @@ server <- function(input, output) {
                          style = 'notification', 
                          value = 1, 
                          {
-                             return(
-                                 violations_all_download %>% 
-                                     filter(violation_date >= start_date(),
-                                            violation_date <= end_date()) %>%
-                                     filter(site_id %in% (cal_epa_sites_raw() %>% 
-                                                              pull(site_id))) %>%
-                                     group_by(site_id) %>%
-                                     summarize(violations_count = n()) %>%
-                                     {.}
-                             )
+                             if (nrow(cal_epa_sites_raw()) > 0) {
+                                 return(
+                                     violations_all_download %>% 
+                                         filter(violation_date >= start_date(),
+                                                violation_date <= end_date()) %>%
+                                         filter(site_id %in% (cal_epa_sites_raw() %>% 
+                                                                  pull(site_id))) %>%
+                                         group_by(site_id) %>%
+                                         summarize(violations_count = n()) %>%
+                                         {.}
+                                 )
+                             } else {
+                                 return(tibble())
+                             }
                          })
         })
         enforcement_summary <- reactive({
@@ -816,16 +824,20 @@ server <- function(input, output) {
                          style = 'notification', 
                          value = 1, 
                          {
-                             return(
-                                 enforcement_all_download %>% 
-                                     filter(enf_action_date >= start_date(),
-                                            enf_action_date <= end_date()) %>%
-                                     filter(site_id %in% (cal_epa_sites_raw() %>% 
-                                                              pull(site_id))) %>%
-                                     group_by(site_id) %>%
-                                     summarize(enforcements_count = n()) %>%
-                                     {.}
-                             )
+                             if (nrow(cal_epa_sites_raw()) > 0) {
+                                 return(
+                                     enforcement_all_download %>% 
+                                         filter(enf_action_date >= start_date(),
+                                                enf_action_date <= end_date()) %>%
+                                         filter(site_id %in% (cal_epa_sites_raw() %>% 
+                                                                  pull(site_id))) %>%
+                                         group_by(site_id) %>%
+                                         summarize(enforcements_count = n()) %>%
+                                         {.}
+                                 )
+                             } else {
+                                 return(tibble())
+                             }
                          })
         })
         
@@ -843,29 +855,33 @@ server <- function(input, output) {
             withProgress(message = 'Summarizing Regulatory Action Data', 
                          style = 'notification', 
                          value = 1, { # style = 'notification' 'old'
-
-
-        # join the regulatory data to the sites data
-            cal_epa_sites_summarized_compute <- cal_epa_sites_raw()
-            cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                # left_join(inspections_count, by = c('site_id'))
-                left_join(inspections_summary(), by = c('site_id'))
-            cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                # left_join(violations_count, by = c('site_id'))
-                left_join(violations_summary(), by = c('site_id'))
-            cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                # left_join(enforcement_count, by = c('site_id')) %>%
-                left_join(enforcement_summary(), by = c('site_id'))
-        # replace NAs with zeros for the counts
-            cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                mutate(inspections_count = case_when(is.na(inspections_count) ~ 0L,
-                                                     TRUE ~ inspections_count),
-                       violations_count = case_when(is.na(violations_count) ~ 0L,
-                                                    TRUE ~ violations_count),
-                       enforcements_count = case_when(is.na(enforcements_count) ~ 0L,
-                                                      TRUE ~ enforcements_count))
-        })
-        return(cal_epa_sites_summarized_compute)
+                             
+                             if (nrow(cal_epa_sites_raw()) > 0) {
+                                 # join the regulatory data to the sites data
+                                 cal_epa_sites_summarized_compute <- cal_epa_sites_raw()
+                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+                                     # left_join(inspections_count, by = c('site_id'))
+                                     left_join(inspections_summary(), by = c('site_id'))
+                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+                                     # left_join(violations_count, by = c('site_id'))
+                                     left_join(violations_summary(), by = c('site_id'))
+                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+                                     # left_join(enforcement_count, by = c('site_id')) %>%
+                                     left_join(enforcement_summary(), by = c('site_id'))
+                                 # replace NAs with zeros for the counts
+                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+                                     mutate(inspections_count = case_when(is.na(inspections_count) ~ 0L,
+                                                                          TRUE ~ inspections_count),
+                                            violations_count = case_when(is.na(violations_count) ~ 0L,
+                                                                         TRUE ~ violations_count),
+                                            enforcements_count = case_when(is.na(enforcements_count) ~ 0L,
+                                                                           TRUE ~ enforcements_count))
+                                 
+                                 return(cal_epa_sites_summarized_compute)
+                             } else {
+                                 return(tibble())
+                             }
+                         })
         }) 
             
 
@@ -876,8 +892,9 @@ server <- function(input, output) {
         cal_epa_sites_filtered_0 <- reactive({
             withProgress(message = 'Filtering Regulatory Action Data',
                          style = 'notification', value = 1, { # style = 'notification' 'old'
-                             cal_epa_sites_filtered_0_compute <- cal_epa_sites_summarized()
-                             # 1 - filter for sites with inspections, violations, and/or enforcement records > 0
+                             if (nrow(cal_epa_sites_raw()) > 0) {
+                                 cal_epa_sites_filtered_0_compute <- cal_epa_sites_summarized()
+                                 # 1 - filter for sites with inspections, violations, and/or enforcement records > 0
                                  if ('Inspections' %in% input$show_violations_enforcement) {
                                      cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
                                          filter(inspections_count > 0)
@@ -890,44 +907,53 @@ server <- function(input, output) {
                                      cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
                                          filter(enforcements_count > 0)
                                  }
-                             # 2 - filter for sites by CES polygon score
-                                # find the CES polygons that meet the selected criteria (range of values)
-                                     parameter <- ces_choices %>% 
-                                         filter(name == input$ces_parameter) %>% 
-                                         pull(ces_variable)
-                                     ces3_poly_filtered <- ces3_poly() %>% 
-                                         filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>%
-                                         # filter(CES_3_Score >= input$ces_range_filter[1]) %>% 
-                                         filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
-                                         # filter(CES_3_Score <= input$ces_range_filter[2]) %>%
-                                         st_as_sf() %>% 
-                                         {.}
+                                 # 2 - filter for sites by CES polygon score
+                                 # find the CES polygons that meet the selected criteria (range of values)
+                                 parameter <- ces_choices %>% 
+                                     filter(name == input$ces_parameter) %>% 
+                                     pull(ces_variable)
+                                 ces3_poly_filtered <- ces3_poly() %>% 
+                                     filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>%
+                                     # filter(CES_3_Score >= input$ces_range_filter[1]) %>% 
+                                     filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
+                                     # filter(CES_3_Score <= input$ces_range_filter[2]) %>%
+                                     st_as_sf() %>% 
+                                     {.}
                                  # filter for sites with CES polygons meeting the selected criteria
-                                    cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[ces3_poly_filtered, ] # filter for sites within the selected ces polygons
-                             # 3 - filter for sites by HOLC rating
-                                if (input$holc_rating_sites_filter_on_off == TRUE) {
-                                    cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[redline_polygons %>% 
-                                                                                                             filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
-                                                                                                             filter(city %in% input$holc_city_sites_filter), ]
-                                }
+                                 cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[ces3_poly_filtered, ] # filter for sites within the selected ces polygons
+                                 # 3 - filter for sites by HOLC rating
+                                 if (input$holc_rating_sites_filter_on_off == TRUE) {
+                                     cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[redline_polygons %>% 
+                                                                                                              filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                                                                                              filter(city %in% input$holc_city_sites_filter), ]
+                                 }
+                                 
+                                 return(cal_epa_sites_filtered_0_compute)
+                             } else {
+                                 return(tibble())
+                             }
                          })
-            return(cal_epa_sites_filtered_0_compute)
         })
 
     # filter for sites by program type if selected
         cal_epa_sites_filtered <- reactive({
             withProgress(message = 'Filtering Regulatory Action Data', 
                          style = 'notification', value = 1, { # style = 'notification' 'old'
-                        cal_epa_sites_filtered_compute <- cal_epa_sites_filtered_0()
-                        # if program type filters are selected, filter for the selected program types
-                             if (!is.null(input$program_type_1)) {
-                                 program_types_filter <- program_types %>% 
-                                     filter(ei_description %in% input$program_type_1)
-                                 cal_epa_sites_filtered_compute <- cal_epa_sites_filtered_compute %>% 
-                                     filter(site_id %in% program_types_filter$site_id)
+                             if (nrow(cal_epa_sites_raw()) > 0) {
+                                 cal_epa_sites_filtered_compute <- cal_epa_sites_filtered_0()
+                                 # if program type filters are selected, filter for the selected program types
+                                 if (!is.null(input$program_type_1)) {
+                                     program_types_filter <- program_types %>% 
+                                         filter(ei_description %in% input$program_type_1)
+                                     cal_epa_sites_filtered_compute <- cal_epa_sites_filtered_compute %>% 
+                                         filter(site_id %in% program_types_filter$site_id)
+                                 }
+                                 
+                                 return(cal_epa_sites_filtered_compute)
+                             } else {
+                                 return(tibble())
                              }
                          })
-            return(cal_epa_sites_filtered_compute)
         })
 
     # create a dynamic input for program type
@@ -935,7 +961,7 @@ server <- function(input, output) {
             selectInput(inputId = 'program_type_1',
                         label = '**Filter Sites By Program Type:**',
                         multiple = TRUE,
-                        choices = if (length(input$site_type_1) > 0 | input$sites_source == site_source_choices[3]) {
+                        choices = if (nrow(cal_epa_sites_raw()) > 0) { #(length(input$site_type_1) > 0 | input$sites_source == site_source_choices[3]) {
                             program_types %>%
                                 filter(site_id %in% (cal_epa_sites_filtered_0()$site_id)) %>%
                                 # st_drop_geometry() %>%
@@ -964,12 +990,15 @@ server <- function(input, output) {
             # })
         # revise the data frame
             summary_table_df <- reactive({ # eventReactive(input$site_type_1, {
-                if(input$sites_source == site_source_choices[1]) { 
+                # if(input$sites_source == site_source_choices[1]) { 
+                #     shiny::showNotification("No data", type = "error")
+                #     NULL
+                # } else if (input$sites_source == site_source_choices[3] & length(input$site_type_1) == 0) {
+                #     shiny::showNotification("No data", type = "error")
+                #     NULL
+                if (nrow(cal_epa_sites_raw()) == 0) {
                     shiny::showNotification("No data", type = "error")
-                    NULL
-                } else if (input$sites_source == site_source_choices[3] & length(input$site_type_1) == 0) {
-                    shiny::showNotification("No data", type = "error")
-                    NULL
+                    return(NULL)
                 } else {
                     parameter <- ces_choices %>% 
                         filter(name == input$ces_parameter) %>% 
