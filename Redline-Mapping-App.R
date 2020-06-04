@@ -13,8 +13,9 @@
             projected_crs <- 3310 # other options: 26910 -- see: https://epsg.io/3310 and https://epsg.io/26910
             geographic_crs <- 4326 # see: https://epsg.io/4326
     
-    # initial selected city
-        initial_selected_city <- 'Sacramento' 
+    # initial zoom level / location
+         initial_zoom_level <- 'State' # options: 'Redline Bounds (All)', 'State','City'
+        # initial_selected_city <- 'Sacramento' # un-comment this line if the 'City' option is selected in the line above
     
 # Load Packages ----
     # Shiny platform
@@ -79,15 +80,16 @@
                    data_source = 'CalEPA Regulated Site Portal') %>% 
             # mutate(coordinates = Map(c, longitude, latitude)) %>%  # see: https://stackoverflow.com/a/46396386
             arrange(site_id) %>% 
-            # slice(1:50000) %>% 
+            mutate(site_id = factor(site_id)) %>%
             {.}
             # check (NOTE: no missing coordinate data in the flat file)
                 # range(calepa_reg_sites$latitude)
                 # range(calepa_reg_sites$longitude)
     # define choices for sources of CalEPA regulated site data
         site_source_choices <- c('None',
-                                 'All Sites (Source: CalEPA Regulated Site Portal)', 
-                                 'Select By Type (Source: CalEPA Geoserver)')
+                                 'Select By Type (Source: CalEPA Geoserver)'#,
+                                 #'All Sites (Source: CalEPA Regulated Site Portal)'
+                                 )
         
     # List of program types to select
         program_types <- fread('data_regulatory_actions/SiteEI.csv') %>%
@@ -115,7 +117,9 @@
                 clean_names() %>%
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(eval_date = mdy(eval_date)) %>% 
-                arrange(site_id, eval_date)
+                arrange(site_id, eval_date) %>% 
+                mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+                {.}
         # violations
             violations_all_download <- fread('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
                 # violations_all_download <- read_csv('data_regulatory_actions/Violations.zip') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
@@ -125,7 +129,9 @@
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(violation_date = mdy(violation_date)) %>% 
-                arrange(site_id, violation_date)        
+                arrange(site_id, violation_date) %>% 
+                mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+                {.}      
         # enforcement actions
             enforcement_all_download <- fread('data_regulatory_actions/EA.csv') %>%
                 # enforcement_all_download <- read_csv('data_regulatory_actions/Enforcements.zip') %>% 
@@ -135,7 +141,9 @@
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(enf_action_date = mdy(enf_action_date)) %>% 
-                arrange(site_id, enf_action_date)
+                arrange(site_id, enf_action_date) %>% 
+                mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+                {.}
         # get the date of the most recent regulatory records
             most_recent_reg_records <- max(
                 max(inspections_all_download %>% 
@@ -174,9 +182,9 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                 sidebarPanel(
                     # Inputs: 
                     selectInput(inputId = 'city_selected_1', 
-                                label = 'Zoom To City:', 
-                                choices = c(unique(redline_polygons$city)), 
-                                selected = initial_selected_city), # 'All'
+                                label = 'Zoom To:', 
+                                choices = c('Statewide', unique(redline_polygons$city)), 
+                                selected = 'Statewide'), # 'All'
                     hr(style="border: 1px solid darkgrey"),
                     h4('CalEPA Regulated Sites:'),
                     # checkboxGroupInput(inputId = 'site_type_1', 
@@ -270,27 +278,40 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         # NOTE: can be either static (showing all options) or dynamic (showing only the options available as the result of the filtered sites))
                         # the dynamic option might be problematic becasue it automatically resets every time a new filter is chosen
                     uiOutput('program_type_1'),
-                    tags$em(p('**this filter resets whenever the other filters above are changed'))
+                    tags$em(p('**this filter resets whenever the other filters above are changed')),
                     # selectInput(inputId = 'program_type_1',
                     #             label = 'Filter Sites By Program Type:',
                     #             multiple = TRUE,
                     #             choices = program_types_distinct)
-                    # hr(style="border: 1px solid darkgrey"),
-                    # p(tags$b('NOTE:'), 'Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off.')
+                    hr(style="border: 1px solid darkgrey"),
+                    h4('Additional Map Layers:'),
+                    selectInput(inputId = 'additional_map_layers',
+                                label = 'Select Layers:',
+                                choices = c('303d Listed Waterbodies', 
+                                            'Drinking Water Provider Service Areas',
+                                            'State Water Board Region Boundaries'),
+                                selected = NULL, 
+                                multiple = TRUE),
+                    hr(),
+                    br(),
+                    br()
                 ),
                 # Main panel for displaying outputs 
                 mainPanel(
                     fluidRow(
                         p(tags$b('NOTE:'), 
-                          paste('Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off.', 
-                                'Tabular data for the selected sites is available to view/download below the maps.')
-                        ),
+                          paste('Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off (some map layers must be activated in the sidebar on the left first).', 
+                                'Tabular data for the selected sites is available to view/download below the maps.')#,
+                          # hr()
+                        )),
+                    fluidRow(
                         column(6, 
-                               #tags$h4('Environmental / Public Health Indicators & Regulated Facilities:'),
                                tags$h4('CalEPA Data:'),
+                               # p(tags$b('CalEPA Data:')),
                                leafletOutput(outputId = 'map1', height = 700) %>% withSpinner(color="#0dc5c1")),
                         column(6, 
-                               tags$h4('HOLC Rated (Redlined) Areas:'),
+                               tags$h4('HOLC (Redline) Data:'),
+                               # p(tags$b('HOLC (Redline) Data:')),
                                leafletOutput(outputId = 'map2', height = 700) %>% withSpinner(color="#0dc5c1"))
                     ),
                     fluidRow(
@@ -448,7 +469,7 @@ server <- function(input, output) {
     
     observe({
         toggle(id = 'site_type_1',
-               condition = input$sites_source == site_source_choices[3])
+               condition = input$sites_source == 'Select By Type (Source: CalEPA Geoserver)')
       })
 
     # get reactive values (to isolate from each other and prevent map from completely rebuilding when an input is changed) 
@@ -659,7 +680,7 @@ server <- function(input, output) {
 
         # Get the CalEPA regulated sites
             cal_epa_sites_raw <- reactive({
-                if (input$sites_source == site_source_choices[2]) {
+                if (input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
                     # Create an sf object using the sites data from the saved flat file
                     cal_epa_sites_raw_download <- st_as_sf(calepa_reg_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
                                                            coords = c('longitude', 'latitude'),
@@ -667,11 +688,11 @@ server <- function(input, output) {
                                                            # agr = 'constant',
                                                            remove = FALSE)
                     # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
-                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
-                        # st_crs(cal_epa_sites_raw_download)
+                    cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
+                    # st_crs(cal_epa_sites_raw_download)
                     # return the object
-                        return(cal_epa_sites_raw_download)
-                } else if (input$sites_source == site_source_choices[3] & 
+                    return(cal_epa_sites_raw_download)
+                } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & 
                            length(input$site_type_1) > 0) {    
                     withProgress(message = 'Getting Site Data', style = 'notification', value = 1, { # style = 'notification' 'old'
                     # })
@@ -739,8 +760,11 @@ server <- function(input, output) {
                     # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
                         cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
                         # st_crs(cal_epa_sites_raw_download)
-                        # return the object
-                            return(cal_epa_sites_raw_download)
+                    # convert site_id column to factor
+                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
+                            mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id))
+                    # return the object
+                        return(cal_epa_sites_raw_download)
                 } else {
                         return(tibble())
                     }
@@ -876,7 +900,6 @@ server <- function(input, output) {
                                                                          TRUE ~ violations_count),
                                             enforcements_count = case_when(is.na(enforcements_count) ~ 0L,
                                                                            TRUE ~ enforcements_count))
-                                 
                                  return(cal_epa_sites_summarized_compute)
                              } else {
                                  return(tibble())
@@ -961,7 +984,7 @@ server <- function(input, output) {
             selectInput(inputId = 'program_type_1',
                         label = '**Filter Sites By Program Type:**',
                         multiple = TRUE,
-                        choices = if (nrow(cal_epa_sites_raw()) > 0) { #(length(input$site_type_1) > 0 | input$sites_source == site_source_choices[3]) {
+                        choices = if (nrow(cal_epa_sites_raw()) > 0) { #(length(input$site_type_1) > 0 | input$sites_source == 'Select By Type (Source: CalEPA Geoserver)') {
                             program_types %>%
                                 filter(site_id %in% (cal_epa_sites_filtered_0()$site_id)) %>%
                                 # st_drop_geometry() %>%
@@ -993,7 +1016,7 @@ server <- function(input, output) {
                 # if(input$sites_source == site_source_choices[1]) { 
                 #     shiny::showNotification("No data", type = "error")
                 #     NULL
-                # } else if (input$sites_source == site_source_choices[3] & length(input$site_type_1) == 0) {
+                # } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & length(input$site_type_1) == 0) {
                 #     shiny::showNotification("No data", type = "error")
                 #     NULL
                 if (nrow(cal_epa_sites_raw()) == 0) {
@@ -1162,21 +1185,29 @@ server <- function(input, output) {
                 contentType = 'text/csv'
             )
 
+
     # MAP 1 -----------------------------------------------------------------------------------------------------------------#
     output$map1 <- renderLeaflet({
         withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
-        # get the bounds of the HOLC (redline) polygons for the selected city
-            # bounds_1 <- attributes(st_geometry(redline_polygons %>% filter(city == input$city_selected_1)))$bbox
-            bounds_1 <- attributes(st_geometry(redline_polygons %>% 
-                                                   st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
-                                                   filter(city == initial_selected_city)))$bbox
-
-        
+            
+        # specify the initial zoom level to use in the map
+            if (initial_zoom_level == 'Redline Bounds (All)') {
+                bounds_selected <- attributes(st_geometry(redline_polygons %>% 
+                                                              st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            } else if (initial_zoom_level == 'State') {
+                bounds_selected <- attributes(st_geometry(rb_boundary() %>%
+                                               st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            } else if (initial_zoom_level == 'City') {
+                bounds_selected <- attributes(st_geometry(redline_polygons %>%
+                                                              st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                                              filter(city == initial_selected_city)))$bbox
+            }
+            
         # create the new (empty) map
             l_map1 <- leaflet()
             
             l_map1 <- l_map1 %>% addMapPane("ces_polygons", zIndex = 410) %>% 
-                addMapPane("redline_polygons", zIndex = 420) %>% 
+                addMapPane("redline_polygons_pane", zIndex = 420) %>% 
                 addMapPane("303d_lines", zIndex = 430) %>% 
                 addMapPane("303d_polygons", zIndex = 440) %>% 
                 addMapPane("region_polygon", zIndex = 450) %>% 
@@ -1204,16 +1235,18 @@ server <- function(input, output) {
             )
         
         # create a button to center the map on CA
-            bounds_ca <- attributes(st_geometry(rb_boundary() %>%
-                                       st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
-            l_map1 <- l_map1 %>% 
-                addEasyButton(easyButton(
-                    icon="fa-globe", title="Statewide View",
-                    onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
-                                      round(bounds_ca[[2]],4)-0.01, ', ',
-                                      round(bounds_ca[[1]],4)-0.01, '],[',
-                                      round(bounds_ca[[4]],4)+0.01, ', ',
-                                      round(bounds_ca[[3]],4)+0.01, ']]); }'))))
+            # get the bounds of the entire state
+                bounds_ca <- attributes(st_geometry(rb_boundary() %>%
+                               st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            # make button
+                l_map1 <- l_map1 %>% 
+                    addEasyButton(easyButton(
+                        icon="fa-globe", title="Statewide View",
+                        onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+                                          round(bounds_ca[[2]],4)-0.01, ', ',
+                                          round(bounds_ca[[1]],4)-0.01, '],[',
+                                          round(bounds_ca[[4]],4)+0.01, ', ',
+                                          round(bounds_ca[[3]],4)+0.01, ']]); }'))))
         # add a 'locate me' button
             l_map1 <- l_map1 %>% 
                 addEasyButton(easyButton(
@@ -1222,154 +1255,19 @@ server <- function(input, output) {
         # add measurement button
             l_map1 <- l_map1 %>% 
                 addMeasure()
-
-        # Add the 303d polygons
-            # add polygons
-                l_map1 <- l_map1 %>% addPolygons(data = impaired_303d_poly() %>% st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
-                                                 options = pathOptions(pane = "303d_polygons"),
-                                                 color = 'darkblue',
-                                                 weight = 0.5,
-                                                 opacity = 0.8,
-                                                 fillColor = 'blue',
-                                                 fillOpacity = 0.5,
-                                                 smoothFactor = 1.0,
-                                                 highlightOptions = highlightOptions(color = "white", weight = 2),
-                                                 popup = ~paste0('<b>', '<u>', '303d Listed Waterbody (2014/2016)', '</u>', '</b>', '<br/>',
-                                                                 '<b>', 'Water Body Name: ', '</b>', wbname, '<br/>',
-                                                                 '<b>', 'Type: ', '</b>', wbtype, '<br/>',
-                                                                 '<b>', 'Region: ', '</b>', region_num, ' (', region_nam,')', '<br/>',
-                                                                 '<b>', 'ID: ', '</b>', wbid, '<br/>',
-                                                                 '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
-                                                                 '<b>', 'Listing Comments: ', '</b>', comments, '<br/>',
-                                                                 '<b>', 'Potential Sources: ', '</b>', sources),
-                                                 group = '303d Listed Waters')
-
-        # Add the 303d lines
-            # add polylines
-                l_map1 <- l_map1 %>% addPolylines(data = impaired_303d_lines() %>% 
-                                                      st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet 
-                                                  options = pathOptions(pane = "303d_lines"),
-                                                  color = 'blue',
-                                                  weight = 2.0, 
-                                                  opacity = 1.0, 
-                                                  # fillOpacity = 0.5,
-                                                  smoothFactor = 1.0,
-                                                  highlightOptions = highlightOptions(color = "white", weight = 2),
-                                                  popup = ~paste0('<b>', '<u>','303d Listed Waterbody (2014/2016)','</u>', '</b>','<br/>',
-                                                                  '<b>', 'Water Body Name: ', '</b>', wbname,'<br/>',
-                                                                  '<b>', 'Type: ', '</b>', wbtype,'<br/>',
-                                                                  '<b>', 'Region: ', '</b>', region_num, ' (', region_nam,')','<br/>',
-                                                                  '<b>', 'ID: ', '</b>', wbid, '<br/>',
-                                                                  '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
-                                                                  '<b>', 'Listing Comments: ', '</b>', comments,  '<br/>',
-                                                                  '<b>', 'Potential Sources: ', '</b>', sources),
-                                                  group = '303d Listed Waters')
-
-        
-        # add the region boundary
-            l_map1 <- l_map1 %>% addPolygons(data = rb_boundary() %>% 
-                                                 st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
-                                             options = pathOptions(pane = "region_polygon"),
-                                             color = 'black', # "#444444",
-                                             weight = 1.0,
-                                             smoothFactor = 1.0,
-                                             opacity = 1.0,
-                                             fill = FALSE,
-                                             # fillOpacity = 0.5,
-                                             # fillColor = 'lightblue',
-                                             # fillColor = ~redline_leaflet_pal(holc_grade),
-                                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                                             popup = ~paste0('<b>', '<u>', 'Regional Board Boundary', '</u>', '</b>','<br/>',
-                                                             '<b>', 'Region Name: ', '</b>', RB_NAME, '<br/>',
-                                                             '<b>', 'Region Number: ', '</b>', RB_OFF),
-                                             group = 'Regional Board Boundary'
-            )
-        
-        # add the drinking water provider service areas
-            # add polygons
-                l_map1 <- l_map1 %>% 
-                    addPolygons(data = service_areas() %>% 
-                                    st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
-                                options = pathOptions(pane = "serviceareas_polygon"),
-                                color = 'black', # "#444444", 
-                                weight = 0.5, 
-                                smoothFactor = 1.0,
-                                opacity = 0.8, 
-                                fillOpacity = 0.5,
-                                fillColor = 'lightblue',
-                                highlightOptions = highlightOptions(color = "white", weight = 2),
-                                popup = ~paste0('<b>', '<u>','Drinking Water Provider Service Area Boundary', '</u>','</b>','<br/>',
-                                                '<b>', 'PWSID: ', '</b>', pwsid,'<br/>',
-                                                '<b>', 'Name: ', '</b>',  name,'<br/>',
-                                                '<b>', 'County: ', '</b>', d_prin_cnt,'<br/>',
-                                                '<b>', 'Population: ', '</b>', d_populati,'<br/>'),
-                                                #'<b>', 'Verified: ', '</b>', verified_s), # verified_status
-                                group = 'Drinking Water Provider Service Areas'
-                    )
-
-        
-        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
-            isolate(if (is.null(input$map1_bounds)) {
-                l_map1 <- l_map1 %>% fitBounds(lng1 = bounds_1[[1]],
-                                               lat1 = bounds_1[[2]],
-                                               lng2 = bounds_1[[3]],
-                                               lat2 = bounds_1[[4]])
-            } else { # maintain the current view
-                l_map1 <- l_map1 %>% setView(lng = mean(c(input$map1_bounds$west, input$map1_bounds$east)),
-                                             lat = mean(c(input$map1_bounds$north, input$map1_bounds$south)),
-                                             zoom = input$map1_zoom)
-            })
-
-        # Add controls to select the basemap and layers
-            l_map1 <- l_map1 %>% addLayersControl(baseGroups = basemap_options,
-                                                  overlayGroups = c('CalEnviroScreen', 
-                                                                    'HOLC Polygons', 
-                                                                    '303d Listed Waters', 
-                                                                    'CalEPA Regulated Sites',
-                                                                    'Drinking Water Provider Service Areas',
-                                                                    'Regional Board Boundary',
-                                                                    'Legend'),
-                                                  options = layersControlOptions(collapsed = TRUE,
-                                                                                 autoZIndex = TRUE))
-        # Hide some groups by default (can be turned on with the layers control box on the map)
-            l_map1 <- l_map1 %>% hideGroup(c('Drinking Water Provider Service Areas')) #, 'HOLC Polygons')) 
-                
-        # output the map object
-            l_map1
-        })
-    })
-    
-    # Use a separate observer to recreate some parts of the map as they are updated, without re-drawing the entire map ----
-        # # create a button to re-center the map - NOT WORKING!!!!!!!!!
-        #     observe({
-        #         bounds_1 <- attributes(st_geometry(redline_polygons %>% 
-        #                                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
-        #                                                filter(city == input$city_selected_1)))$bbox
-        #         leafletProxy('map1') %>% 
-        #             addEasyButton(easyButton(
-        #                 icon="fa-globe", title="Center Map on Selected City",
-        #                 onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
-        #                                   round(bounds_1[[2]],4)-0.01, ', ',
-        #                                   round(bounds_1[[1]],4)-0.01, '],[',
-        #                                   round(bounds_1[[4]],4)+0.01, ', ',
-        #                                   round(bounds_1[[3]],4)+0.01, ']]); }'))))
-        #     })
-    
-    
-        # HOLC rated (redlined) areas
-            observe({
-                withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
-                # Create the color palette for the Redline scores
+            
+        # Add the Redline scores
+            # Create the color palette for the Redline scores
                 redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
-                                                   domain = redline_polygons$holc_grade, 
+                                                   domain = redline_polygons$holc_grade,
                                                    levels = c('A', 'B', 'C', 'D'))
-                leafletProxy('map1') %>%
-                    clearGroup('HOLC Polygons') %>%
-                    addPolygons(data = redline_polygons %>% 
+            # Add polygons to map
+                 l_map1 <- l_map1 %>% 
+                    addPolygons(data = redline_polygons %>%
                                     st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
-                                    # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                    # filter(holc_grade %in% input$holc_rating_sites_filter) %>%
                                     {.},
-                                options = pathOptions(pane = "redline_polygons"),
+                                options = pathOptions(pane = "redline_polygons_pane"),
                                 color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
                                 weight = 2.0,
                                 smoothFactor = 1.0,
@@ -1382,16 +1280,191 @@ server <- function(input, output) {
                                 popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
                                                 '<b>', 'City: ', '</b>', city, '<br/>',
                                                 '<b>', 'Name: ', '</b>', name, '<br/>',
-                                                '<b>', 'Grade (A-D): ', '</b>', holc_grade),
+                                                '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                                '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                                # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>',
+                                                '<b>', paste0('HOLC Form Link (', year, '): '), '</b>',
+                                                paste0('<a href = "', link, '" ', 'target="_blank"> ', link, ' </a>')),
                                 group = 'HOLC Polygons'
                                 )
-                })
+
+        # # Add the 303d polygons
+        #     # add polygons
+        #         l_map1 <- l_map1 %>% addPolygons(data = impaired_303d_poly() %>% st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+        #                                          options = pathOptions(pane = "303d_polygons"),
+        #                                          color = 'darkblue',
+        #                                          weight = 0.5,
+        #                                          opacity = 0.8,
+        #                                          fillColor = 'blue',
+        #                                          fillOpacity = 0.5,
+        #                                          smoothFactor = 1.0,
+        #                                          highlightOptions = highlightOptions(color = "white", weight = 2),
+        #                                          popup = ~paste0('<b>', '<u>', '303d Listed Waterbody (2014/2016)', '</u>', '</b>', '<br/>',
+        #                                                          '<b>', 'Water Body Name: ', '</b>', wbname, '<br/>',
+        #                                                          '<b>', 'Type: ', '</b>', wbtype, '<br/>',
+        #                                                          '<b>', 'Region: ', '</b>', region_num, ' (', region_nam,')', '<br/>',
+        #                                                          '<b>', 'ID: ', '</b>', wbid, '<br/>',
+        #                                                          '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
+        #                                                          '<b>', 'Listing Comments: ', '</b>', comments, '<br/>',
+        #                                                          '<b>', 'Potential Sources: ', '</b>', sources),
+        #                                          group = '303d Listed Waterbodies')
+        # 
+        # # Add the 303d lines
+        #     # add polylines
+        #         l_map1 <- l_map1 %>% addPolylines(data = impaired_303d_lines() %>% 
+        #                                               st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet 
+        #                                           options = pathOptions(pane = "303d_lines"),
+        #                                           color = 'blue',
+        #                                           weight = 2.0, 
+        #                                           opacity = 1.0, 
+        #                                           # fillOpacity = 0.5,
+        #                                           smoothFactor = 1.0,
+        #                                           highlightOptions = highlightOptions(color = "white", weight = 2),
+        #                                           popup = ~paste0('<b>', '<u>','303d Listed Waterbody (2014/2016)','</u>', '</b>','<br/>',
+        #                                                           '<b>', 'Water Body Name: ', '</b>', wbname,'<br/>',
+        #                                                           '<b>', 'Type: ', '</b>', wbtype,'<br/>',
+        #                                                           '<b>', 'Region: ', '</b>', region_num, ' (', region_nam,')','<br/>',
+        #                                                           '<b>', 'ID: ', '</b>', wbid, '<br/>',
+        #                                                           '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
+        #                                                           '<b>', 'Listing Comments: ', '</b>', comments,  '<br/>',
+        #                                                           '<b>', 'Potential Sources: ', '</b>', sources),
+        #                                           group = '303d Listed Waterbodies')
+
+        
+        # # add the region boundary
+        #     l_map1 <- l_map1 %>% addPolygons(data = rb_boundary() %>% 
+        #                                          st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+        #                                      options = pathOptions(pane = "region_polygon"),
+        #                                      color = 'black', # "#444444",
+        #                                      weight = 1.0,
+        #                                      smoothFactor = 1.0,
+        #                                      opacity = 1.0,
+        #                                      fill = FALSE,
+        #                                      # fillOpacity = 0.5,
+        #                                      # fillColor = 'lightblue',
+        #                                      # fillColor = ~redline_leaflet_pal(holc_grade),
+        #                                      highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+        #                                      popup = ~paste0('<b>', '<u>', 'State Water Board Region Boundary', '</u>', '</b>','<br/>',
+        #                                                      '<b>', 'Region Name: ', '</b>', RB_NAME, '<br/>',
+        #                                                      '<b>', 'Region Number: ', '</b>', RB_OFF),
+        #                                      group = 'State Water Board Region Boundaries'
+        #     )
+        
+        # # add the drinking water provider service areas
+        #     # add polygons
+        #         l_map1 <- l_map1 %>% 
+        #             addPolygons(data = service_areas() %>% 
+        #                             st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+        #                         options = pathOptions(pane = "serviceareas_polygon"),
+        #                         color = 'black', # "#444444", 
+        #                         weight = 0.5, 
+        #                         smoothFactor = 1.0,
+        #                         opacity = 0.8, 
+        #                         fillOpacity = 0.5,
+        #                         fillColor = 'lightblue',
+        #                         highlightOptions = highlightOptions(color = "white", weight = 2),
+        #                         popup = ~paste0('<b>', '<u>','Drinking Water Provider Service Area Boundary', '</u>','</b>','<br/>',
+        #                                         '<b>', 'PWSID: ', '</b>', pwsid,'<br/>',
+        #                                         '<b>', 'Name: ', '</b>',  name,'<br/>',
+        #                                         '<b>', 'County: ', '</b>', d_prin_cnt,'<br/>',
+        #                                         '<b>', 'Population: ', '</b>', d_populati,'<br/>'),
+        #                                         #'<b>', 'Verified: ', '</b>', verified_s), # verified_status
+        #                         group = 'Drinking Water Provider Service Areas'
+        #             )
+
+        
+        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city or entire state, 
+        # after that the map is based on the most recent bounds when a new option is selected
+            isolate(if (is.null(input$map1_bounds)) { 
+                l_map1 <- l_map1 %>% fitBounds(lng1 = bounds_selected[[1]],
+                                               lat1 = bounds_selected[[2]],
+                                               lng2 = bounds_selected[[3]],
+                                               lat2 = bounds_selected[[4]])
+            } else { # maintain the current view
+                l_map1 <- l_map1 %>% setView(lng = mean(c(input$map1_bounds$west, input$map1_bounds$east)),
+                                             lat = mean(c(input$map1_bounds$north, input$map1_bounds$south)),
+                                             zoom = input$map1_zoom)
             })
+
+        # Add controls to select the basemap and layers
+            l_map1 <- l_map1 %>% addLayersControl(baseGroups = basemap_options,
+                                                  overlayGroups = c('CalEnviroScreen', 
+                                                                    'HOLC Polygons', 
+                                                                    '303d Listed Waterbodies', 
+                                                                    'CalEPA Regulated Sites',
+                                                                    'Drinking Water Provider Service Areas',
+                                                                    'State Water Board Region Boundaries',
+                                                                    'Legend'),
+                                                  options = layersControlOptions(collapsed = TRUE,
+                                                                                 autoZIndex = TRUE))
+            # Hide some groups by default (can be turned on with the layers control box on the map)
+                # l_map1 <- l_map1 %>% hideGroup(c('Drinking Water Provider Service Areas')) #, 'HOLC Polygons')) 
+                
+        # output the map object
+            l_map1
+        })
+    })
+    
+    # Use a separate observer to recreate some parts of the map as they are updated, without re-drawing the entire map ----
+        # # create a button to re-center the map - NOT WORKING!!!!!!!!!
+        #     observe({
+        #         bounds_center <- attributes(st_geometry(redline_polygons %>% 
+        #                                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
+        #                                                filter(city == input$city_selected_1)))$bbox
+        #         leafletProxy('map1') %>% 
+        #             addEasyButton(easyButton(
+        #                 icon="fa-globe", title="Center Map on Selected City",
+        #                 onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+        #                                   round(bounds_center[[2]],4)-0.01, ', ',
+        #                                   round(bounds_center[[1]],4)-0.01, '],[',
+        #                                   round(bounds_center[[4]],4)+0.01, ', ',
+        #                                   round(bounds_center[[3]],4)+0.01, ']]); }'))))
+        #     })
+    
+    
+        # # HOLC rated (redlined) areas
+        #     observe({
+        #         withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
+        #         # Create the color palette for the Redline scores
+        #         redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+        #                                            domain = redline_polygons$holc_grade,
+        #                                            levels = c('A', 'B', 'C', 'D'))
+        #         leafletProxy('map1') %>%
+        #             clearGroup('HOLC Polygons') %>%
+        #             addPolygons(data = redline_polygons %>%
+        #                             st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
+        #                             # filter(holc_grade %in% input$holc_rating_sites_filter) %>%
+        #                             {.},
+        #                         options = pathOptions(pane = "redline_polygons_pane"),
+        #                         color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+        #                         weight = 2.0,
+        #                         smoothFactor = 1.0,
+        #                         opacity = 1.0,
+        #                         # fill = FALSE,
+        #                         fillOpacity = 0, # input$redline_fill_1,
+        #                         fillColor = 'lightgrey',
+        #                         # fillColor = ~redline_leaflet_pal(holc_grade),
+        #                         highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+        #                         popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
+        #                                         '<b>', 'City: ', '</b>', city, '<br/>',
+        #                                         '<b>', 'Name: ', '</b>', name, '<br/>',
+        #                                         '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+        #                                         '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+        #                                         # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>',
+        #                                         '<b>', paste0('HOLC Form Link (', year, '): '), '</b>',
+        #                                         paste0('<a href = "', link, '" ', 'target="_blank"> ', link, ' </a>')),
+        #                         group = 'HOLC Polygons'
+        #                         )
+        #         })
+        #     })
+    
+    
+    
         
         # CalEPA sites
             observe({
                 withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
-                if (length(input$site_type_1) > 0 | input$sites_source == site_source_choices[2]) {
+                if (length(input$site_type_1) > 0 | input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
                     cal_epa_sites <- cal_epa_sites_filtered() %>% 
                         st_transform(crs = geographic_crs) # have to convert to geographic coordinate system for leaflet
                     # # if the option is selected, filter for sites with violations and/or enforcement actions
@@ -1414,7 +1487,7 @@ server <- function(input, output) {
                                          stroke = TRUE, weight = 0.5, color = 'black', opacity = 1,
                                          fill = TRUE, fillOpacity = 1, fillColor = 'black', # 'grey', # ~wqi.leaflet.pal(WQI),
                                          # clusterOptions = markerClusterOptions(spiderfyDistanceMultiplier = 2),# freezeAtZoom = 13, maxClusterRadius = 10),#,#singleMarkerMode = TRUE),
-                                         clusterOptions = markerClusterOptions(disableClusteringAtZoom = 13, 
+                                         clusterOptions = markerClusterOptions(disableClusteringAtZoom = 11, 
                                                                                maxClusterRadius = 60),
                                          popup = ~paste0('<b>', '<u>', 'CalEPA Regulated Site', '</u>','</b>','<br/>',
                                                          # '<b>', '<u>', 'Site Information:', '</u>', '</b>','<br/>',
@@ -1535,18 +1608,132 @@ server <- function(input, output) {
                 })
             })
 
-        
+        # 303d Listed Waterbodies
+            observe({
+                if ('303d Listed Waterbodies' %in% input$additional_map_layers) {
+                    withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
+                        leafletProxy('map1') %>%
+                            clearGroup('303d Listed Waterbodies') %>%
+                            addPolygons(data = impaired_303d_poly() %>% st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+                                        options = pathOptions(pane = "303d_polygons"),
+                                        color = 'darkblue',
+                                        weight = 0.5,
+                                        opacity = 0.8,
+                                        fillColor = 'blue',
+                                        fillOpacity = 0.5,
+                                        smoothFactor = 1.0,
+                                        highlightOptions = highlightOptions(color = "white", weight = 2),
+                                        popup = ~paste0('<b>', '<u>', '303d Listed Waterbody (2014/2016)', '</u>', '</b>', '<br/>',
+                                                        '<b>', 'Water Body Name: ', '</b>', wbname, '<br/>',
+                                                        '<b>', 'Type: ', '</b>', wbtype, '<br/>',
+                                                        '<b>', 'Region: ', '</b>', region_num, ' (', region_nam,')', '<br/>',
+                                                        '<b>', 'ID: ', '</b>', wbid, '<br/>',
+                                                        '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
+                                                        '<b>', 'Listing Comments: ', '</b>', comments, '<br/>',
+                                                        '<b>', 'Potential Sources: ', '</b>', sources),
+                                        group = '303d Listed Waterbodies') %>%
+                            addPolylines(data = impaired_303d_lines() %>%
+                                             st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+                                         options = pathOptions(pane = "303d_lines"),
+                                         color = 'blue',
+                                         weight = 2.0,
+                                         opacity = 1.0,
+                                         # fillOpacity = 0.5,
+                                         smoothFactor = 1.0,
+                                         highlightOptions = highlightOptions(color = "white", weight = 2),
+                                         popup = ~paste0('<b>', '<u>','303d Listed Waterbody (2014/2016)','</u>', '</b>','<br/>',
+                                                         '<b>', 'Water Body Name: ', '</b>', wbname,'<br/>',
+                                                         '<b>', 'Type: ', '</b>', wbtype,'<br/>',
+                                                         '<b>', 'Region: ', '</b>', region_num, ' (', region_nam,')','<br/>',
+                                                         '<b>', 'ID: ', '</b>', wbid, '<br/>',
+                                                         '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
+                                                         '<b>', 'Listing Comments: ', '</b>', comments,  '<br/>',
+                                                         '<b>', 'Potential Sources: ', '</b>', sources),
+                                         group = '303d Listed Waterbodies')
+                    })
+                } else {
+                    leafletProxy('map1') %>%
+                        clearGroup('303d Listed Waterbodies')
+                }
+            })
+            
+            
+     # Drinking Water Provider Service Areas
+             observe({
+                 if ('Drinking Water Provider Service Areas' %in% input$additional_map_layers) {
+                     withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
+                         leafletProxy('map1') %>%
+                             clearGroup('Drinking Water Provider Service Areas') %>%
+                             addPolygons(data = service_areas() %>%
+                                             st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+                                         options = pathOptions(pane = "serviceareas_polygon"),
+                                         color = 'black', # "#444444",
+                                         weight = 0.5,
+                                         smoothFactor = 1.0,
+                                         opacity = 0.8,
+                                         fillOpacity = 0.5,
+                                         fillColor = 'lightblue',
+                                         highlightOptions = highlightOptions(color = "white", weight = 2),
+                                         popup = ~paste0('<b>', '<u>','Drinking Water Provider Service Area Boundary', '</u>','</b>','<br/>',
+                                                         '<b>', 'PWSID: ', '</b>', pwsid,'<br/>',
+                                                         '<b>', 'Name: ', '</b>',  name,'<br/>',
+                                                         '<b>', 'County: ', '</b>', d_prin_cnt,'<br/>',
+                                                         '<b>', 'Population: ', '</b>', d_populati,'<br/>'),
+                                         # <b>', 'Verified: ', '</b>', verified_s), # verified_status
+                                         group = 'Drinking Water Provider Service Areas')
+
+                     })
+                 } else {
+                     leafletProxy('map1') %>%
+                         clearGroup('Drinking Water Provider Service Areas')
+                 }
+             })
+
+
+            # State Water Board Region Boundaries
+            observe({
+                if ('State Water Board Region Boundaries' %in% input$additional_map_layers) {
+                    withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
+                        leafletProxy('map1') %>%
+                            clearGroup('State Water Board Region Boundaries') %>%
+                            addPolygons(data = rb_boundary() %>%
+                                            st_transform(crs = geographic_crs), # have to convert to geographic coordinate system for leaflet
+                                        options = pathOptions(pane = "region_polygon"),
+                                        color = 'black', # "#444444",
+                                        weight = 1.0,
+                                        smoothFactor = 1.0,
+                                        opacity = 1.0,
+                                        fill = FALSE,
+                                        # fillOpacity = 0.5,
+                                        # fillColor = 'lightblue',
+                                        # fillColor = ~redline_leaflet_pal(holc_grade),
+                                        highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                                        popup = ~paste0('<b>', '<u>', 'State Water Board Region Boundary', '</u>', '</b>','<br/>',
+                                                        '<b>', 'Region Name: ', '</b>', RB_NAME, '<br/>',
+                                                        '<b>', 'Region Number: ', '</b>', RB_OFF),
+                                        group = 'State Water Board Region Boundaries')
+                    })
+                } else {
+                    leafletProxy('map1') %>%
+                        clearGroup('State Water Board Region Boundaries')
+                }
+            })
     
     
     # MAP 2 -----------------------------------------------------------------------------------------------------------------#    
     output$map2 <- renderLeaflet({
-        # get the bounds of the HOLC (redline) polygons for the selected city
-            #bounds_2 <- attributes(st_geometry(redline_polygons %>% filter(city == input$city_selected_1)))$bbox
-            bounds_2 <- attributes(st_geometry(redline_polygons %>% 
-                                                   st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
-                                                   filter(city == initial_selected_city)))$bbox
-                                                    
-
+        # specify the initial zoom level to use in the map
+            if (initial_zoom_level == 'Redline Bounds (All)') {
+                bounds_selected <- attributes(st_geometry(redline_polygons %>% 
+                                                              st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            } else if (initial_zoom_level == 'State') {
+                bounds_selected <- attributes(st_geometry(rb_boundary() %>%
+                                               st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            } else if (initial_zoom_level == 'City') {
+                bounds_selected <- attributes(st_geometry(redline_polygons %>%
+                                                              st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                                              filter(city == initial_selected_city)))$bbox
+            }
         # create the new (empty) map
             l_map2 <- leaflet(options = leafletOptions(zoomControl = FALSE, 
                                                        dragging = FALSE))
@@ -1554,7 +1741,8 @@ server <- function(input, output) {
         # Basemap Options
             basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap') 
             for (provider in basemap_options) {
-                l_map2 <- l_map2 %>% addProviderTiles(provider, group = provider)
+                l_map2 <- l_map2 %>% 
+                    addProviderTiles(provider, group = provider)
             }
         
         # add the min-map window
@@ -1587,63 +1775,96 @@ server <- function(input, output) {
                           title = paste0('HOLC Polygons'))
         
         # Add controls to select the basemap and layers
-            l_map2 <- l_map2 %>% addLayersControl(baseGroups = basemap_options,
-                                                 overlayGroups = c('HOLC Polygons', 'Legend'),
-                                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
+            l_map2 <- l_map2 %>% 
+                addLayersControl(baseGroups = basemap_options,
+                                 overlayGroups = c('HOLC Polygons', 'Legend'),
+                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
         
         # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
             isolate(if (is.null(input$map2_bounds)) {
-                l_map2 <- l_map2 %>% fitBounds(lng1 = bounds_2[[1]],
-                                               lat1 = bounds_2[[2]],
-                                               lng2 = bounds_2[[3]],
-                                               lat2 = bounds_2[[4]])
+                l_map2 <- l_map2 %>% 
+                    fitBounds(lng1 = bounds_selected[[1]],
+                              lat1 = bounds_selected[[2]],
+                              lng2 = bounds_selected[[3]],
+                              lat2 = bounds_selected[[4]])
             } else { # maintain the current view
-                l_map2 <- l_map2 %>% setView(lng = mean(c(input$map2_bounds$west, input$map2_bounds$east)),
-                                             lat = mean(c(input$map2_bounds$north, input$map2_bounds$south)),
-                                             zoom = input$map2_zoom)
+                l_map2 <- l_map2 %>% 
+                    setView(lng = mean(c(input$map2_bounds$west, input$map2_bounds$east)),
+                            lat = mean(c(input$map2_bounds$north, input$map2_bounds$south)),
+                            zoom = input$map2_zoom)
             })
+            
+        # Add the HOLC (redline) polygons
+            l_map2 <- l_map2 %>% 
+                addPolygons(data = redline_polygons %>% 
+                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                {.},
+                            color = 'black', # "#444444",
+                            weight = 1.0,
+                            smoothFactor = 1.0,
+                            opacity = 1.0,
+                            # fill = FALSE,
+                            fillOpacity = 1.0,
+                            # fillColor = 'lightblue',
+                            fillColor = ~redline_leaflet_pal(holc_grade),
+                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                            popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', city, '<br/>',
+                                            '<b>', 'Name: ', '</b>', name, '<br/>',
+                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+                                            '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', 
+                                            paste0('<a href = "', link, '" ', 'target="_blank"> ', link, ' </a>')),
+                            group = 'HOLC Polygons'
+                )
         
         # output the map object
             l_map2
     })
     
     
-    # Use a separate observer to recreate some parts of Map 2 as they are updated, without re-drawing the entire map
-        # HOLC (redline) polygons
-            observe({
-                #input$city_selected_1 # to re-draw polygons when city is changed
-                # Create the color palette for the Redline scores
-                redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
-                                                   domain = redline_polygons$holc_grade, 
-                                                   levels = c('A', 'B', 'C', 'D'))
-                leafletProxy("map2") %>% 
-                    clearShapes() %>% 
-                    addPolygons(data = redline_polygons %>% 
-                                    st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
-                                    # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
-                                    {.},
-                                color = 'black', # "#444444",
-                                weight = 1.0,
-                                smoothFactor = 1.0,
-                                opacity = 1.0,
-                                # fill = FALSE,
-                                fillOpacity = 1.0,
-                                # fillColor = 'lightblue',
-                                fillColor = ~redline_leaflet_pal(holc_grade),
-                                highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                                popup = ~paste0('<b>', '<u>', 'HOLC Polygon', '</u>', '</b>','<br/>',
-                                                '<b>', 'City: ', '</b>', city, '<br/>',
-                                                '<b>', 'Name: ', '</b>', name, '<br/>',
-                                                '<b>', 'Grade (A-D): ', '</b>', holc_grade),
-                                group = 'HOLC Polygons'
-                    )
-            })
+    # # Use a separate observer to recreate some parts of Map 2 as they are updated, without re-drawing the entire map
+    #     # HOLC (redline) polygons
+    #         observe({
+    #             #input$city_selected_1 # to re-draw polygons when city is changed
+    #             # Create the color palette for the Redline scores
+    #             redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+    #                                                domain = redline_polygons$holc_grade, 
+    #                                                levels = c('A', 'B', 'C', 'D'))
+    #             leafletProxy("map2") %>% 
+    #                 clearShapes() %>% 
+    #                 addPolygons(data = redline_polygons %>% 
+    #                                 st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+    #                                 # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+    #                                 {.},
+    #                             color = 'black', # "#444444",
+    #                             weight = 1.0,
+    #                             smoothFactor = 1.0,
+    #                             opacity = 1.0,
+    #                             # fill = FALSE,
+    #                             fillOpacity = 1.0,
+    #                             # fillColor = 'lightblue',
+    #                             fillColor = ~redline_leaflet_pal(holc_grade),
+    #                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+    #                             popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
+    #                                             '<b>', 'City: ', '</b>', city, '<br/>',
+    #                                             '<b>', 'Name: ', '</b>', name, '<br/>',
+    #                                             '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+    #                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+    #                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+    #                                             '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', 
+    #                                             paste0('<a href = "', link, '" ', 'target="_blank"> ', link, ' </a>')),
+    #                             group = 'HOLC Polygons'
+    #                 )
+    #         })
 
 
 # Helper functions ---------------------------------------------------------------------------------------------------------#
     # Center map1 and map2 on change in city selection
         observeEvent(input$city_selected_1, {
-            if (input$city_selected_1 == 'All') {
+            if (input$city_selected_1 == 'Statewide') {
                 redline_selected_1 <- redline_polygons %>% 
                     st_transform(crs = geographic_crs) # have to convert to geographic coordinate system for leaflet,
             } else {

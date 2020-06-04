@@ -70,9 +70,21 @@
                                                                          TRUE ~ city))
         redline_polygons <- st_as_sf(redline_polygons)
         st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]]) # make sure the CRS is defined
+    # add extra information to the redline polygons
+        # links to holc forms for each holc polygon
+            holc_form_links <- read_csv(here('data_raw', 'redline-polygons-list.csv')) %>% 
+                select(holc_id, city, link, year) %>% 
+                filter(!is.na(holc_id))
+            redline_polygons <- redline_polygons %>% 
+                left_join(holc_form_links, 
+                          by = c('city', 'holc_id'))
+        # area description for each holc polygon
+            
+        
     # save to geopackage file
         st_write(obj = redline_polygons, 
-                 here('data_prepared', 'redline_polygons.gpkg')) 
+                 here('data_prepared', 'redline_polygons.gpkg'),
+                 append = FALSE) 
     # simplify and save simplified version
         # simplify
             redline_polygons_simplify <- redline_polygons %>% 
@@ -80,7 +92,8 @@
         # save to geopackage file
             st_write(obj = redline_polygons_simplify, 
                      here('data_prepared', 
-                          'redline_polygons_simplified.gpkg'))
+                          'redline_polygons_simplified.gpkg'),
+                     append = FALSE)
         
         
 

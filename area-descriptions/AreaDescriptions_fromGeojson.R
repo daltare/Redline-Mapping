@@ -5,6 +5,7 @@ library(tidyr)
 library(janitor)
 library(readxl)
 library(writexl)
+library(geojsonsf)
 
 # Links ----
     # url_fresno <- 'https://dsl.richmond.edu/panorama/redlining/static/downloads/geojson/CAFresno1936.geojson'
@@ -18,6 +19,7 @@ library(writexl)
 
 # LOS ANGELES -- Convert geojson to dataframe ----
     # geojson_raw_la <- readr::read_lines(url_losangeles)
+    geojson_sf_la <- geojson_raw_la %>% geojson_sf()
     # geojson_list_la <- jsonlite::fromJSON(geojson_raw_la)
     # geojson_result_la <- geojson_list_la$features
     geojson_la <- (readr::read_lines(url_losangeles) %>% jsonlite::fromJSON())$features
@@ -29,6 +31,7 @@ library(writexl)
     # df_description_la <- bind_cols(df_properties_la, df_properties_la_2)
     df_description_la <- bind_cols(geojson_la$properties %>% select(-area_description_data), 
                                    geojson_la$properties$area_description_data)
+    
     
         # dput(sort(names(df_description_la)))
     df_description_la <- df_description_la %>% 
@@ -94,6 +97,8 @@ library(writexl)
         clean_names()
     # names(df_description_la) <- gsub(pattern = 'x', replacement = 'q_', x = names(df_description_la))
         
+    z <- bind_cols(df_description_la, df_geometry_la)
+    View(z)
     
     write_csv(x = df_description_la, path = 'area-descriptions/redline_los-angeles_area-descriptions.csv')
     write_xlsx(x = df_description_la, path = 'area-descriptions/redline_los-angeles_area-descriptions.xlsx')
@@ -101,6 +106,7 @@ library(writexl)
     # https://dsl.richmond.edu/panorama/redlining/#loc=9/34.005/-118.823&city=los-angeles-ca&area=A2&adview=full&adimage=3/76.619/-139.219
     # https://dsl.richmond.edu/panorama/redlining/#loc=9/34.005/-118.823&city=los-angeles-ca&area=A3&adview=full&adimage=3/76.619/-139.219
 
+    'https://dsl.richmond.edu/panorama/redlining/#loc=//&city=los-angeles-ca&area=A3&adview=full&adimage=3/1/-1'
     
 # SACRAMENTO -- Convert geojson to dataframe ----
     geojson_sac <- (readr::read_lines(url_sacramento) %>% jsonlite::fromJSON())$features
