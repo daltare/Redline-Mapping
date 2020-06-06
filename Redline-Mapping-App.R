@@ -173,145 +173,178 @@
 # Define UI --------------------------------------------------------------------
 ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythemes::shinytheme('flatly'),
     # Maps / Tabular Data Tab ----
-        tabPanel('Maps',
+        tabPanel('Maps', icon = icon('map'),
                  useShinyjs(),
-            tags$head(tags$style(".buttonstyle{background-color:#f2f2f2;} .buttonstyle{color: black;}")), # define button style (background color and font color)
-            # Sidebar layout with input and output definitions
-            sidebarLayout(
-                # Sidebar
-                sidebarPanel(
-                    # Inputs: 
-                    selectInput(inputId = 'city_selected_1', 
-                                label = 'Zoom To:', 
-                                choices = c('Statewide', unique(redline_polygons$city)), 
-                                selected = 'Statewide'), # 'All'
-                    hr(style="border: 1px solid darkgrey"),
-                    h4('CalEPA Regulated Sites:'),
-                    # checkboxGroupInput(inputId = 'site_type_1', 
-                    #                    label = 'Select CalEPA Regulated Site Types:', 
-                    #                    choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
-                    #                    selected = NULL),
-                    selectInput(inputId = 'sites_source', 
-                                label = 'Site Selection Options:', 
-                                choices = site_source_choices, 
-                                selected = site_source_choices[1]),
-                    selectInput(inputId = 'site_type_1', 
-                                label = 'Select Site Types:', 
-                                choices = c('California Integrated Water Quality System (CIWQS)', 
-                                            'GeoTracker', 
-                                            'Storm Water Multiple Application and Report Tracking System (SMARTS)',
-                                            'Chemical Hazards - Fire',
-                                            'Chemical Hazards - Reactivity',
-                                            'Chemical Hazards - Sudden Release of Pressure',
-                                            'California Environmental Reporting System (CERS)',
-                                            'EnviroStor Cleanup (ENVSTORCLN)',
-                                            'EnviroStor Hazardous Waste (ENVSTORHAZ)',
-                                            'National Emissions Inventory System (EIS)',
-                                            'Toxic Release Inventory (TRI)'
-                                ),
-                                selected = NULL, 
-                                multiple = TRUE),
-                    # checkboxGroupInput(inputId = 'holc_rating_sites_filter',
-                    #                    label = 'Select HOLC Rating:',
-                    #                    choices = list('A (Best)' = 'A',
-                    #                                   'B (Still Desirable)' = 'B',
-                    #                                   'C (Definitely Declining)' = 'C',
-                    #                                   'D (Hazardous)' = 'D'),
-                    #                    selected = c('A','B','C','D')),
-                    hr(style="border: 1px solid darkgrey"),
-                    h4('Redlining Data:'),
-                    tags$b('Filter For Sites Within HOLC Rated Polygons:'),
-                    switchInput(inputId = 'holc_rating_sites_filter_on_off', 
-                                value = FALSE, 
-                                size = 'small'),
-                    selectInput(inputId = 'holc_rating_sites_filter', 
-                                label = 'Select Sites By HOLC Polygon Rating:',
-                                choices = list('A (Best)' = 'A',
-                                               'B (Still Desirable)' = 'B',
-                                               'C (Definitely Declining)' = 'C',
-                                               'D (Hazardous)' = 'D'),
-                                selected = c('A','B','C','D'),
-                                multiple = TRUE),
-                    selectInput(inputId = 'holc_city_sites_filter', 
-                                label = 'Select Sites By City:',
-                                choices = c('Fresno', 'Los Angeles', 'Oakland', 
-                                            'Sacramento', 'San Diego', 'San Francisco',
-                                            'San Jose', 'Stockton'),
-                                selected = c('Fresno', 'Los Angeles', 'Oakland', 
-                                            'Sacramento', 'San Diego', 'San Francisco',
-                                            'San Jose', 'Stockton'),
-                                multiple = TRUE),
-                    hr(style="border: 1px solid darkgrey"),
-                    h4('Environmental, Public Health, & Socieconomic Data:'),
-                    selectInput(inputId = 'ces_parameter', 
-                        label = 'Select CalEnviroScreen (CES) Parameter:', 
-                        choices = ces_choices$name, 
-                        selected = ces_choices$name[1]),
-                    # sliderInput(inputId = 'ces_score_range', 
-                    #             label = 'Filter Sites By Score of Selected CES Parameter:', 
-                    #             min = 0, max = 100, value = c(0,100)),
-                    uiOutput('ces_range_filter'),
-                    hr(style="border: 1px solid darkgrey"),
-                    h4('CalEPA Regulatory Actions:'),
-                    dateRangeInput2(inputId = "sites_date_range", 
-                                    label = "Select Date Range For Inspections, Violations, & Enforcement Actions:*", 
-                                    startview = "year", 
-                                    minview = "months", 
-                                    maxview = "decades", 
-                                    format = 'yyyy-mm', 
-                                    start = NULL, # as.Date("2010-01-01"),
-                                    end = NULL, #as.Date(paste(year(Sys.Date()), month(Sys.Date()), 1, sep = '-')),
-                                    min = as.Date("1900-01-01"),
-                                    max = as.Date(paste(year(most_recent_reg_records), month(most_recent_reg_records), 1, sep = '-'))),
-                    tags$em(textOutput('data_availability_msg')),
-                    br(),
-                    # checkboxGroupInput(inputId = 'show_violations_enforcement',
-                    #                    label = 'Filter For CalEPA Regulated Sites With:',
-                    #                    choices = c('Violations', 'Enforcement Actions'),
-                    #                    selected = NULL),
-                    selectInput(inputId = 'show_violations_enforcement',
-                                label = 'Filter For Sites With Inspections, Violations, or Enforcement Actions In Selected Time Period:',
-                                choices = c('Inspections', 'Violations', 'Enforcement Actions'),
-                                selected = NULL, 
-                                multiple = TRUE),
-                    # select program types
-                        # NOTE: can be either static (showing all options) or dynamic (showing only the options available as the result of the filtered sites))
-                        # the dynamic option might be problematic becasue it automatically resets every time a new filter is chosen
-                    uiOutput('program_type_1'),
-                    tags$em(p('**this filter resets whenever the other filters above are changed')),
-                    # selectInput(inputId = 'program_type_1',
-                    #             label = 'Filter Sites By Program Type:',
-                    #             multiple = TRUE,
-                    #             choices = program_types_distinct)
-                    hr(style="border: 1px solid darkgrey"),
-                    h4('Additional Map Layers:'),
-                    selectInput(inputId = 'additional_map_layers',
-                                label = 'Select Layers:',
-                                choices = c('303d Listed Waterbodies', 
-                                            'Drinking Water Provider Service Areas',
-                                            'State Water Board Region Boundaries'),
-                                selected = NULL, 
-                                multiple = TRUE),
-                    hr(),
-                    br(),
-                    br()
-                ),
+                 tags$head(
+                     # Code to resize main panel to 100% width after show/hide sidebar button clicked
+                     # see: https://stackoverflow.com/a/33424463
+                     tags$script(
+                         HTML("
+                                $(document).ready(function(){
+                                  // Mark columns we want to toggle
+                                  $('body').find('div [class=col-sm-4]').addClass('sidebarPanel');
+                                  $('body').find('div [class=col-sm-8]').addClass('mainPanel');
+                                })
+                    
+                    
+                                Shiny.addCustomMessageHandler ('resize',function (message) {
+                                  $('.sidebarPanel').toggle();
+                                  $('.mainPanel').toggleClass('col-sm-8 col-sm-12');
+                                  $(window).trigger('resize')
+                                });
+                    
+                               ")
+                     ),
+                     # define button style (background color and font color)
+                     tags$style(".buttonstyle{background-color:#f2f2f2;} .buttonstyle{color: black;}")
+                 ), 
+                 # Sidebar layout with input and output definitions
+                 sidebarLayout(
+                     # Sidebar
+                     # div(id ="Sidebar", sidebarPanel(
+                     sidebarPanel(
+                         # Inputs: 
+                         selectInput(inputId = 'city_selected_1', 
+                                     label = 'Zoom To:', 
+                                     choices = c('Statewide', unique(redline_polygons$city)), 
+                                     selected = 'Statewide'), # 'All'
+                         hr(style="border: 1px solid darkgrey"),
+                         h4('CalEPA Regulated Sites:'),
+                         # checkboxGroupInput(inputId = 'site_type_1', 
+                         #                    label = 'Select CalEPA Regulated Site Types:', 
+                         #                    choices = c('CIWQS', 'SMARTS', 'GeoTracker'),
+                         #                    selected = NULL),
+                         selectInput(inputId = 'sites_source', 
+                                     label = 'Site Selection Options:', 
+                                     choices = site_source_choices, 
+                                     selected = site_source_choices[1]),
+                         selectInput(inputId = 'site_type_1', 
+                                     label = 'Select Site Types:', 
+                                     choices = c('California Integrated Water Quality System (CIWQS)', 
+                                                 'GeoTracker', 
+                                                 'Storm Water Multiple Application and Report Tracking System (SMARTS)',
+                                                 'Chemical Hazards - Fire',
+                                                 'Chemical Hazards - Reactivity',
+                                                 'Chemical Hazards - Sudden Release of Pressure',
+                                                 'California Environmental Reporting System (CERS)',
+                                                 'EnviroStor Cleanup (ENVSTORCLN)',
+                                                 'EnviroStor Hazardous Waste (ENVSTORHAZ)',
+                                                 'National Emissions Inventory System (EIS)',
+                                                 'Toxic Release Inventory (TRI)'
+                                     ),
+                                     selected = NULL, 
+                                     multiple = TRUE),
+                         # checkboxGroupInput(inputId = 'holc_rating_sites_filter',
+                         #                    label = 'Select HOLC Rating:',
+                         #                    choices = list('A (Best)' = 'A',
+                         #                                   'B (Still Desirable)' = 'B',
+                         #                                   'C (Definitely Declining)' = 'C',
+                         #                                   'D (Hazardous)' = 'D'),
+                         #                    selected = c('A','B','C','D')),
+                         hr(style="border: 1px solid darkgrey"),
+                         h4('Redlining Data:'),
+                         tags$b('Filter For Sites Within HOLC Rated Polygons:'),
+                         switchInput(inputId = 'holc_rating_sites_filter_on_off', 
+                                     value = FALSE, 
+                                     size = 'small'),
+                         selectInput(inputId = 'holc_rating_sites_filter', 
+                                     label = 'Select Sites By HOLC Polygon Rating:',
+                                     choices = list('A (Best)' = 'A',
+                                                    'B (Still Desirable)' = 'B',
+                                                    'C (Definitely Declining)' = 'C',
+                                                    'D (Hazardous)' = 'D'),
+                                     selected = c('A','B','C','D'),
+                                     multiple = TRUE),
+                         selectInput(inputId = 'holc_city_sites_filter', 
+                                     label = 'Select Sites By City:',
+                                     choices = c('Fresno', 'Los Angeles', 'Oakland', 
+                                                 'Sacramento', 'San Diego', 'San Francisco',
+                                                 'San Jose', 'Stockton'),
+                                     selected = c('Fresno', 'Los Angeles', 'Oakland', 
+                                                  'Sacramento', 'San Diego', 'San Francisco',
+                                                  'San Jose', 'Stockton'),
+                                     multiple = TRUE),
+                         hr(style="border: 1px solid darkgrey"),
+                         h4('Environmental, Public Health, & Socieconomic Data:'),
+                         selectInput(inputId = 'ces_parameter', 
+                                     label = 'Select CalEnviroScreen (CES) Parameter:', 
+                                     choices = ces_choices$name, 
+                                     selected = ces_choices$name[1]),
+                         # sliderInput(inputId = 'ces_score_range', 
+                         #             label = 'Filter Sites By Score of Selected CES Parameter:', 
+                         #             min = 0, max = 100, value = c(0,100)),
+                         uiOutput('ces_range_filter'),
+                         hr(style="border: 1px solid darkgrey"),
+                         h4('CalEPA Regulatory Actions:'),
+                         dateRangeInput2(inputId = "sites_date_range", 
+                                         label = "Select Date Range For Inspections, Violations, & Enforcement Actions:*", 
+                                         startview = "year", 
+                                         minview = "months", 
+                                         maxview = "decades", 
+                                         format = 'yyyy-mm', 
+                                         start = NULL, # as.Date("2010-01-01"),
+                                         end = NULL, #as.Date(paste(year(Sys.Date()), month(Sys.Date()), 1, sep = '-')),
+                                         min = as.Date("1900-01-01"),
+                                         max = as.Date(paste(year(most_recent_reg_records), month(most_recent_reg_records), 1, sep = '-'))),
+                         tags$em(textOutput('data_availability_msg')),
+                         br(),
+                         # checkboxGroupInput(inputId = 'show_violations_enforcement',
+                         #                    label = 'Filter For CalEPA Regulated Sites With:',
+                         #                    choices = c('Violations', 'Enforcement Actions'),
+                         #                    selected = NULL),
+                         selectInput(inputId = 'show_violations_enforcement',
+                                     label = 'Filter For Sites With Inspections, Violations, or Enforcement Actions In Selected Time Period:',
+                                     choices = c('Inspections', 'Violations', 'Enforcement Actions'),
+                                     selected = NULL, 
+                                     multiple = TRUE),
+                         # select program types
+                         # NOTE: can be either static (showing all options) or dynamic (showing only the options available as the result of the filtered sites))
+                         # the dynamic option might be problematic becasue it automatically resets every time a new filter is chosen
+                         uiOutput('program_type_1'),
+                         tags$em(p('**this filter resets whenever the other filters above are changed')),
+                         # selectInput(inputId = 'program_type_1',
+                         #             label = 'Filter Sites By Program Type:',
+                         #             multiple = TRUE,
+                         #             choices = program_types_distinct)
+                         hr(style="border: 1px solid darkgrey"),
+                         h4('Additional Map Layers:'),
+                         selectInput(inputId = 'additional_map_layers',
+                                     label = 'Select Layers:',
+                                     choices = c('303d Listed Waterbodies', 
+                                                 'Drinking Water Provider Service Areas',
+                                                 'State Water Board Region Boundaries'),
+                                     selected = NULL, 
+                                     multiple = TRUE),
+                         hr(),
+                         br(),
+                         br()
+                         # )
+                     ),
                 # Main panel for displaying outputs 
                 mainPanel(
                     fluidRow(
-                        p(tags$b('NOTE:'), 
-                          paste('Use the left side map to pan/zoom, and use the button in the upper left corner of each map to toggle layers on or off (some map layers must be activated in the sidebar on the left first).', 
-                                'Tabular data for the selected sites is available to view/download below the maps.')#,
-                          # hr()
-                        )),
+                        div(style="display:inline-block;vertical-align:top;",
+                            # actionButton("toggleSidebar", "Toggle sidebar"),
+                            actionButton("showpanel", "Show/Hide Sidebar", 
+                                         class = "buttonstyle", icon = icon('bars'), 
+                                         style = 'padding:4px; font-size:80%'), # 'display:inline;'), 
+                            p(tags$b('NOTE:'),
+                              paste('Use the left side map to pan/zoom, and use the button in the upper right corner of each map to toggle layers on or off (some map layers must be activated in the sidebar on the left first).',
+                                    'Tabular data for the selected sites is available to view/download below the maps.'),
+                              style = 'padding:4px; font-size:80%'#,
+                              # style = 'display:inline'
+                              # hr()
+                            )
+                        )
+                    ),
                     fluidRow(
                         column(6, 
-                               tags$h4('CalEPA Data:'),
-                               # p(tags$b('CalEPA Data:')),
+                               #tags$h5('CalEPA Data:', style = 'padding:4px;'),
+                               p(tags$b('CalEPA Data:'), style = 'padding:1px;'),
                                leafletOutput(outputId = 'map1', height = 700) %>% withSpinner(color="#0dc5c1")),
                         column(6, 
-                               tags$h4('HOLC (Redline) Data:'),
-                               # p(tags$b('HOLC (Redline) Data:')),
+                               # tags$h5('HOLC (Redline) Data:', style = 'padding:4px;'),
+                               p(tags$b('HOLC (Redline) Data:'), style = 'padding:1px;'),
                                leafletOutput(outputId = 'map2', height = 700) %>% withSpinner(color="#0dc5c1"))
                     ),
                     fluidRow(
@@ -338,11 +371,11 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
             ),
         ),
     # Analysis Tab ----
-    tabPanel('Redline-CES Analysis',
+    tabPanel('Redline-CES Analysis', icon = icon('chart-bar'),
              p('Working on it...')
     ),
-    # Background Info Tab ----
-        tabPanel('Background Info',
+    # Background Info Tab ---- 
+        tabPanel('Background Info', icon = icon('info-circle'), # icon = icon('book-reader')
                  p('This draft tool displays California\'s Redlined communites, and helps to assess potential correlations between those policies and indicators of enviornmental and public health (e.g., 303d impaired water bodies, CalEnviroScreen scores), as well as facilities regulated by the CalEPA. More layers will be added in the future.'),
                  # Redlining History
                      h3('Redlining History'),
@@ -432,7 +465,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
 )
 
 # Define server logic ----
-server <- function(input, output) {
+server <- function(input, output, session) {
     # # create list of which region each city is in (for filtering related datasets) ----
     #     cities_regions <- list('Fresno' = '5F',
     #                            'Los Angeles' = '4',
@@ -455,6 +488,16 @@ server <- function(input, output) {
     #                                    '7' = '0.004',
     #                                    '8' = '0.007',
     #                                    '9' = '0.006')
+    
+    # toggle sidebar panel
+    observeEvent(input$showpanel,{
+        session$sendCustomMessage(type = 'resize', message = 1)
+    })
+    
+    # # toggle sidebar panel
+    # observeEvent(input$toggleSidebar, {
+    #     shinyjs::toggle(id = "Sidebar")
+    # })
     
     # toggle the HOLC (redline) polygon selection input based on the on/off switch ----
      observe({
@@ -1049,6 +1092,14 @@ server <- function(input, output) {
                                    holc_grade, 
                                    ces3_polygon_score
                                    ) %>% 
+                            mutate(site_id = as.character(site_id), # trying to get rid of the error: "DataTables warning: table id=DataTables_Table_1 - Ajax error. For more information about this error, please see http://datatables.net/tn/7"
+                                   zip_code = as.character(site_id)) %>% 
+                            mutate(inspections_count = as.numeric(inspections_count), # trying to get rid of the error: "DataTables warning: table id=DataTables_Table_1 - Ajax error. For more information about this error, please see http://datatables.net/tn/7"
+                                   violations_count = as.numeric(violations_count), 
+                                   enforcements_count = as.numeric(enforcements_count), 
+                                   latitude = as.numeric(latitude), 
+                                   longitude = as.numeric(longitude), 
+                                   ces3_polygon_score = as.numeric(ces3_polygon_score)) %>% 
                             # rename(!!paste0('inspections_', col_name_custom()) := 'inspections_count') %>% 
                             st_drop_geometry() %>%
                             mutate(ces3_measure = input$ces_parameter) %>% 
