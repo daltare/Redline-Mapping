@@ -50,7 +50,7 @@ output:
 
 ```{r ces measures list}
 # Get list of CES 3 variable names and plain text names
-    ces_variables <- read_csv(here('data_prepared', 
+    ces_variables <- read_csv(here('data_processed', 
                                     'ces_names.csv'))
 
 ces_measures_effects <- ces_variables %>% 
@@ -117,7 +117,7 @@ The CES polygons and the Redline polygons have different coverages, as shown in 
 ```{r load data}
     # load data
         # Redline Polygons
-            redline_polygons <- read_rds(here('data_prepared', 'redline_polygons.gpkg'))
+            redline_polygons <- read_rds(here('data_processed', 'redline_polygons.gpkg'))
                 # st_crs(redline_polygons) # to check the reference system
             # modify the 'city' column to better keep track when joining with other datasets
                 redline_polygons <- redline_polygons %>% rename('redline_city' = 'city')

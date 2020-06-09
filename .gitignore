@@ -19,4 +19,5 @@ Site.csv
 Coordinates.csv
 inspections_check/
 API_Sites_With_Missing_Coordinates.R
-regulatory_actions.csv
+regulatory_actions_processed.csv
+regulated_sites_processed.csv

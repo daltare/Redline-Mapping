@@ -51,21 +51,20 @@
         library(shinyWidgets)
         library(shinyjs)
 
-
 # Read some static data into R ------------------------------------------------------------------------------------------------------------------
     # HOLC (Redline) Polygons
-        # redline_polygons <- read_rds('data_prepared/redline_polygons.RDS')
+        # redline_polygons <- read_rds('data_processed/redline_polygons.RDS')
         # st_crs(redline_polygons) <- 4326
-        redline_polygons <- st_read('data_prepared/redline_polygons.gpkg')
+        redline_polygons <- st_read('data_processed/redline_polygons.gpkg')
         # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
             redline_polygons <- redline_polygons %>% st_transform(crs = projected_crs)
             # st_crs(redline_polygons)
             
     # List of the CES parameter choices to plot
-        ces_choices <- read_csv('data_prepared/ces_names.csv') %>% # manually prepared this file to make more descriptive names for the fields
+        ces_choices <- read_csv('data_processed/ces_names.csv') %>% # manually processed this file to make more descriptive names for the fields
             mutate(ces_variable = make_clean_names(name, 'parsed')) %>% 
             slice(8:64) # rows 8 to 64
-        # ces_choices <- read_rds('data_prepared/ces_3_names.RDS') %>% 
+        # ces_choices <- read_rds('data_processed/ces_3_names.RDS') %>% 
         #     # filter(grepl(pattern = 'Percentile$', x = .$name)) %>% 
         #     slice(8:64) # rows 8 to 64
         
@@ -85,10 +84,15 @@
             # check (NOTE: no missing coordinate data in the flat file)
                 # range(calepa_reg_sites$latitude)
                 # range(calepa_reg_sites$longitude)
+    # regulated sites - processed version (with CES and HOLC data for each site included)
+        calepa_sites_processed <- fread('data_regulatory_actions/regulated_sites_processed.csv') %>% 
+            tibble() %>% 
+            {.}
+        
     # define choices for sources of CalEPA regulated site data
         site_source_choices <- c('None',
-                                 'Select By Type (Source: CalEPA Geoserver)'#,
-                                 #'All Sites (Source: CalEPA Regulated Site Portal)'
+                                 'Select By Type (Source: CalEPA Geoserver)',
+                                 'All Sites (Source: CalEPA Regulated Site Portal)'
                                  )
         
     # List of program types to select
@@ -108,6 +112,9 @@
             pull(ei_description)
 
     # CalEPA regulatory data
+        # all regulatory data (processed)
+            regulatory_data_processed <- fread('data_regulatory_actions/regulatory_actions_processed.csv') %>% 
+                tibble()
         # inspections
             inspections_all_download <- fread('data_regulatory_actions/Evaluations.csv') %>%
                 # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.zip') %>% 
@@ -520,7 +527,7 @@ server <- function(input, output, session) {
             rb_boundary <- reactive({
                 withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
                     if (data_source_rb_bounds == 'local') {
-                        rb_boundary_download <- st_read('data_prepared/rb_boundary_simplified.gpkg')
+                        rb_boundary_download <- st_read('data_processed/rb_boundary_simplified.gpkg')
                     } else if (data_source_rb_bounds == 'remote') {
                         # # Get Regional Board Office Areas from WB GIS Services (GEOJSON) - note that this filters for just the regional board containing the selected city
                         # url_rb_office_areas <- paste0("http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0/query?where=UPPER(rb_off)%20like%20'%25",
@@ -540,7 +547,7 @@ server <- function(input, output, session) {
                     # st_crs(rb_boundary_download)
                 return(rb_boundary_download)
                 # # get the regional board boundary containing the selected city from a saved file (old method - not used)
-                #     rb_boundary_download <- read_rds('data_prepared/Regional_Board_Offices.RDS') %>% 
+                #     rb_boundary_download <- read_rds('data_processed/Regional_Board_Offices.RDS') %>% 
                 #         filter(RB_OFF == cities_regions[[input$city_selected_1]])
                 })
             })
@@ -558,10 +565,10 @@ server <- function(input, output, session) {
             ces3_poly <- reactive({
                 withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
                 if (data_source_ces3 == 'local') {
-                    ces3_poly_download <- st_read('data_prepared/ces3_poly_simplified.gpkg')
+                    ces3_poly_download <- st_read('data_processed/ces3_poly.gpkg') # st_read('data_processed/ces3_poly_simplified.gpkg')
                 } else if (data_source_ces3 == 'remote') {
                 # # get data
-                #     ces3_poly_download <- read_rds('data_prepared/ces3_poly_download.RDS')
+                #     ces3_poly_download <- read_rds('data_processed/ces3_poly_download.RDS')
                 # get data from API
                     # # transform to rb boundary to coordinate system used in web service
                     #     rb_boundary_simplify_transform <- st_transform(rb_boundary_simplify(), 3310)
@@ -606,7 +613,7 @@ server <- function(input, output, session) {
                     # revise column names
                         # ces3_poly_download <- ces3_poly_download %>% select(-CES2018_Rn)
                         col_names_original <- names(ces3_poly_download)
-                        col_names_new <- read_csv('data_prepared/ces_names.csv')
+                        col_names_new <- read_csv('data_processed/ces_names.csv')
                             col_names_new$id[nrow(col_names_new)] <- 'CES2018_Rn'
                         col_names_original_df <- as.data.frame(x = col_names_original)
                         col_names_original_df <- col_names_original_df %>% left_join(col_names_new, by = c('col_names_original' = 'id'))
@@ -638,8 +645,8 @@ server <- function(input, output, session) {
             impaired_303d_poly <- reactive({
                 withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
                 # get data
-                    # impaired_303d_poly_download <- read_rds('data_prepared/impaired_303d_poly_download.RDS')
-                    impaired_303d_poly_download <- st_read('data_prepared/303d_polygons_simplified.gpkg')
+                    # impaired_303d_poly_download <- read_rds('data_processed/impaired_303d_poly_download.RDS')
+                    impaired_303d_poly_download <- st_read('data_processed/303d_polygons_simplified.gpkg')
                 # filter for 303d polygons in the region containing the selected city
                     # impaired_poly_filter <- st_intersects(x = impaired_303d_poly_download,
                     #                                       y = rb_boundary(),
@@ -657,8 +664,8 @@ server <- function(input, output, session) {
             impaired_303d_lines <- reactive({
                 withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
                 # get data
-                    # impaired_303d_lines_download <- read_rds('data_prepared/impaired_303d_lines_download_simplify_R1removed.RDS')
-                    impaired_303d_lines_download <- st_read('data_prepared/303d_lines_R1removed_simplified.gpkg')
+                    # impaired_303d_lines_download <- read_rds('data_processed/impaired_303d_lines_download_simplify_R1removed.RDS')
+                    impaired_303d_lines_download <- st_read('data_processed/303d_lines_R1removed_simplified.gpkg')
                 # filter out records with empty geometries
                     impaired_303d_lines_download <- impaired_303d_lines_download %>% filter(!is.na(st_dimension(.)))
                 # # filter for 303d lines in the region containing the selected city
@@ -679,7 +686,7 @@ server <- function(input, output, session) {
             service_areas <- reactive({
                 withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
                     if (data_source_service_areas == 'local') {
-                        service_areas_download <- st_read('data_prepared/drinking_water_service_areas_simplified.gpkg')
+                        service_areas_download <- st_read('data_processed/drinking_water_service_areas_simplified.gpkg')
                         # # filter for polygons in the region containing the selected city
                         #     service_areas_download_filter <- st_intersects(x = service_areas_download,
                         #                                           y = rb_boundary(),
@@ -850,6 +857,7 @@ server <- function(input, output, session) {
                                                                   pull(site_id))) %>%
                                          group_by(site_id) %>%
                                          summarize(inspections_count = n()) %>%
+                                         ungroup() %>% 
                                          {.}
                                  )
                              } else {
@@ -879,6 +887,7 @@ server <- function(input, output, session) {
                                                                   pull(site_id))) %>%
                                          group_by(site_id) %>%
                                          summarize(violations_count = n()) %>%
+                                         ungroup() %>% 
                                          {.}
                                  )
                              } else {
@@ -900,6 +909,7 @@ server <- function(input, output, session) {
                                                                   pull(site_id))) %>%
                                          group_by(site_id) %>%
                                          summarize(enforcements_count = n()) %>%
+                                         ungroup() %>% 
                                          {.}
                                  )
                              } else {
@@ -937,12 +947,14 @@ server <- function(input, output, session) {
                                      left_join(enforcement_summary(), by = c('site_id'))
                                  # replace NAs with zeros for the counts
                                  cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                                     mutate(inspections_count = case_when(is.na(inspections_count) ~ 0L,
-                                                                          TRUE ~ inspections_count),
-                                            violations_count = case_when(is.na(violations_count) ~ 0L,
-                                                                         TRUE ~ violations_count),
-                                            enforcements_count = case_when(is.na(enforcements_count) ~ 0L,
-                                                                           TRUE ~ enforcements_count))
+                                     # mutate(inspections_count = case_when(is.na(inspections_count) ~ 0L,
+                                     #                                      TRUE ~ inspections_count),
+                                     #        violations_count = case_when(is.na(violations_count) ~ 0L,
+                                     #                                     TRUE ~ violations_count),
+                                     #        enforcements_count = case_when(is.na(enforcements_count) ~ 0L,
+                                     #                                       TRUE ~ enforcements_count)) %>% 
+                                     mutate_if(is.integer, ~replace(., is.na(.), 0)) %>% 
+                                     {.}
                                  return(cal_epa_sites_summarized_compute)
                              } else {
                                  return(tibble())

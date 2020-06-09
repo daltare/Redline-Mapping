@@ -1,6 +1,6 @@
 This draft tool (available at: https://cawaterdatadive.shinyapps.io/Redline-Mapping/) displays California's Redlined communites, and helps to assess potential correlations between those policies and indicators of enviornmental and public health (e.g., 303d impaired water bodies, CalEnviroScreen scores), as well as facilities regulated by the CalEPA. More layers will be added in the future (current data sources are described in the script file). 
 
-NOTE: the `Prepare-Data.R` script shows how to access and transform some of the data to prepare it for use in this application
+NOTE: the `Process-Data.R` script shows how to access and transform some of the data to prepare it for use in this application
 
 For more information on the history around Redline mapping and other studies of its effects, see:
 - [Mapping Inequality: Redlining in New Deal America (University of Richmond)](https://dsl.richmond.edu/panorama/redlining/#text=intro)
