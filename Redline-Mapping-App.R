@@ -10,8 +10,15 @@
             # redline_polygons - these could be pulled on the fly from the U of R site, but it's faster to download and join them ahead of time
     
         # Define coordinate systems to use for transformations
-            projected_crs <- 3310 # other options: 26910 -- see: https://epsg.io/3310 and https://epsg.io/26910
-            geographic_crs <- 4326 # see: https://epsg.io/4326
+            projected_crs <- 3310 # see: https://epsg.io/3310 
+                # other options: 26910 see: https://epsg.io/26910
+                # resources: 
+                    # https://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=109326&inline
+                    # 
+            geographic_crs <- 4269 # see: https://epsg.io/4269
+                # see: https://epsg.io/4326
+                
+                    
     
     # initial zoom level / location
          initial_zoom_level <- 'State' # options: 'Redline Bounds (All)', 'State','City'
@@ -33,6 +40,7 @@
         library(data.table)
         library(tidyselect)
         library(purrr)
+        library(tidyr)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -67,6 +75,10 @@
         # ces_choices <- read_rds('data_processed/ces_3_names.RDS') %>% 
         #     # filter(grepl(pattern = 'Percentile$', x = .$name)) %>% 
         #     slice(8:64) # rows 8 to 64
+    
+    # CES 3 polygons using the 2010 tiger census tract geometry
+        ces3_tiger <- st_read('data_processed/tiger_2010_tracts.gpkg') %>% 
+            st_transform(projected_crs)
         
     # CalEPA regulated sites
         calepa_reg_sites <- fread('data_regulatory_actions/Site.csv') %>%
@@ -79,7 +91,7 @@
                    data_source = 'CalEPA Regulated Site Portal') %>% 
             # mutate(coordinates = Map(c, longitude, latitude)) %>%  # see: https://stackoverflow.com/a/46396386
             arrange(site_id) %>% 
-            mutate(site_id = factor(site_id)) %>%
+            # mutate(site_id = factor(site_id)) %>%
             {.}
             # check (NOTE: no missing coordinate data in the flat file)
                 # range(calepa_reg_sites$latitude)
@@ -124,8 +136,9 @@
                 clean_names() %>%
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(eval_date = mdy(eval_date)) %>% 
+                mutate(site_id = as.integer(site_id)) %>% 
                 arrange(site_id, eval_date) %>% 
-                mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+                # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
                 {.}
         # violations
             violations_all_download <- fread('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
@@ -136,8 +149,9 @@
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(violation_date = mdy(violation_date)) %>% 
+                mutate(site_id = as.integer(site_id)) %>% 
                 arrange(site_id, violation_date) %>% 
-                mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+                # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
                 {.}      
         # enforcement actions
             enforcement_all_download <- fread('data_regulatory_actions/EA.csv') %>%
@@ -148,8 +162,9 @@
                 clean_names() %>% 
                 select(-dplyr::ends_with(as.character(0:9))) %>%
                 mutate(enf_action_date = mdy(enf_action_date)) %>% 
+                mutate(site_id = as.integer(site_id)) %>% 
                 arrange(site_id, enf_action_date) %>% 
-                mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+                # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
                 {.}
         # get the date of the most recent regulatory records
             most_recent_reg_records <- max(
@@ -213,7 +228,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          # Inputs: 
                          selectInput(inputId = 'city_selected_1', 
                                      label = 'Zoom To:', 
-                                     choices = c('Statewide', unique(redline_polygons$city)), 
+                                     choices = c('Statewide', unique(redline_polygons$holc_city)), 
                                      selected = 'Statewide'), # 'All'
                          hr(style="border: 1px solid darkgrey"),
                          h4('CalEPA Regulated Sites:'),
@@ -382,7 +397,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
              p('Working on it...')
     ),
     # Background Info Tab ---- 
-        tabPanel('Background Info', icon = icon('info-circle'), # icon = icon('book-reader')
+        tabPanel('Background Information', icon = icon('info-circle'), # icon = icon('book-reader')
                  p('This draft tool displays California\'s Redlined communites, and helps to assess potential correlations between those policies and indicators of enviornmental and public health (e.g., 303d impaired water bodies, CalEnviroScreen scores), as well as facilities regulated by the CalEPA. More layers will be added in the future.'),
                  # Redlining History
                      h3('Redlining History'),
@@ -602,9 +617,9 @@ server <- function(input, output, session) {
                                                )
                     # make api call
                         ces3_poly_download <- read_lines(url_ces3_api) %>% geojson_sf()
-                        st_crs(ces3_poly_download) <- 3310 # the crs is incorrectly defined in the data returned by the api - have to reset it
-                        ces3_poly_download <- ces3_poly_download %>% 
-                            st_transform(crs = geographic_crs) # transform back to lat/lon coordinates
+                        st_crs(ces3_poly_download) <- 3310 # think the crs is incorrectly defined in the data returned by the api - have to reset it
+                        ces3_poly_download <- ces3_poly_download # %>% 
+                            # st_transform(crs = geographic_crs) # transform back to lat/lon coordinates
                     # check
                         # plot(ces3_poly_download$geometry, border = 'blue', col = 'grey')
                         # plot(rb_boundary$geometry, lwd = 3, add = TRUE)
@@ -731,17 +746,20 @@ server <- function(input, output, session) {
         # Get the CalEPA regulated sites
             cal_epa_sites_raw <- reactive({
                 if (input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
-                    # Create an sf object using the sites data from the saved flat file
-                    cal_epa_sites_raw_download <- st_as_sf(calepa_reg_sites %>% filter(!is.na(latitude) & !is.na(longitude)),
-                                                           coords = c('longitude', 'latitude'),
-                                                           crs = 4326,
-                                                           # agr = 'constant',
-                                                           remove = FALSE)
-                    # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
-                    cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
-                    # st_crs(cal_epa_sites_raw_download)
+                        cal_epa_sites_raw_download <- calepa_sites_processed %>% 
+                            filter(!is.na(latitude) & !is.na(longitude)) %>% 
+                            {.}
+                    # # Create an sf object using the sites data from the saved flat file
+                    #     cal_epa_sites_raw_download <- st_as_sf(calepa_sites_processed %>% filter(!is.na(latitude) & !is.na(longitude)),
+                    #                                            coords = c('longitude', 'latitude'),
+                    #                                            crs = 4269,
+                    #                                            # agr = 'constant',
+                    #                                            remove = FALSE)
+                    # # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
+                    #     cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
+                    #     # st_crs(cal_epa_sites_raw_download)
                     # return the object
-                    return(cal_epa_sites_raw_download)
+                        return(cal_epa_sites_raw_download)
                 } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & 
                            length(input$site_type_1) > 0) {    
                     withProgress(message = 'Getting Site Data', style = 'notification', value = 1, { # style = 'notification' 'old'
@@ -801,18 +819,45 @@ server <- function(input, output, session) {
                     # Create an sf object from the sites data
                     cal_epa_sites_raw_download <- st_as_sf(cal_epa_sites_raw_download %>% filter(!is.na(latitude) & !is.na(longitude)),
                                                          coords = c('longitude', 'latitude'),
-                                                         crs = 4326,
+                                                         crs = 4269,
                                                          # agr = 'constant',
                                                          remove = FALSE)
                     # rename some columns to match the data from the regulated site portal
-                    cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
-                        rename(site_name = facility_name)
+                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>%
+                            rename(site_name = facility_name)
                     # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
-                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% st_transform(crs = projected_crs)
-                        # st_crs(cal_epa_sites_raw_download)
-                    # convert site_id column to factor
                         cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
-                            mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id))
+                            st_transform(crs = st_crs(projected_crs))
+                        # st_crs(cal_epa_sites_raw_download)
+                    # join to get the CES3 data (using the geometry from the tiger census tracts)
+                        cal_epa_sites_raw_download <- st_join(cal_epa_sites_raw_download, 
+                                                              ces3_tiger, 
+                                                              join = st_intersects)
+                        # remove duplicates
+                            cal_epa_sites_raw_download <- cal_epa_sites_raw_download[!duplicated(cal_epa_sites_raw_download$site_id),]
+
+                    # join to get the redline data
+                        cal_epa_sites_raw_download <- st_join(cal_epa_sites_raw_download,
+                                                              redline_polygons,
+                                                              join = st_intersects)
+                        
+                    # # convert site_id column to factor
+                    #     cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
+                    #         mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id))
+                    # ALTERNATE METHOD
+                    # # filter to get these sites
+                    #     cal_epa_sites_raw_download <- calepa_sites_processed %>% 
+                    #         filter(site_id %in% api_result_all$site_id)
+                    #         filter(!is.na(latitude) & !is.na(longitude)) %>% 
+                    #         {.}
+                    # drop geometry
+                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
+                            st_drop_geometry()
+                    # drop un-needed fields to match the 'calepa_sites_processed' data frame
+                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
+                            select(-c(id, type, coordinates, originating_system_seq, url)) %>%
+                            mutate(county = NA) %>%
+                            select(names(calepa_sites_processed)) # reorder the columns
                     # return the object
                         return(cal_epa_sites_raw_download)
                 } else {
@@ -843,28 +888,76 @@ server <- function(input, output, session) {
             })
             
     # summarize the inspections, violations, and enforcement actions for the selected period
-        inspections_summary <- reactive({
+        regulatory_data_summary <- reactive({
             withProgress(message = 'Summarizing Data...', 
                          style = 'notification', 
                          value = 1, 
                          {
                              if (nrow(cal_epa_sites_raw()) > 0) {
-                                 return(
-                                     inspections_all_download %>% 
-                                         filter(eval_date >= start_date(),
-                                                eval_date <= end_date()) %>%
-                                         filter(site_id %in% (cal_epa_sites_raw() %>% 
-                                                                  pull(site_id))) %>%
-                                         group_by(site_id) %>%
-                                         summarize(inspections_count = n()) %>%
-                                         ungroup() %>% 
-                                         {.}
-                                 )
+                                 # summarize the regulatory data for the given time period, then add the site info (via a left join)
+                                 reg_data_summary <- regulatory_data_processed %>% 
+                                     filter(action_date >= start_date(), action_date <= end_date()) %>%
+                                     filter(site_id %in% (cal_epa_sites_raw() %>% pull(site_id))) %>%
+                                     group_by(site_id, action) %>% 
+                                     summarize(count = n()) %>%
+                                     ungroup() %>% 
+                                     pivot_wider(names_from = action, 
+                                                 values_from = count) %>% # count) %>% 
+                                     rename(inspections_count = inspection,
+                                            violations_count = violation,
+                                            enforcement_actions_count = enf_action) %>% 
+                                     relocate(inspections_count, 
+                                              violations_count, 
+                                              enforcement_actions_count, 
+                                              .after = site_id) %>%
+                                     mutate_if(is.integer, ~replace(., is.na(.), 0)) %>% # replace NAs with zeros
+                                     left_join(calepa_sites_processed) %>% 
+                                     {.}
+                                 # find sites in the sites that don't have any regulatory actions and add a zero record to make sure they are included
+                                    missing_site_ids <- cal_epa_sites_raw() %>% 
+                                        filter(!(site_id %in% reg_data_summary$site_id)) %>% 
+                                        pull(site_id) %>% 
+                                        {.}
+                                    missing_sites <- calepa_sites_processed %>% 
+                                        filter(site_id %in% missing_site_ids) %>% 
+                                        mutate(inspections_count = 0,
+                                               violations_count = 0,
+                                               enforcement_actions_count = 0) %>% 
+                                        {.}
+                                # bind the sites with no reg actions to the dataset (this is the dataset to use)
+                                    reg_data_summary <- bind_rows(reg_data_summary, 
+                                                                  missing_sites) %>% 
+                                        arrange(site_id)
+                                # return the dataset
+                                    return(reg_data_summary)
                              } else {
                                  return(tibble())
                              }
                          })
         })
+            
+        # inspections_summary <- reactive({
+        #     withProgress(message = 'Summarizing Data...', 
+        #                  style = 'notification', 
+        #                  value = 1, 
+        #                  {
+        #                      if (nrow(cal_epa_sites_raw()) > 0) {
+        #                          return(
+        #                              inspections_all_download %>% 
+        #                                  filter(eval_date >= start_date(),
+        #                                         eval_date <= end_date()) %>%
+        #                                  filter(site_id %in% (cal_epa_sites_raw() %>% 
+        #                                                           pull(site_id))) %>%
+        #                                  group_by(site_id) %>%
+        #                                  summarize(inspections_count = n()) %>%
+        #                                  ungroup() %>% 
+        #                                  {.}
+        #                          )
+        #                      } else {
+        #                          return(tibble())
+        #                      }
+        #                  })
+        # })
         # inspection_types <- reactive({
         #     return(
         #         inspections_all_download %>% 
@@ -873,50 +966,50 @@ server <- function(input, output, session) {
         #             pull(eval_type)
         #     )
         # })
-        violations_summary <- reactive({
-            withProgress(message = 'Summarizing Data...', 
-                         style = 'notification', 
-                         value = 1, 
-                         {
-                             if (nrow(cal_epa_sites_raw()) > 0) {
-                                 return(
-                                     violations_all_download %>% 
-                                         filter(violation_date >= start_date(),
-                                                violation_date <= end_date()) %>%
-                                         filter(site_id %in% (cal_epa_sites_raw() %>% 
-                                                                  pull(site_id))) %>%
-                                         group_by(site_id) %>%
-                                         summarize(violations_count = n()) %>%
-                                         ungroup() %>% 
-                                         {.}
-                                 )
-                             } else {
-                                 return(tibble())
-                             }
-                         })
-        })
-        enforcement_summary <- reactive({
-            withProgress(message = 'Summarizing Data...', 
-                         style = 'notification', 
-                         value = 1, 
-                         {
-                             if (nrow(cal_epa_sites_raw()) > 0) {
-                                 return(
-                                     enforcement_all_download %>% 
-                                         filter(enf_action_date >= start_date(),
-                                                enf_action_date <= end_date()) %>%
-                                         filter(site_id %in% (cal_epa_sites_raw() %>% 
-                                                                  pull(site_id))) %>%
-                                         group_by(site_id) %>%
-                                         summarize(enforcements_count = n()) %>%
-                                         ungroup() %>% 
-                                         {.}
-                                 )
-                             } else {
-                                 return(tibble())
-                             }
-                         })
-        })
+        # violations_summary <- reactive({
+        #     withProgress(message = 'Summarizing Data...', 
+        #                  style = 'notification', 
+        #                  value = 1, 
+        #                  {
+        #                      if (nrow(cal_epa_sites_raw()) > 0) {
+        #                          return(
+        #                              violations_all_download %>% 
+        #                                  filter(violation_date >= start_date(),
+        #                                         violation_date <= end_date()) %>%
+        #                                  filter(site_id %in% (cal_epa_sites_raw() %>% 
+        #                                                           pull(site_id))) %>%
+        #                                  group_by(site_id) %>%
+        #                                  summarize(violations_count = n()) %>%
+        #                                  ungroup() %>% 
+        #                                  {.}
+        #                          )
+        #                      } else {
+        #                          return(tibble())
+        #                      }
+        #                  })
+        # })
+        # enforcement_summary <- reactive({
+        #     withProgress(message = 'Summarizing Data...', 
+        #                  style = 'notification', 
+        #                  value = 1, 
+        #                  {
+        #                      if (nrow(cal_epa_sites_raw()) > 0) {
+        #                          return(
+        #                              enforcement_all_download %>% 
+        #                                  filter(enf_action_date >= start_date(),
+        #                                         enf_action_date <= end_date()) %>%
+        #                                  filter(site_id %in% (cal_epa_sites_raw() %>% 
+        #                                                           pull(site_id))) %>%
+        #                                  group_by(site_id) %>%
+        #                                  summarize(enforcement_actions_count = n()) %>%
+        #                                  ungroup() %>% 
+        #                                  {.}
+        #                          )
+        #                      } else {
+        #                          return(tibble())
+        #                      }
+        #                  })
+        # })
         
     # create an output text statement to report the most recent regulatory records available
         output$data_availability_msg <- renderText({
@@ -927,42 +1020,93 @@ server <- function(input, output, session) {
         })
         
     ###########################################################################################
-    # summarize the inspections, violations, and/or enforcement records for the given time period, then join to the sites data
-        cal_epa_sites_summarized <- reactive({
-            withProgress(message = 'Summarizing Regulatory Action Data', 
-                         style = 'notification', 
-                         value = 1, { # style = 'notification' 'old'
-                             
-                             if (nrow(cal_epa_sites_raw()) > 0) {
-                                 # join the regulatory data to the sites data
-                                 cal_epa_sites_summarized_compute <- cal_epa_sites_raw()
-                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                                     # left_join(inspections_count, by = c('site_id'))
-                                     left_join(inspections_summary(), by = c('site_id'))
-                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                                     # left_join(violations_count, by = c('site_id'))
-                                     left_join(violations_summary(), by = c('site_id'))
-                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                                     # left_join(enforcement_count, by = c('site_id')) %>%
-                                     left_join(enforcement_summary(), by = c('site_id'))
-                                 # replace NAs with zeros for the counts
-                                 cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
-                                     # mutate(inspections_count = case_when(is.na(inspections_count) ~ 0L,
-                                     #                                      TRUE ~ inspections_count),
-                                     #        violations_count = case_when(is.na(violations_count) ~ 0L,
-                                     #                                     TRUE ~ violations_count),
-                                     #        enforcements_count = case_when(is.na(enforcements_count) ~ 0L,
-                                     #                                       TRUE ~ enforcements_count)) %>% 
-                                     mutate_if(is.integer, ~replace(., is.na(.), 0)) %>% 
-                                     {.}
-                                 return(cal_epa_sites_summarized_compute)
-                             } else {
-                                 return(tibble())
-                             }
-                         })
-        }) 
+    # # summarize the inspections, violations, and/or enforcement records for the given time period, then join to the sites data
+    #     cal_epa_sites_summarized <- reactive({
+    #         withProgress(message = 'Summarizing Regulatory Action Data', 
+    #                      style = 'notification', 
+    #                      value = 1, { # style = 'notification' 'old'
+    #                          
+    #                          if (nrow(cal_epa_sites_raw()) > 0) {
+    #                              # join the regulatory data to the sites data
+    #                              cal_epa_sites_summarized_compute <- cal_epa_sites_raw()
+    #                              cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+    #                                  # left_join(inspections_count, by = c('site_id'))
+    #                                  left_join(inspections_summary(), by = c('site_id'))
+    #                              cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+    #                                  # left_join(violations_count, by = c('site_id'))
+    #                                  left_join(violations_summary(), by = c('site_id'))
+    #                              cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+    #                                  # left_join(enforcement_count, by = c('site_id')) %>%
+    #                                  left_join(enforcement_summary(), by = c('site_id'))
+    #                              # replace NAs with zeros for the counts
+    #                              cal_epa_sites_summarized_compute <- cal_epa_sites_summarized_compute %>% 
+    #                                  # mutate(inspections_count = case_when(is.na(inspections_count) ~ 0L,
+    #                                  #                                      TRUE ~ inspections_count),
+    #                                  #        violations_count = case_when(is.na(violations_count) ~ 0L,
+    #                                  #                                     TRUE ~ violations_count),
+    #                                  #        enforcement_actions_count = case_when(is.na(enforcement_actions_count) ~ 0L,
+    #                                  #                                       TRUE ~ enforcement_actions_count)) %>% 
+    #                                  mutate_if(is.integer, ~replace(., is.na(.), 0)) %>% 
+    #                                  {.}
+    #                              return(cal_epa_sites_summarized_compute)
+    #                          } else {
+    #                              return(tibble())
+    #                          }
+    #                      })
+    #     }) 
             
 
+    # # filter for sites... 
+    #     # (1) with inspections, violations, and/or enforcement records > 0 if selected
+    #     # (2) by CES polygon score
+    #     # (3) by HOLC polygon rating
+    #     cal_epa_sites_filtered_0 <- reactive({
+    #         withProgress(message = 'Filtering Regulatory Action Data',
+    #                      style = 'notification', value = 1, { # style = 'notification' 'old'
+    #                          if (nrow(cal_epa_sites_raw()) > 0) {
+    #                              cal_epa_sites_filtered_0_compute <- cal_epa_sites_summarized()
+    #                              # 1 - filter for sites with inspections, violations, and/or enforcement records > 0
+    #                              if ('Inspections' %in% input$show_violations_enforcement) {
+    #                                  cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
+    #                                      filter(inspections_count > 0)
+    #                              }
+    #                              if ('Violations' %in% input$show_violations_enforcement) {
+    #                                  cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
+    #                                      filter(violations_count > 0)
+    #                              }
+    #                              if ('Enforcement Actions' %in% input$show_violations_enforcement) {
+    #                                  cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
+    #                                      filter(enforcement_actions_count > 0)
+    #                              }
+    #                              # 2 - filter for sites by CES polygon score
+    #                              # find the CES polygons that meet the selected criteria (range of values)
+    #                              parameter <- ces_choices %>% 
+    #                                  filter(name == input$ces_parameter) %>% 
+    #                                  pull(ces_variable)
+    #                              ces3_poly_filtered <- ces3_poly() %>% 
+    #                                  filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>%
+    #                                  # filter(CES_3_Score >= input$ces_range_filter[1]) %>% 
+    #                                  filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
+    #                                  # filter(CES_3_Score <= input$ces_range_filter[2]) %>%
+    #                                  st_as_sf() %>% 
+    #                                  {.}
+    #                              # filter for sites with CES polygons meeting the selected criteria
+    #                              cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[ces3_poly_filtered, ] # filter for sites within the selected ces polygons
+    #                              # 3 - filter for sites by HOLC rating
+    #                              if (input$holc_rating_sites_filter_on_off == TRUE) {
+    #                                  cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[redline_polygons %>% 
+    #                                                                                                           filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+    #                                                                                                           filter(city %in% input$holc_city_sites_filter), ]
+    #                              }
+    #                              
+    #                              return(cal_epa_sites_filtered_0_compute)
+    #                          } else {
+    #                              return(tibble())
+    #                          }
+    #                      })
+    #     })
+        
+    
     # filter for sites... 
         # (1) with inspections, violations, and/or enforcement records > 0 if selected
         # (2) by CES polygon score
@@ -971,7 +1115,7 @@ server <- function(input, output, session) {
             withProgress(message = 'Filtering Regulatory Action Data',
                          style = 'notification', value = 1, { # style = 'notification' 'old'
                              if (nrow(cal_epa_sites_raw()) > 0) {
-                                 cal_epa_sites_filtered_0_compute <- cal_epa_sites_summarized()
+                                 cal_epa_sites_filtered_0_compute <- regulatory_data_summary()
                                  # 1 - filter for sites with inspections, violations, and/or enforcement records > 0
                                  if ('Inspections' %in% input$show_violations_enforcement) {
                                      cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
@@ -983,35 +1127,31 @@ server <- function(input, output, session) {
                                  }
                                  if ('Enforcement Actions' %in% input$show_violations_enforcement) {
                                      cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>%
-                                         filter(enforcements_count > 0)
+                                         filter(enforcement_actions_count > 0)
                                  }
                                  # 2 - filter for sites by CES polygon score
-                                 # find the CES polygons that meet the selected criteria (range of values)
-                                 parameter <- ces_choices %>% 
-                                     filter(name == input$ces_parameter) %>% 
-                                     pull(ces_variable)
-                                 ces3_poly_filtered <- ces3_poly() %>% 
-                                     filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>%
-                                     # filter(CES_3_Score >= input$ces_range_filter[1]) %>% 
-                                     filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
-                                     # filter(CES_3_Score <= input$ces_range_filter[2]) %>%
-                                     st_as_sf() %>% 
-                                     {.}
-                                 # filter for sites with CES polygons meeting the selected criteria
-                                 cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[ces3_poly_filtered, ] # filter for sites within the selected ces polygons
+                                    # get the name of the parameter
+                                         parameter <- ces_choices %>% 
+                                             filter(name == input$ces_parameter) %>% 
+                                             pull(ces_variable)
+                                    # filter for sites with CES polygons meeting the selected criteria
+                                         cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>% 
+                                             filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>% 
+                                             filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
+                                             {.}
                                  # 3 - filter for sites by HOLC rating
-                                 if (input$holc_rating_sites_filter_on_off == TRUE) {
-                                     cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute[redline_polygons %>% 
-                                                                                                              filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
-                                                                                                              filter(city %in% input$holc_city_sites_filter), ]
-                                 }
-                                 
+                                     if (input$holc_rating_sites_filter_on_off == TRUE) {
+                                         cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>% 
+                                             filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                             filter(holc_city %in% input$holc_city_sites_filter)
+                                     }
                                  return(cal_epa_sites_filtered_0_compute)
                              } else {
                                  return(tibble())
                              }
                          })
         })
+    
 
     # filter for sites by program type if selected
         cal_epa_sites_filtered <- reactive({
@@ -1026,7 +1166,6 @@ server <- function(input, output, session) {
                                      cal_epa_sites_filtered_compute <- cal_epa_sites_filtered_compute %>% 
                                          filter(site_id %in% program_types_filter$site_id)
                                  }
-                                 
                                  return(cal_epa_sites_filtered_compute)
                              } else {
                                  return(tibble())
@@ -1066,7 +1205,7 @@ server <- function(input, output, session) {
             #     )
             #     )
             # })
-        # revise the data frame
+        # revise the data frame for use in the data table
             summary_table_df <- reactive({ # eventReactive(input$site_type_1, {
                 # if(input$sites_source == site_source_choices[1]) { 
                 #     shiny::showNotification("No data", type = "error")
@@ -1078,12 +1217,13 @@ server <- function(input, output, session) {
                     shiny::showNotification("No data", type = "error")
                     return(NULL)
                 } else {
-                    parameter <- ces_choices %>% 
-                        filter(name == input$ces_parameter) %>% 
-                        pull(ces_variable)
-                    ces3_poly_join <- ces3_poly() %>% # create a df with the ces3 polygons, with just the selected ces score
-                        select(all_of(parameter)) %>% 
-                        rename(ces3_polygon_score := !!parameter) # rename the field to use a consistent name (the ces measure/parameter will be reported in a separate field)
+                    # get the selected CES parameter
+                        parameter <- ces_choices %>%
+                            filter(name == input$ces_parameter) %>%
+                            pull(ces_variable)
+                    # ces3_poly_join <- ces3_poly() %>% # create a df with the ces3 polygons, with just the selected ces score
+                    #     select(all_of(parameter)) %>% 
+                    #     rename(ces3_polygon_score := !!parameter) # rename the field to use a consistent name (the ces measure/parameter will be reported in a separate field)
                 #     parameter <- ces_choices %>% filter(name == input$ces_parameter) %>% pull(ces_variable)
                 #     ces_pal_domain <- as.data.frame(ces3_poly() %>% st_drop_geometry()) %>% 
                 #         select(all_of(parameter)) %>% 
@@ -1094,36 +1234,37 @@ server <- function(input, output, session) {
                 #         mutate(fill_variable = ces_pal_domain)
                     return( 
                         cal_epa_sites_filtered() %>% 
-                            st_join(redline_polygons %>% select(-city)) %>% 
-                            st_join(ces3_poly_join) %>%
+                            # st_join(redline_polygons %>% select(-city)) %>% 
+                            # st_join(ces3_poly_join) %>%
                             select(site_id, site_name, address,
                                    city, state, zip_code, 
                                    inspections_count, violations_count,
-                                   enforcements_count, data_source, 
+                                   enforcement_actions_count, data_source, 
                                    latitude, longitude,
                                    holc_grade, 
-                                   ces3_polygon_score
+                                   all_of(parameter) # ces3_polygon_score
                                    ) %>% 
-                            mutate(site_id = as.character(site_id), # trying to get rid of the error: "DataTables warning: table id=DataTables_Table_1 - Ajax error. For more information about this error, please see http://datatables.net/tn/7"
-                                   zip_code = as.character(site_id)) %>% 
-                            mutate(inspections_count = as.numeric(inspections_count), # trying to get rid of the error: "DataTables warning: table id=DataTables_Table_1 - Ajax error. For more information about this error, please see http://datatables.net/tn/7"
-                                   violations_count = as.numeric(violations_count), 
-                                   enforcements_count = as.numeric(enforcements_count), 
-                                   latitude = as.numeric(latitude), 
-                                   longitude = as.numeric(longitude), 
-                                   ces3_polygon_score = as.numeric(ces3_polygon_score)) %>% 
+                            rename(ces3_polygon_score := !!parameter) %>% # rename the ces score field to use a consistent name (the ces measure/parameter will be reported in a separate field)
+                            # mutate(site_id = as.character(site_id), # trying to get rid of the error: "DataTables warning: table id=DataTables_Table_1 - Ajax error. For more information about this error, please see http://datatables.net/tn/7"
+                            #        zip_code = as.character(zip_code)) %>% 
+                            # mutate(inspections_count = as.numeric(inspections_count), # trying to get rid of the error: "DataTables warning: table id=DataTables_Table_1 - Ajax error. For more information about this error, please see http://datatables.net/tn/7"
+                            #        violations_count = as.numeric(violations_count), 
+                            #        enforcement_actions_count = as.numeric(enforcement_actions_count), 
+                            #        latitude = as.numeric(latitude), 
+                            #        longitude = as.numeric(longitude), 
+                            #        ces3_polygon_score = as.numeric(ces3_polygon_score)) %>% 
                             # rename(!!paste0('inspections_', col_name_custom()) := 'inspections_count') %>% 
-                            st_drop_geometry() %>%
+                            # st_drop_geometry() %>%
                             mutate(ces3_measure = input$ces_parameter) %>% 
                             mutate(reg_action_filter_start_date = if (is.na(input$sites_date_range[1]) | # this adds a new column showing the start date filter
                                                            is.null(input$sites_date_range[1])) {
-                                NA
+                                'NA'
                                 } else {
                                     input$sites_date_range[1]
                                     },
                                 reg_action_filter_end_date = if (is.na(input$sites_date_range[2]) | # this adds a new column showing the end date filter
                                                       is.null(input$sites_date_range[2])) {
-                                    NA
+                                    'NA'
                                     } else {
                                         min(
                                             as.Date(paste0(year(input$sites_date_range[2]), '-',
@@ -1133,10 +1274,12 @@ server <- function(input, output, session) {
                                         )
                                         }) %>% 
                             rename(holc_polygon_grade = holc_grade) %>% 
-                            # for cases where there are multiple joins on the CES data (overlapping polygons)
-                            filter(ces3_polygon_score >= input$ces_range_filter[1] & # first re-filter for sites within the selected range
-                                       ces3_polygon_score <= input$ces_range_filter[2]) %>% 
-                            filter(!duplicated(site_id)) %>%  # if duplicates still remain, just keep the first one
+                            # double check for cases where there are multiple joins on the CES data (overlapping polygons)
+                            # filter(ces3_polygon_score >= input$ces_range_filter[1] & # first re-filter for sites within the selected range
+                            #            ces3_polygon_score <= input$ces_range_filter[2]) %>%
+                            # filter(!duplicated(site_id)) %>%  # if duplicates still remain, just keep the first one
+                            # in text columns, convert NAs to "NA"
+                            mutate_if(is.character, ~replace(., is.na(.), 'NA')) %>% # replace NAs with "NA" in character columns
                             {.}
                     )
                 }
@@ -1263,7 +1406,7 @@ server <- function(input, output, session) {
             } else if (initial_zoom_level == 'City') {
                 bounds_selected <- attributes(st_geometry(redline_polygons %>%
                                                               st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
-                                                              filter(city == initial_selected_city)))$bbox
+                                                              filter(holc_city == initial_selected_city)))$bbox
             }
             
         # create the new (empty) map
@@ -1340,14 +1483,14 @@ server <- function(input, output, session) {
                                 fillColor = 'lightgrey',
                                 # fillColor = ~redline_leaflet_pal(holc_grade),
                                 highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                                popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
-                                                '<b>', 'City: ', '</b>', city, '<br/>',
-                                                '<b>', 'Name: ', '</b>', name, '<br/>',
+                                popup = ~paste0('<b>', '<u>', paste0('HOLC Rated Polygon (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                                '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                                '<b>', 'Name: ', '</b>', holc_name, '<br/>',
                                                 '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                                 '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
                                                 # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>',
-                                                '<b>', paste0('HOLC Form Link (', year, '): '), '</b>',
-                                                paste0('<a href = "', link, '" ', 'target="_blank"> ', link, ' </a>')),
+                                                '<b>', 'HOLC Form Link: ', '</b>',
+                                                paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')),
                                 group = 'HOLC Polygons'
                                 )
 
@@ -1529,13 +1672,19 @@ server <- function(input, output, session) {
                 withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
                 if (length(input$site_type_1) > 0 | input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
                     cal_epa_sites <- cal_epa_sites_filtered() %>% 
-                        st_transform(crs = geographic_crs) # have to convert to geographic coordinate system for leaflet
+                        filter(!is.na(latitude) & !is.na(longitude)) %>% 
+                        st_as_sf(coords = c('longitude', 'latitude'),
+                                 crs = 4326,
+                                 # agr = 'constant',
+                                 remove = FALSE) %>% 
+                        st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                        {.}
                     # # if the option is selected, filter for sites with violations and/or enforcement actions
                     #     if ('Violations' %in% input$show_violations_enforcement) {
                     #         cal_epa_sites <- cal_epa_sites %>% filter(violations_count > 0)
                     #     }
                     #     if ('Enforcement Actions' %in% input$show_violations_enforcement) {
-                    #         cal_epa_sites <- cal_epa_sites %>% filter(enforcements_count > 0)
+                    #         cal_epa_sites <- cal_epa_sites %>% filter(enforcement_actions_count > 0)
                     #     }
                     # # if program type filters are selected, filter for the selected program types
                     #     if (!is.null(input$program_type_1)) {
@@ -1564,7 +1713,7 @@ server <- function(input, output, session) {
                                                          '<b>', 'Regulatory Actions (for selected time period):', '</b>','<br/>',
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Inspection Records: ', '</b>', inspections_count, '<br/>', # chr(149),
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Violation Records: ', '</b>', violations_count, '<br/>', # chr(149),
-                                                         '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcements_count # chr(149),
+                                                         '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcement_actions_count # chr(149),
                                          ),
                                          group = 'CalEPA Regulated Sites')
                 } else {
@@ -1872,14 +2021,14 @@ server <- function(input, output, session) {
                             # fillColor = 'lightblue',
                             fillColor = ~redline_leaflet_pal(holc_grade),
                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                            popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
-                                            '<b>', 'City: ', '</b>', city, '<br/>',
-                                            '<b>', 'Name: ', '</b>', name, '<br/>',
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Rated Polygon (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
                                             '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
-                                            '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', 
-                                            paste0('<a href = "', link, '" ', 'target="_blank"> ', link, ' </a>')),
+                                            '<b>', 'HOLC Form Link: ', '</b>', 
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')),
                             group = 'HOLC Polygons'
                 )
         
@@ -1933,7 +2082,7 @@ server <- function(input, output, session) {
             } else {
                 redline_selected_1 <- redline_polygons %>% 
                     st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
-                    filter(city == input$city_selected_1)
+                    filter(holc_city == input$city_selected_1)
             }
             bounds_1 <- attributes(st_geometry(redline_selected_1))$bbox
             # update map 1 to appropriate bounds

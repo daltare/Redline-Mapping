@@ -43,9 +43,9 @@
                 temp <- tempfile()
                 download.file(url = redline_cities[[i]]$url,
                               destfile = temp)
-                unzip(zipfile = temp, 
-                      exdir = here('data_raw', 
-                                   'Redline_Maps', 
+                unzip(zipfile = temp,
+                      exdir = here('data_raw',
+                                   'Redline_Maps',
                                    names(redline_cities[i])))
             # read data into R
                 redline_poly_list[[i]] <- st_read(here('data_raw', 
@@ -69,7 +69,7 @@
                                                                          city == 'SanJose' ~ 'San Jose',
                                                                          TRUE ~ city))
         redline_polygons <- st_as_sf(redline_polygons)
-        st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]]) # make sure the CRS is defined
+        st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]]) # make sure the CRS is defined (4326)
     # add extra information to the redline polygons
         # links to holc forms for each holc polygon
             holc_form_links <- read_csv(here('data_raw', 'redline-polygons-list.csv')) %>% 
@@ -80,20 +80,25 @@
                           by = c('city', 'holc_id'))
         # area description for each holc polygon
             
-        
+    # rename the columns to add 'holc_' prefix
+        redline_polygons <- redline_polygons %>% 
+            rename(holc_name = name,
+                   holc_city = city,
+                   holc_link = link,
+                   holc_year = year)
     # save to geopackage file
         st_write(obj = redline_polygons, 
                  here('data_processed', 'redline_polygons.gpkg'),
                  append = FALSE) 
-    # simplify and save simplified version
-        # simplify
-            redline_polygons_simplify <- redline_polygons %>% 
-                ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
-        # save to geopackage file
-            st_write(obj = redline_polygons_simplify, 
-                     here('data_processed', 
-                          'redline_polygons_simplified.gpkg'),
-                     append = FALSE)
+    # # simplify and save simplified version
+    #     # simplify
+    #         redline_polygons_simplify <- redline_polygons %>% 
+    #             ms_simplify(keep = 0.05, keep_shapes = TRUE, snap = TRUE)
+    #     # save to geopackage file
+    #         st_write(obj = redline_polygons_simplify, 
+    #                  here('data_processed', 
+    #                       'redline_polygons_simplified.gpkg'),
+    #                  append = FALSE)
         
         
 
@@ -104,11 +109,12 @@
                                               "&outFields=*&outSR=4326&f=geojson") 
             rb_boundary <- read_lines(url_rb_office_areas) %>% 
                 geojson_sf()
-            # st_crs(rb_boundary)
+            # st_crs(rb_boundary) # 4326
         # write the raw data to geopackage file
             st_write(obj = rb_boundary, 
                      here('data_raw', 'RB_Office_Boundaries',
-                          'rb_office_boundaries.gpkg'))
+                          'rb_office_boundaries.gpkg'),
+                     append = FALSE)
             object_size(rb_boundary)
         # simplify
             rb_boundary_simplify <- rb_boundary %>% 
@@ -140,8 +146,7 @@
                                    'CalEnviroScreen3',
                                    'CESJune2018Update_SHP',
                                    'CES3June2018Update.shp')) #%>%
-            #st_transform(4326)
-            st_crs(ces3_poly)
+            st_crs(ces3_poly) # 3310
         # Fix self-intersecting polygons
         if (sum(!st_is_valid(ces3_poly)) > 0) {
             ces3_poly <- sf::st_buffer(ces3_poly, dist = 0)
@@ -152,7 +157,7 @@
         ces3_names_cleaned <- c(ces3_names %>% pull(ces_variable), 'geometry')
         names(ces3_poly) <- ces3_names_cleaned
     # save to geopackage file
-        st_write(obj = ces3_poly %>% st_transform(4326), 
+        st_write(obj = ces3_poly, 
                  here('data_processed', 'ces3_poly.gpkg'),
                  append = FALSE)
     # simplify
@@ -168,7 +173,7 @@
             # object_size(ces3_poly)
             # mapview::mapview(ces3_poly_simplify %>% filter(Nearby_City == 'Sacramento'))
     # save simplified version to geopackage file
-        st_write(obj = ces3_poly_simplify %>% st_transform(4326), 
+        st_write(obj = ces3_poly_simplify, 
                  here('data_processed', 'ces3_poly_simplified.gpkg'),
                  append = FALSE)
 
@@ -186,11 +191,12 @@
                                     '&outSR=4326',
                                     '&f=geojson')
         service_areas <- read_lines(service_areas_url) %>% geojson_sf()
-            # st_crs(service_areas)
+            # st_crs(service_areas) # 4326
     # write the raw data to geopackage file
         st_write(obj = service_areas, 
                  here('data_raw', 'Drinking_Water_Service_Areas',
-                      'drinking_water_service_areas.gpkg'))
+                      'drinking_water_service_areas.gpkg'),
+                 append = FALSE)
         object_size(service_areas)
     # simplify
         service_areas_simplify <- service_areas %>% 
@@ -207,15 +213,13 @@
 
 
 # California Counties (from saved internal waterboard dataset) --------------------------------------------------------------
-    # # read data into R
-    #     counties_poly <- st_read(here('data_raw', 'CA_Counties', 'WBGIS_Counties.shp')) %>%
-    #         st_transform(4326)
-    # # save to RDS file
-    #     saveRDS(object = counties_poly, file = here('data_processed', 'CA_Counties.RDS'))
-    # # SIMPLIFY
-    #     # counties_poly_simplify <- rmapshaper::ms_simplify(counties_poly)
-    #     # save to RDS file
-    #         # saveRDS(object = counties_poly_simplify, file = here('data_processed', 'CA_Counties_simplify.RDS'))
+    # read data into R
+        counties_poly <- st_read(here('data_raw', 'CA_Counties', 'WBGIS_Counties.shp')) 
+            st_crs(counties_poly) # 3310
+    # save to RDS file
+            st_write(counties_poly, here('data_processed', 'CA_Counties.gpkg'))
+    # SIMPLIFY
+        # counties_poly_simplify <- rmapshaper::ms_simplify(counties_poly)
 
 
 
@@ -234,9 +238,9 @@
         # Read the shapefile into R
             impaired_303d_poly <- st_read(here('data_raw', 
                                                '2014_2016_303d_Polygons_Final', 
-                                               'IR_1416_Impaired_Polys.shp')) %>% 
-                st_transform(4326)
-            object_size(impaired_303d_poly)
+                                               'IR_1416_Impaired_Polys.shp')) 
+                st_crs(impaired_303d_poly) # 3310
+                object_size(impaired_303d_poly)
         # clean names
             impaired_303d_poly <- clean_names(impaired_303d_poly)
         # simplify
@@ -256,8 +260,8 @@
         # Read the shapefile into R
             impaired_303d_lines <- st_read(here('data_raw', 
                                                 '2014_2016_303d_Lines_Final', 
-                                                'IR_1416_Impaired_Lines.shp')) %>% 
-                st_transform(4326)
+                                                'IR_1416_Impaired_Lines.shp'))
+            st_crs(impaired_303d_lines) # 3310
         # clean names
             impaired_303d_lines <- clean_names(impaired_303d_lines)
         # SIMPLIFY AND REMOVE REGION 1 LINES (TOO MUCH DATA USED FOR R1 LINES)
@@ -291,18 +295,18 @@
                                                            paste0(pollutant, ': ',comments_included_on_303_d_list ),
                                                            'NA'))
                     impaired_pollutants_1$pollutant_comment[impaired_pollutants_1$pollutant_comment == 'NA'] <- NA # replace text NAs from formual above with actual NAs
-                # Create a list of the unique IDs
-                    impaired_ids_1 <- impaired_pollutants_1 %>% distinct(wbid)
-                # for each ID in the list, append the list of pollutants associated with that ID, and the comments associated with those pollutants (if any)
-                    # initialize the new columns (this just helps to prevent a warning message in the next step)
-                    impaired_ids_1 <- impaired_ids_1 %>% mutate(pollutant = '',
-                                                            comments = '')
-                    for (i in seq(nrow(impaired_ids_1))){
-                        temp <- impaired_pollutants_1 %>% filter(wbid == impaired_ids_1$wbid[i])
-                        impaired_ids_1$pollutant[i] <- paste0(temp$pollutant, collapse = ' | ')
-                        temp2 <- impaired_pollutants_1 %>% filter(wbid == impaired_ids_1$wbid[i] & !is.na(pollutant_comment))
-                        impaired_ids_1$comments[i] <- paste0(temp2$pollutant_comment, collapse = ' | ')
-                    }
+                    # Create a list of the unique IDs
+                        impaired_ids_1 <- impaired_pollutants_1 %>% distinct(wbid)
+                    # for each ID in the list, append the list of pollutants associated with that ID, and the comments associated with those pollutants (if any)
+                        # initialize the new columns (this just helps to prevent a warning message in the next step)
+                        impaired_ids_1 <- impaired_ids_1 %>% mutate(pollutant = '',
+                                                                comments = '')
+                        for (i in seq(nrow(impaired_ids_1))){
+                            temp <- impaired_pollutants_1 %>% filter(wbid == impaired_ids_1$wbid[i])
+                            impaired_ids_1$pollutant[i] <- paste0(temp$pollutant, collapse = ' | ')
+                            temp2 <- impaired_pollutants_1 %>% filter(wbid == impaired_ids_1$wbid[i] & !is.na(pollutant_comment))
+                            impaired_ids_1$comments[i] <- paste0(temp2$pollutant_comment, collapse = ' | ')
+                        }
 
     # 303d Pollutant Potential Sources (table 2) ---
             # access and transform the 303d tabular data
