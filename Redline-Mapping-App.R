@@ -1490,7 +1490,8 @@ server <- function(input, output, session) {
                                                 '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
                                                 # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>',
                                                 '<b>', 'HOLC Form Link: ', '</b>',
-                                                paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')),
+                                                paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>'), '<br/>',
+                                                '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts),
                                 group = 'HOLC Polygons'
                                 )
 
@@ -2028,7 +2029,8 @@ server <- function(input, output, session) {
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
-                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')),
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>'), '<br/>',
+                                            '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts),
                             group = 'HOLC Polygons'
                 )
         

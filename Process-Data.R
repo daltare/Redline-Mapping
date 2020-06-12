@@ -71,6 +71,9 @@
         redline_polygons <- st_as_sf(redline_polygons)
         st_crs(redline_polygons) <- st_crs(redline_poly_list[[1]]) # make sure the CRS is defined (4326)
     # add extra information to the redline polygons
+        # some polygons are missing holc_id's and can't be joined - separate these out
+            redline_polygons_missing_id <- redline_polygons %>% filter(is.na(holc_id))
+            redline_polygons <- redline_polygons %>% filter(!is.na(holc_id))
         # links to holc forms for each holc polygon
             holc_form_links <- read_csv(here('data_raw', 'redline-polygons-list.csv')) %>% 
                 select(holc_id, city, link, year) %>% 
@@ -79,6 +82,13 @@
                 left_join(holc_form_links, 
                           by = c('city', 'holc_id'))
         # area description for each holc polygon
+            area_descriptions <- read_csv(here('area-descriptions', 
+                                               '_redline_combined_area-descriptions.csv'))
+            redline_polygons <- redline_polygons %>% 
+                left_join(area_descriptions %>% select(city, holc_id, area_description_excerpts), 
+                          by = c('city', 'holc_id'))
+        # add back in the polygons with missing id's
+            redline_polygons <- bind_rows(redline_polygons, redline_polygons_missing_id)
             
     # rename the columns to add 'holc_' prefix
         redline_polygons <- redline_polygons %>% 

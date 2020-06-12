@@ -6,6 +6,8 @@ library(janitor)
 library(readxl)
 library(writexl)
 library(geojsonsf)
+library(here)
+library(glue)
 
 # Links ----
     url_fresno <- 'https://dsl.richmond.edu/panorama/redlining/static/downloads/geojson/CAFresno1936.geojson'
@@ -20,6 +22,7 @@ library(geojsonsf)
 
     
 # FRESNO -- Convert geojson to dataframe ----
+{
     geojson_fr <- (readr::read_lines(url_fresno) %>% jsonlite::fromJSON())$features
     df_description_fr <- bind_cols(geojson_fr$properties %>% select(-area_description_data), 
                                     geojson_fr$properties$area_description_data)
@@ -45,9 +48,10 @@ library(geojsonsf)
     write_xlsx(x = df_description_fr, 
                path = here('area-descriptions',
                            'redline_fresno_area-descriptions.xlsx'))    
- 
+}
     
 # SAN DIEGO -- Convert geojson to dataframe ----
+{
     geojson_sd <- (readr::read_lines(url_sandiego) %>% jsonlite::fromJSON())$features
     df_description_sd <- bind_cols(geojson_sd$properties %>% select(-area_description_data), 
                                     geojson_sd$properties$area_description_data)
@@ -73,8 +77,10 @@ library(geojsonsf)
     write_xlsx(x = df_description_sd, 
                path = here('area-descriptions',
                            'redline_san_diego_area-descriptions.xlsx')) 
+}
     
 # SAN FRANCISCO -- Convert geojson to dataframe ----
+{
     geojson_sf <- (readr::read_lines(url_sanfrancisco) %>% jsonlite::fromJSON())$features
     df_description_sf <- bind_cols(geojson_sf$properties %>% select(-area_description_data), 
                                     geojson_sf$properties$area_description_data)
@@ -100,10 +106,12 @@ library(geojsonsf)
     write_xlsx(x = df_description_sf, 
                path = here('area-descriptions',
                            'redline_san_francisco_area-descriptions.xlsx'))  
+}
     
 # LOS ANGELES -- Convert geojson to dataframe ----
+{
     # geojson_raw_la <- readr::read_lines(url_losangeles)
-    geojson_sf_la <- geojson_raw_la %>% geojson_sf()
+    # geojson_sf_la <- geojson_raw_la %>% geojson_sf()
     # geojson_list_la <- jsonlite::fromJSON(geojson_raw_la)
     # geojson_result_la <- geojson_list_la$features
     geojson_la <- (readr::read_lines(url_losangeles) %>% jsonlite::fromJSON())$features
@@ -126,7 +134,7 @@ library(geojsonsf)
                  "2d", "2e", "2f", "2g", "2h", "2i", "2j", "2k", "2l", "2m", "2n", 
                  "2o", "2p", "3", "4a", "4b", 
                  "5", "5a", "5b", "6", "71", "72", 
-                 "8", "9", "10", "V1"))
+                 "8", "9", "10"))#, "V1"))
     # sort rows
     df_description_la <- df_description_la %>% 
         separate(col = holc_id, 
@@ -136,7 +144,7 @@ library(geojsonsf)
         mutate(id_numb = as.numeric(id_numb)) %>% 
         arrange(id_grade, id_numb) %>% 
         select(-c('id_grade', 'id_numb')) %>% 
-        select(-c('name', 'V1')) %>% 
+        select(-c('name')) %>% 
         rename('holc_region' = '0',
                'inhabitants_pop_trend' = '1a',
                'inhabitants_occupation' = '1b',
@@ -181,8 +189,8 @@ library(geojsonsf)
         clean_names()
     # names(df_description_la) <- gsub(pattern = 'x', replacement = 'q_', x = names(df_description_la))
         
-    z <- bind_cols(df_description_la, df_geometry_la)
-    View(z)
+    # z <- bind_cols(df_description_la, df_geometry_la)
+    # View(z)
     
     write_csv(x = df_description_la, 
               path = here('area-descriptions', 
@@ -190,13 +198,10 @@ library(geojsonsf)
     write_xlsx(x = df_description_la, 
                path = here('area-descriptions', 
                            'redline_los-angeles_area-descriptions.xlsx'))
-    
-    # https://dsl.richmond.edu/panorama/redlining/#loc=9/34.005/-118.823&city=los-angeles-ca&area=A2&adview=full&adimage=3/76.619/-139.219
-    # https://dsl.richmond.edu/panorama/redlining/#loc=9/34.005/-118.823&city=los-angeles-ca&area=A3&adview=full&adimage=3/76.619/-139.219
+}   
 
-    'https://dsl.richmond.edu/panorama/redlining/#loc=//&city=los-angeles-ca&area=A3&adview=full&adimage=3/1/-1'
-    
 # SACRAMENTO -- Convert geojson to dataframe ----
+{
     geojson_sac <- (readr::read_lines(url_sacramento) %>% jsonlite::fromJSON())$features
     df_description_sac <- bind_cols(geojson_sac$properties %>% select(-area_description_data), 
                                    geojson_sac$properties$area_description_data)
@@ -265,9 +270,10 @@ library(geojsonsf)
     write_xlsx(x = df_description_sac, 
                path = here('area-descriptions', 
                            'redline_sacramento_area-descriptions.xlsx'))
-    
+}  
 
 # STOCKTON -- Convert geojson to dataframe ----
+{
     geojson_stk <- (readr::read_lines(url_stockton) %>% jsonlite::fromJSON())$features
     df_description_stk <- bind_cols(geojson_stk$properties %>% select(-area_description_data), 
                                     geojson_stk$properties$area_description_data)
@@ -340,9 +346,10 @@ library(geojsonsf)
     write_xlsx(x = df_description_stk, 
                path = here('area-descriptions', 
                            'redline_stockton_area-descriptions.xlsx'))    
-
+}
     
 # EAST BAY (OAKLAND) -- Convert geojson to dataframe ----
+{
     geojson_oak <- (readr::read_lines(url_oakland) %>% jsonlite::fromJSON())$features
     df_description_oak <- bind_cols(geojson_oak$properties %>% select(-area_description_data), 
                                     geojson_oak$properties$area_description_data)
@@ -412,9 +419,10 @@ library(geojsonsf)
     write_xlsx(x = df_description_oak, 
                path = here('area-descriptions', 
                            'redline_east-bay_area-descriptions.xlsx'))    
-    
+}   
 
 # SAN JOSE -- Convert geojson to dataframe ----
+{
     geojson_sj <- (readr::read_lines(url_sanjose) %>% jsonlite::fromJSON())$features
     df_description_sj <- bind_cols(geojson_sj$properties %>% select(-area_description_data), 
                                     geojson_sj$properties$area_description_data)
@@ -483,15 +491,38 @@ library(geojsonsf)
     write_xlsx(x = df_description_sj, 
                path = here('area-descriptions', 
                            'redline_san-jose_area-descriptions.xlsx'))    
+}   
+    
+    
+    
     
 
+    
+    
 # BIND ----
     df_description_combined <- bind_rows(df_description_sac, 
                                   df_description_stk, 
                                   df_description_oak, 
                                   df_description_sj, 
-                                  df_description_la)
-    write_csv(x = df_descriptionc_combined, 
+                                  df_description_la,
+                                  df_description_fr,
+                                  df_description_sf,
+                                  df_description_sd)
+
+# create a new column with area description excerpts (for use in the app in the popup for each holc polygon)
+    df_description_combined <- df_description_combined %>% 
+        mutate(area_description_excerpts = case_when(
+            city == 'Fresno' | city == 'San Francisco' | city == 'San Diego' | city == 'Los Angeles' ~
+                area_description,
+            city == 'East Bay' | city == 'Sacramento' | city == 'San Jose' | city == 'Stockton' ~
+              as.character(
+                  glue('FAVORABLE INFLUENCES: {area_favorable_influences} | DETRIMENTAL INFLUENCES: {area_detrimental_influences} | CLARIFYING REMARKS: {clarifying_remarks}')
+                  ),
+            TRUE ~ area_description
+        ))
+    
+# save to csv file
+    write_csv(x = df_description_combined, 
               path = here('area-descriptions', 
                           '_redline_combined_area-descriptions.csv'))
     write_xlsx(x = df_description_combined, 

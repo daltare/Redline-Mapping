@@ -126,7 +126,7 @@ library(tidylog)
                 st_transform(3310)
         # join redline data to the sites data
             calepa_reg_sites <- st_join(calepa_reg_sites, 
-                                        redline_polygons, 
+                                        redline_polygons %>% select(-c(area_description_excerpts, holc_link, holc_year)), 
                                         join = st_intersects) # only join sites that fall within HOLC polygons
         # drop the geometry (make into data frame)
             calepa_reg_sites <- calepa_reg_sites %>% st_drop_geometry()
