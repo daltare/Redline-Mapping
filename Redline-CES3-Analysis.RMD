@@ -548,7 +548,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
             geom_point(aes(x = !!as.name(paste0(var_name, '_departure')), 
                            y = holc_grade, 
                            color = holc_grade)) + 
-            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3)) +
+            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4)) +
             scale_y_discrete(limits = rev(levels(holc_poly_wt_score_departures$holc_grade))) +
             facet_wrap(vars(holc_city)) + 
             labs(x = paste0(ces_measure_name, ' Departure'), y = 'HOLC Grade') +
@@ -562,7 +562,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
             geom_point(aes(x = !!as.name(paste0(var_name)), 
                            y = holc_grade, 
                            color = holc_grade)) + 
-            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.6)) +
+            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4)) +
             scale_y_discrete(limits = rev(levels(holc_poly_wt_score_departures$holc_grade))) +
             facet_wrap(vars(holc_city)) + 
             labs(x = paste0(ces_measure_name, ' Raw Score'), y = 'HOLC Grade') +
@@ -575,12 +575,17 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         summarize(city_holc_dep_average = mean(!!as.name(paste0(var_name, '_departure'))),
                   city_holc_dep_median = median(!!as.name(paste0(var_name, '_departure'))))
     
-    holc_city_means_plot <- ggplot(holc_poly_wt_score_departures_summary) +
-        geom_jitter(aes(x = city_holc_dep_average, 
-                        y = holc_city, 
-                        color = holc_grade),
-                    height = 0.15) + 
-        scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.6), name = 'HOLC Grade') +
+    holc_city_means_plot <- ggplot(holc_poly_wt_score_departures_summary) + 
+        geom_point(aes(x = city_holc_dep_average, 
+                       y = holc_city, 
+                       color = holc_grade)) + 
+        # geom_jitter(aes(x = city_holc_dep_average, 
+        #                 y = holc_city, 
+        #                 color = holc_grade),
+        #             height = 0.15) + 
+        scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 1.0), 
+                           name = 'HOLC Grade') +
+        scale_y_discrete(limits = rev(levels(holc_poly_wt_score_departures_summary$holc_city))) +
         labs(x = paste0(ces_measure_name, ' Average Departure'), y = 'City') +
         theme(legend.position = 'bottom') +
         geom_blank()
