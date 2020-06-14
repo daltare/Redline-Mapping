@@ -96,6 +96,13 @@
                    holc_city = city,
                    holc_link = link,
                    holc_year = year)
+    # fix self-intersecting polygons (if needed)
+        crs_redline <- st_crs(redline_polygons)
+        redline_polygons <- redline_polygons %>% st_transform(3310)
+        if (sum(!st_is_valid(redline_polygons)) > 0) {
+            redline_polygons <- sf::st_buffer(redline_polygons, dist = 0)
+        }
+        redline_polygons <- redline_polygons %>% st_transform(crs_redline)
     # save to geopackage file
         st_write(obj = redline_polygons, 
                  here('data_processed', 'redline_polygons.gpkg'),
