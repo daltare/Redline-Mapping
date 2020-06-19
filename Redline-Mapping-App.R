@@ -41,6 +41,7 @@
         library(tidyselect)
         library(purrr)
         library(tidyr)
+        library(ggplot2)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -70,12 +71,25 @@
             
     # List of the CES parameter choices to plot
         ces_choices <- read_csv('data_processed/ces_names.csv') %>% # manually processed this file to make more descriptive names for the fields
-            mutate(ces_variable = make_clean_names(name, 'parsed')) %>% 
-            slice(8:64) # rows 8 to 64
-        # ces_choices <- read_rds('data_processed/ces_3_names.RDS') %>% 
-        #     # filter(grepl(pattern = 'Percentile$', x = .$name)) %>% 
-        #     slice(8:64) # rows 8 to 64
-    
+            mutate(ces_variable = make_clean_names(name)) %>% #, 'parsed')) %>% 
+            slice(8:64) %>%  # rows 8 to 64
+            filter(type != 'other?')
+        # reorder
+        ces_choices <- ces_choices %>% 
+            filter(group == 'overall', subgroup == 'overall') %>% 
+            bind_rows(ces_choices %>% filter(group == 'pollution burden', subgroup == 'overall')) %>% 
+            bind_rows(ces_choices %>% filter(group == 'pollution burden', subgroup == 'exposures')) %>% 
+            bind_rows(ces_choices %>% filter(group == 'pollution burden', subgroup == 'environmental effects')) %>%
+            bind_rows(ces_choices %>% filter(group == 'population characteristics', subgroup == 'overall')) %>% 
+            bind_rows(ces_choices %>% filter(group == 'population characteristics', subgroup == 'sensitive populations')) %>% 
+            bind_rows(ces_choices %>% filter(group == 'population characteristics', subgroup == 'socioeconomic factors')) %>%
+            bind_rows(ces_choices %>% filter(group == 'demographic', subgroup == 'demographic')) %>%
+            {.}
+    # all CES field names
+        ces_field_names <- read_csv('data_processed/ces_names.csv') %>% 
+            mutate(ces_variable = make_clean_names(name)) #, 'parsed'))
+
+
     # CES 3 polygons using the 2010 tiger census tract geometry
         ces3_tiger <- st_read('data_processed/tiger_2010_tracts.gpkg') %>% 
             st_transform(projected_crs)
@@ -178,7 +192,15 @@
                         filter(enf_action_date <= Sys.Date()) %>% 
                         pull(enf_action_date))
             )
-        
+            
+    # read data for the Redline-CES analysis
+        analysis_clipped_ces <- st_read('data_processed-analysis/ces_clipped_to_holc_bounds.gpkg')
+        analysis_raw_scores <- st_read('data_processed-analysis/area_weighted_scores.gpkg')
+        analysis_departure_scores <- st_read('data_processed-analysis/departure-area_weighted_scores.gpkg')
+        analysis_citywide_scores <- st_read('data_processed-analysis/citywide_avg-area_weighted_scores.gpkg')
+        analysis_z_scores <- st_read('data_processed-analysis/z_scores-area_weighted_scores.gpkg')
+
+
 # create widget for data range input (selecting month/year only) ----
 # see: https://stackoverflow.com/a/54922170
     dateRangeInput2 <- function(inputId, label, minview = "days", maxview = "decades", ...) {
@@ -195,7 +217,7 @@
 # Define UI --------------------------------------------------------------------
 ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythemes::shinytheme('flatly'),
     # Maps / Tabular Data Tab ----
-        tabPanel('Maps', icon = icon('map'),
+        tabPanel('Maps & CalEPA Data', icon = icon('map'),
                  useShinyjs(),
                  tags$head(
                      # Code to resize main panel to 100% width after show/hide sidebar button clicked
@@ -394,14 +416,126 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
         ),
     # Analysis Tab ----
     tabPanel('Redline-CES Analysis', icon = icon('chart-bar'),
-             p('Working on it...')
+             # p('Working on it...'),
+             h3('Redline-CalEnviroScreen Analysis'),
+             p('This section investigates potential correlations between: '),
+             tags$li('Residential Security (i.e., Redline) maps created by the federal government\'s Home Owners’ 
+             Loan Corporation (HOLC) in major California cities in the 1930s, and'),
+             tags$li('current measures of public health, environmental conditions, and socioeconomic 
+                     characteristics in areas assessed by the HOLC maps.'),
+             br(),
+             p('The HOLC maps evaluated mortgage lending risk in different neighborhoods within 
+             each city on a scale of A through D (A = "Best", B = "Still Desirable", C = "Definitely 
+             Declining", D = "Hazardous"), and relied in part on explicit assessments of the racial and 
+             ethnic makeup of each neighborhood. 
+               This process - now more commonly known as "Redlining" - likely had 
+               significant impacts on the trajectories of neighborhoods and their residents by 
+               creating systematic differences in access to public and private capital, with 
+               resulting disparities in pathways to home ownership, community development, 
+               and other economic and social opportunities. 
+               For more information about the history of Redlining and other studies of its effects, 
+               see the \"Background Information\" tab.'),
+                # systematically reduced or denied access to public and private 
+               # capital to neighborhoods and residents in areas classified in higher risk categories. 
+               # The resulitng inequalities in pathways to home ownership, community development, 
+               # and other economic opportunities between areas with different classifications likely 
+               # had significant impacts on the socioeconomic trajectories of those neighborhoods 
+               # and their residents. 
+             p('Indicators of current conditions come from ', 
+               tags$a(href = 'https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30', 
+               'CalEnviroScreen 3.0'), 
+               ' (CES), which assigns a score to each census tract in California for 12 indicators 
+               of pollution burden and 8 indicators of population characteristics associated with 
+               increased vulnerability to pollution\'s health effects. 
+               Scores increase with increasing pollution burden or vulnerability for 
+               the selected indicator (i.e., lower scores indicate census tracts with relatively low 
+               pollution burden or vulnerabilty, while higher scores indicate tracts with relatively 
+               high pollution burden or vulnerability). For more information about CalEnviroScreen 
+               3.0, see the ', 
+               tags$a(href = 'https://oehha.ca.gov/media/downloads/calenviroscreen/fact-sheet/ces30factsheetfinal.pdf',
+                            'Fact Sheet'),
+               ' and the ',
+               tags$a(href = 'https://oehha.ca.gov/calenviroscreen/indicators',
+                            'Indicators Overview'), 
+               'webpage.'),
+             hr(style="border: 3px solid darkgrey"),
+             h4('Inputs'),
+             p('Select a CES indicator and a city to display in the maps and plots below:'),
+             div(style="display:inline-block;vertical-align:top;",
+                 selectInput(inputId = 'analysis_indicator_selection',
+                             label = 'Select a CalEnviroScreen Indicator:',
+                             choices = ces_choices %>% filter(type == 'score') %>% pull(name),
+                             selected = ces_choices$name[1], 
+                             multiple = FALSE)),
+             div(style="display:inline-block;vertical-align:top;",
+                 HTML('&emsp;')),
+             div(style="display:inline-block;vertical-align:top;",
+                 selectInput(inputId = 'analysis_city_selection',
+                             label = 'Select a City:',
+                             choices = unique(redline_polygons$holc_city),
+                             selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
+                             multiple = FALSE)),
+             hr(style="border: 3px solid darkgrey"),
+             h4('Conversion of CES scores from census tracts to HOLC map polygons:'),
+             p('The areas delineated in the HOLC maps and the census tracts used to assign the CES 
+               scores have different coverages, as shown in the maps below. There are multiple 
+               methods that could be used to approximate a CES score for each polygon in the HOLC 
+               maps.'),
+             p('An area weighted average method identifies the portions of the CES polygons 
+               that overlap each HOLC polygon, then computes the area weighted average of those 
+               overlapping portions of CES polygons. The maps below demonstrate this method: the 
+               left pane of shows the polygons from the HOLC map for the selected city, the center 
+               pane shows the CES indicator scores (at the census tract level) with the HOLC 
+               map superimposed on top, and the right pane shows the portions of the 
+               CES polygons that overlap with the HOLC polygons (border colors represent HOLC 
+               rating). An additional map shows the overlapping CES polygons separated by the rating
+               of the HOLC polygon they overlap.'),
+             # (for example, if an HOLC polygon with an area of 200 units 
+             #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
+             #   overlapping area of 120 units, and B has a score of 50 and an overlapping area of 80 
+             #   units, the area weighted average score for the HOLC polygon is: 
+             #   [30 x 120 + 50 x 80] / 200 = 38')
+             # INSERT MAPS
+             hr(style="border: 3px solid darkgrey"),
+             h4('Analysis of CES scores by HOLC grade:'),
+             # FACETED DOT PLOT - RAW SCORES
+             p('In the plots below, each point represents an individual polygon in the HOLC maps. 
+               The score for each point represents the aggregated CES score for that HOLC polygon, 
+               and the color represents the grade assigned to that HOLC polygon (A = green, B = 
+               blue, C = yellow, D = red).'),
+             p('The plot below shows the HOLC polygon scores, grouped by HOLC grade by city:'),
+             plotOutput('plot_raw_scores_cities'),
+             hr(style="border: 1px solid darkgrey"),
+             # FACETED DOT PLOT - DEPARTURES
+             p('For the plot below, an average score of all HOLC polygons within each city is computed, 
+               and that citywide average score is subtracted from each point in that city. This 
+               \"departure\" score makes it possible to compare the development of different HOLC 
+               rated areas within each city and helps take into account some of the differences in
+               trajectories of development between cities (e.g., regional patterns of economic 
+               development, gentrification, etc.).'),
+             plotOutput('plot_departures_cities'),
+             hr(style="border: 1px solid darkgrey"),
+             # BOX PLOT
+             p('The box plot below displays the distribution of the \"departure\" scores from the plot
+               above across all cities, grouped by HOLC grade. Each of the small grey dots represents an 
+               individual polygon from the HOLC maps (and a dot in the plot above). The notch in the 
+               center of each plot represents the 95% confidence interval for the true value of the 
+               median for that group.'),
+             plotOutput('plot_box_departures'),
+             hr(style="border: 1px solid darkgrey"),
+             # DOT PLOT OF AVERAGES
+             p('Finally, the plot below shows the average departure score for each HOLC class within
+               each city.'), # the size of the dots represent the number of HOLC polygons in that class/city?
+             plotOutput('plot_average_departures'),
     ),
     # Background Info Tab ---- 
         tabPanel('Background Information', icon = icon('info-circle'), # icon = icon('book-reader')
-                 p('This draft tool displays California\'s Redlined communites, and helps to assess potential correlations between those policies and indicators of enviornmental and public health (e.g., 303d impaired water bodies, CalEnviroScreen scores), as well as facilities regulated by the CalEPA. More layers will be added in the future.'),
+                 # p('This draft tool displays California\'s Redlined communites, and helps to assess potential correlations between those policies and indicators of enviornmental and public health (e.g., 303d impaired water bodies, CalEnviroScreen scores), as well as facilities regulated by the CalEPA. More layers will be added in the future.'),
                  # Redlining History
                      h3('Redlining History'),
-                     p('For more information on the history of Redline mapping and some previous studies of its effects, see:'),
+                     p('For more information about the history of the federal government\'s Home 
+                       Owners’ Loan Corporation (HOLC) Residential Security (\"Redline\") mapping
+                       and some previous studies of its effects, see:'),
                      tags$li(tags$a(href = 'https://dsl.richmond.edu/panorama/redlining/#loc=4/36.71/-96.93&text=intro',
                                     'Mapping Inequality: Redlining in New Deal America'), 
                              '(University of Richmond)',
@@ -410,7 +544,6 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                     "Interactive Redlining Map Zooms In On America's History Of Discrimination"), 
                              '(NPR)',
                      ),
-                    
                      tags$li(tags$a(href = 'https://www.nytimes.com/2017/08/24/upshot/how-redlinings-racist-effects-lasted-for-decades.html',
                                     'How Redlining\'s Racist Effects Lasted for Decades'), 
                              '(New York Times)',
@@ -431,7 +564,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                      h3('Data Sources'),
                      p('Data used in this application comes from the following sources (NOTE: some geospatial data displayed in this tool has been processed to show a simplied version of the original source data):'),
                      tags$li(tags$a(href = 'http://dsl.richmond.edu/panorama/redlining/#text=downloads',
-                                    'Redline Maps'), 
+                                    'HOLC Residential Security (Redline) Maps'), 
                              '(University of Richmond)'
                      ),
                      tags$li(tags$a(href = 'https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30', 'CalEnviroScreen 3.0'), 
@@ -1757,55 +1890,226 @@ server <- function(input, output, session) {
                                     fillColor = ~ces_leaflet_pal(fill_variable),
                                     # fillColor = 'green',
                                     highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#,bringToFront = TRUE
-                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 Tract', '</u>','</b>','<br/>',
-                                                    '<b>', 'Census Tract: ', '</b>', Census_Tract,'<br/>',
-                                                    '<b>', 'Location: ', '</b>', Nearby_City,', ', California_County, ' County, ', ZIP,'<br/>',
-                                                    '<b>', 'Population (2010): ', '</b>', Population_2010,'<br/>',
+                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 (CES) Tract', '</u>','</b>','<br/>',
+                                                    '<b>', 'Census Tract: ', '</b>', 
+                                                    census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    '<b>', 'Location: ', '</b>', 
+                                                    nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
+                                                    ', ', 
+                                                    california_county, # eval(as.symbol(ces_field_names %>% filter(id == 'California') %>% pull(ces_variable))),
+                                                    ' County, ', 
+                                                    zip, #eval(as.symbol(ces_field_names %>% filter(id == 'ZIP') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    '<b>', 'Population (2010): ', '</b>', 
+                                                    population_2010, # eval(as.symbol(ces_field_names %>% filter(id == 'pop2010') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    '<b>', '<u>', 'CES Summary Scores (and Percentiles): ','</u>', '</b>',
+                                                    '<br/>',
+                                                    '<b>', 'Overall CES Score: ', '</b>', 
+                                                    ces_3_score, # eval(as.symbol(ces_field_names %>% filter(id == 'CIscore') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    # '&ensp;','|', '&ensp;',
+                                                    #'<b>', 'CES Percentile: ', '</b>', 
+                                                    ces_3_percentile, # eval(as.symbol(ces_field_names %>% filter(id == 'CIscoreP') %>% pull(ces_variable))),
+                                                    ')',
+                                                    '<br/>',
+                                                    '<b>', 'Pollution Burden Group: ', '</b>', 
+                                                    pollution_burden_group_score, # eval(as.symbol(ces_field_names %>% filter(id == 'PollutionS') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    # '&ensp;','|', '&ensp;',
+                                                    # '<b>', 'Pollution Burden Percentile: ', '</b>', 
+                                                    pollution_burden_group_percentile, # eval(as.symbol(ces_field_names %>% filter(id == 'PollutionP') %>% pull(ces_variable))),
+                                                    ')',
+                                                    '<br/>',
+                                                    '<b>', 'Population Characteristics Group: ', '</b>', 
+                                                    population_characteristics_group_score, # eval(as.symbol(ces_field_names %>% filter(id == 'PopCharSco') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    # '&ensp;','|', '&ensp;',
+                                                    # '<b>', 'Population Characteristics Percentile: ', '</b>', 
+                                                    population_characteristics_group_percentile, # eval(as.symbol(ces_field_names %>% filter(id == 'PopCharP') %>% pull(ces_variable))),
+                                                    ')',
+                                                    '<br/>',
                                                     
-                                                    '<b>', '<u>', 'Overall Score: ','</u>', '</b>','<br/>',
-                                                    '<b>', 'CES Score: ', '</b>', CES_3_Score,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'CES Percentile: ', '</b>', CES_3_Percentile,'<br/>',
+                                                    # POLLUTION BURDEN
+                                                    '<b>', '<u>',
+                                                    'Pollution Burden Scores (and Percentiles): ',
+                                                    '</u>', '</b>',
+                                                    '<br/>',
                                                     
-                                                    '<b>', '<u>','Water-Related Environmental/Health Scores (Percentiles): ', '</u>', '</b>','<br/>',
-                                                    '<b>', 'Drinking Water: ', '</b>', Drinking_Water_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Impaired Waterbodies: ', '</b>', Imp_Water_Bodies_Percentile,'<br/>',
-                                                    '<b>', 'Pollution Burden: ', '</b>', Pollution_Burden_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Pesticides: ', '</b>', Pesticides_Percentile,'<br/>',
-                                                    '<b>', 'Toxic Releases: ', '</b>', Tox_Releases_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Cleanup Sites: ', '</b>', Cleanups_Percentile,'<br/>',
-                                                    '<b>', 'Groundwater Threats: ', '</b>', Ground_Water_Threats_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Solid Waste: ', '</b>', Solid_Waste_Percentile,'<br/>',
-                                                    '<b>', 'Hazardous Waste Generators: ', '</b>', Haz_Waste_Percentile,'<br/>',
+                                                    '<b>', 'Ozone: ', '</b>',
+                                                    ozone_score, # eval(as.symbol(ces_field_names %>% filter(id == 'ozone') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    ozone_percentile, # eval(as.symbol(ces_field_names %>% filter(id == 'ozoneP') %>% pull(ces_variable))),
+                                                    ')',
+                                                    # '&ensp;',' | ', '&ensp;',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'PM 2.5: ', '</b>',
+                                                    pm_2_5_score, # eval(as.symbol(ces_field_names %>% filter(id == 'pm') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    pm_2_5_percentile,
+                                                    ')',
+                                                    '<br/>',
                                                     
-                                                    '<b>', '<u>','Other Environmental Scores (Percentiles): ', '</u>', '</b>','<br/>',
-                                                    '<b>', 'Ozone: ', '</b>', Ozone_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'PM 2.5: ', PM_2_5_Percentile,'<br/>',
-                                                    '<b>', 'Diesel PM: ', Diesel_PM_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Traffic Percentile: ', Traffic_Percentile,'<br/>',
+                                                    '<b>', 'Diesel PM: ', '</b>',
+                                                    diesel_pm_score, # eval(as.symbol(ces_field_names %>% filter(id == 'diesel') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    diesel_pm_percentile,
+                                                    ')',
+                                                    #'&ensp;',' | ', '&ensp;',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Pesticides: ', '</b>',
+                                                    pesticides_score,
+                                                    ' (',
+                                                    pesticides_percentile, 
+                                                    ')',
+                                                    '<br/>',
                                                     
-                                                    '<b>', '<u>','Public Health Scores (Percentiles): ', '</u>','</b>','<br/>',
-                                                    '<b>', 'Asthma: ', '</b>', Asthma_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Low Birth Weight: ', '</b>', Low_Birth_Weight_Percentile,'<br/>',
-                                                    '<b>', 'Cardiovascular Disease: ', '</b>', Cardiovascular_Disease_Percentile,'<br/>',
+                                                    '<b>', 'Traffic: ', '</b>',
+                                                    traffic_score, # eval(as.symbol(ces_field_names %>% filter(id == 'traffic') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    traffic_percentile,
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Drinking Water: ', '</b>',
+                                                    drinking_water_score, # eval(as.symbol(ces_field_names %>% filter(id == 'drink') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    drinking_water_percentile,
+                                                    ')',
+                                                    '<br/>',
                                                     
-                                                    '<b>', '<u>','Socioeconomic Scores (Percentiles): ', '</u>','</b>','<br/>',
-                                                    '<b>', 'Education: ', '</b>', Education_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Linguistic Isolation: ', '</b>', Linguistic_Isolation_Percentile,'<br/>',
-                                                    '<b>', 'Poverty: ', '</b>', Poverty_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Unemployment: ', '</b>', Unemployment_Percentile,'<br/>',
-                                                    '<b>', 'Housing Burden: ', '</b>', Housing_Burden_Percentile,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Population Characteristics: ', '</b>', Population_Characteristics_Percentile,'<br/>',
+                                                    '<b>', 'Toxic Releases: ', '</b>',
+                                                    toxic_releases_score, # eval(as.symbol(ces_field_names %>% filter(id == 'RSEIhaz') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    toxic_releases_percentile,
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Solid Waste: ', '</b>',
+                                                    solid_waste_score, # eval(as.symbol(ces_field_names %>% filter(id == 'swis') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    solid_waste_percentile,
+                                                    ')',
+                                                    '<br/>',
                                                     
-                                                    '<b>', '<u>','Demographics (% of Population): ', '</u>','</b>','<br/>',
-                                                    '<b>', 'Children (Age <=10) : ', '</b>', Children_10_percent,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Age 11-64: ', '</b>', Pop_11_64_years_percent,'<br/>',
-                                                    '<b>', 'Elderly (Age >65): ', '</b>', Elderly_65_percent,'<br/>',
-                                                    '<b>', 'Hispanic: ', '</b>', Hispanic_percent,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'White: ', '</b>', White_percent,'<br/>',
-                                                    '<b>', 'African American: ', '</b>', African_American_percent,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Native American: ', '</b>', Native_American_percent,'<br/>',
-                                                    '<b>', 'Asian American: ', '</b>', Asian_American_percent,'&ensp;','|', '&ensp;',
-                                                    '<b>', 'Other: ', '</b>', Other_percent
+                                                    '<b>', 'Cleanup Sites: ', '</b>',
+                                                    cleanup_sites_score, # eval(as.symbol(ces_field_names %>% filter(id == 'cleanups') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    cleanup_sites_percentile,
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Groundwater Threats: ', '</b>',
+                                                    groundwater_threats_score, # eval(as.symbol(ces_field_names %>% filter(id == 'gwthreats') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    groundwater_threats_percentile,
+                                                    ')',
+                                                    '<br/>',
+
+                                                    '<b>', 'Impaired Waterbodies: ', '</b>',
+                                                    impaired_water_bodies_score, # eval(as.symbol(ces_field_names %>% filter(id == 'iwb') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    impaired_water_bodies_percentile,
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Hazardous Waste Generators: ', '</b>',
+                                                    hazardous_waste_score, # eval(as.symbol(ces_field_names %>% filter(id == 'haz') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    hazardous_waste_percentile,
+                                                    ')',
+                                                    '<br/>',
+                                                    
+                                                    # POPULATION CHARACTERISTICS
+                                                    '<b>', '<u>',
+                                                    'Population Characteristics Scores (and Percentiles): ',
+                                                    '</u>', '</b>',
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Asthma: ', '</b>',
+                                                    asthma_score, # eval(as.symbol(ces_field_names %>% filter(id == 'asthma') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    asthma_percentile, 
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Cardiovascular Disease: ', '</b>',
+                                                    cardiovascular_disease_score, # eval(as.symbol(ces_field_names %>% filter(id == 'cvd') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    cardiovascular_disease_percentile,
+                                                    ')',
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Low Birth Weight: ', '</b>',
+                                                    low_birth_weight_score, # eval(as.symbol(ces_field_names %>% filter(id == 'lbw') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    low_birth_weight_percentile,
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Poverty: ', '</b>',
+                                                    poverty_score, # eval(as.symbol(ces_field_names %>% filter(id == 'pov') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    poverty_percentile, 
+                                                    ')',
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Unemployment: ', '</b>',
+                                                    unemployment_score, # eval(as.symbol(ces_field_names %>% filter(id == 'unemp') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    unemployment_percentile,
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Education: ', '</b>',
+                                                    education_score,# eval(as.symbol(ces_field_names %>% filter(id == 'edu') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    education_percentile, 
+                                                    ')',
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Linguistic Isolation: ', '</b>',
+                                                    linguistic_isolation_score, # eval(as.symbol(ces_field_names %>% filter(id == 'ling') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    linguistic_isolation_percentile, 
+                                                    ')',
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Housing Burden: ', '</b>',
+                                                    housing_burden_score, # eval(as.symbol(ces_field_names %>% filter(id == 'housingB') %>% pull(ces_variable))),
+                                                    ' (',
+                                                    housing_burden_percentile, 
+                                                    ')',
+                                                    '<br/>',
+                                                    
+                                                    '<b>', '<u>',
+                                                    'Demographics (% of Population): ',
+                                                    '</u>', '</b>',
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Children (Age <=10) : ', '</b>',
+                                                    children_10_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'Children_u') %>% pull(ces_variable))),
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Age 11-64: ', '</b>',
+                                                    pop_11_64_years_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'Pop_11_64_') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Elderly (Age >65): ', '</b>',
+                                                    elderly_65_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'Elderly_ov') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'African American: ', '</b>',
+                                                    african_american_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'African_Am') %>% pull(ces_variable))),
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Asian American: ', '</b>',
+                                                    asian_american_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'Asian_Amer') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'Hispanic: ', '</b>',
+                                                    hispanic_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'Hispanic_p') %>% pull(ces_variable))),
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Native American: ', '</b>',
+                                                    native_american_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'Native_Ame') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    
+                                                    '<b>', 'White: ', '</b>',
+                                                    white_percent, # eval(as.symbol(ces_field_names %>% filter(id == 'White_pct') %>% pull(ces_variable))),
+                                                    '&ensp;', '&ensp;',
+                                                    '<b>', 'Other: ', '</b>',
+                                                    other_percent # eval(as.symbol(ces_field_names %>% filter(id == 'Other_pct') %>% pull(ces_variable))),
                                     ),
                                     # # popupOptions = popupOptions(textsize = '15px'),
                                     group = 'CalEnviroScreen') %>% 
@@ -2128,6 +2432,173 @@ server <- function(input, output, session) {
     #                           coords_2$north)
     #         }
     #     })
+        
+        
+        
+# PLOTS ----
+    # # box plot - raw scores
+    #     output$plot_box_raw <- renderPlot({
+    #     # get variable values
+    #         var_name <- ces_choices %>% 
+    #             filter(name == input$analysis_indicator_selection) %>% 
+    #             pull(ces_variable)
+    #         measure_name <- input$analysis_indicator_selection
+    #     # make plot
+    #         raw_scores_boxplot <- ggplot(data = analysis_raw_scores,
+    #                                      aes(x = holc_grade,
+    #                                          y = !!as.name(var_name))) +
+    #             geom_boxplot(aes(fill = holc_grade), notch = TRUE) +
+    #             # scale_color_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.4)) +
+    #             scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
+    #             geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
+    #             theme(legend.position="none") +
+    #             labs(x = 'HOLC Grade', y = paste0(measure_name, ' Raw Score')) +
+    #             geom_blank()
+    #     # return the plot
+    #         raw_scores_boxplot
+    # })
+
+    # box plot - departures
+    output$plot_box_departures <- renderPlot({
+        # get variable values
+            var_name <- ces_choices %>% 
+                filter(name == input$analysis_indicator_selection) %>% 
+                pull(ces_variable)
+            measure_name <- input$analysis_indicator_selection
+        # make plot
+            departures_boxplot <- ggplot(data = analysis_departure_scores,
+                                         aes(x = holc_grade,
+                                             y = !!as.name(var_name))) +
+                geom_boxplot(aes(fill = holc_grade), notch = TRUE) +
+                # scale_color_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.4)) +
+                scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
+                geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
+                theme(legend.position = "none") +
+                labs(x = 'HOLC Grade', y = paste0(measure_name, ' Departure')) +
+                geom_blank()
+        # return the plot
+            departures_boxplot
+    })
+
+    
+    # # point plot - all cities - departures
+    # output$plot_point_departures <- renderPlot({
+    #     # get variable values
+    #         var_name <- ces_choices %>% 
+    #             filter(name == input$analysis_indicator_selection) %>% 
+    #             pull(ces_variable)
+    #         measure_name <- input$analysis_indicator_selection
+    #     # make plot
+    #         departures_point <- ggplot(analysis_departure_scores) +
+    #             geom_jitter(aes(x = !!as.name(var_name),
+    #                            y = holc_city, color = holc_grade),
+    #                         height = 0.25) +
+    #             scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3)) +
+    #             labs(x = paste0(measure_name, ' Departure'), y = 'City') +
+    #             scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_city)))) +
+    #             geom_blank()
+    #     # return the plot
+    #         departures_point
+    # })
+        
+    # # point plot - all cities - raw scores
+    # output$plot_point_raw <- renderPlot({
+    #     # get variable values
+    #         var_name <- ces_choices %>% 
+    #             filter(name == input$analysis_indicator_selection) %>% 
+    #             pull(ces_variable)
+    #         measure_name <- input$analysis_indicator_selection
+    #     # make plot
+    #     raw_scores_point <- ggplot(analysis_raw_scores) +
+    #         geom_jitter(aes(x = !!as.name(var_name),
+    #                        y = holc_city, color = holc_grade),
+    #                     height = 0.25) +
+    #         scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3)) +
+    #         labs(x = paste0(measure_name), y = 'City') +
+    #         scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_city)))) +
+    #         geom_blank()
+    #     # return the plot
+    #         raw_scores_point
+    # })
+        
+    # point plot - departures - by city (facet on cities)
+    output$plot_departures_cities <- renderPlot({
+        # get variable values
+            var_name <- ces_choices %>% 
+                filter(name == input$analysis_indicator_selection) %>% 
+                pull(ces_variable)
+            measure_name <- input$analysis_indicator_selection
+        # make plot
+            departures_point_city <- ggplot(analysis_departure_scores) +
+                geom_point(aes(x = !!as.name(var_name),
+                               y = holc_grade,
+                               color = holc_grade)) +
+                scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4),
+                                   name = 'HOLC Grade') +
+                scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_grade)))) +
+                facet_wrap(vars(holc_city), ncol = 4) +
+                labs(x = paste0(measure_name, ' Departure'), y = 'HOLC Grade') +
+                geom_blank()
+        # return the plot
+            departures_point_city
+    })
+        
+        
+    # point plot - raw scores - by city (facet on cities)
+    output$plot_raw_scores_cities <- renderPlot({
+        # get variable values
+            var_name <- ces_choices %>% 
+                filter(name == input$analysis_indicator_selection) %>% 
+                pull(ces_variable)
+            measure_name <- input$analysis_indicator_selection
+        # make plot
+            raw_scores_point_city <- ggplot(analysis_raw_scores) +
+                geom_point(aes(x = !!as.name(var_name),
+                               y = holc_grade,
+                               color = holc_grade)) +
+                scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4),
+                                   name = 'HOLC Grade') +
+                scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_grade)))) +
+                facet_wrap(vars(holc_city), ncol = 4) +
+                labs(x = measure_name,
+                     y = 'HOLC Grade') +
+                geom_blank()
+        # return the plot
+            raw_scores_point_city
+    })
+   
+    # plot average departure for each HOLC grade within each city
+    output$plot_average_departures <- renderPlot({
+        # get variable values
+            var_name <- ces_choices %>% 
+                filter(name == input$analysis_indicator_selection) %>% 
+                pull(ces_variable)
+            measure_name <- input$analysis_indicator_selection
+        # compute average departures (for each HOLC grade within each city)
+            analysis_departure_scores_summary <- analysis_departure_scores %>%
+                group_by(holc_city, holc_grade) %>%
+                summarize(city_holc_dep_average = mean(!!as.name(var_name)),
+                          city_holc_dep_median = median(!!as.name(var_name))) %>% 
+                ungroup() %>% 
+                {.}
+        # make plot
+            holc_city_means_plot <- ggplot(analysis_departure_scores_summary) +
+                geom_point(aes(x = city_holc_dep_average,
+                               y = holc_city,
+                               color = holc_grade)) +
+                # geom_jitter(aes(x = city_holc_dep_average,
+                #                 y = holc_city,
+                #                 color = holc_grade),
+                #             height = 0.15) +
+                scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 1.0),
+                                   name = 'HOLC Grade') +
+                scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores_summary$holc_city)))) +
+                labs(x = paste0(measure_name, ' Average Departure'), y = 'City') +
+                theme(legend.position = 'bottom') +
+                geom_blank()
+        # return the plot
+            holc_city_means_plot
+    })
     
 }
 

@@ -8,52 +8,52 @@ Longitude,Longitude,NA,NA,NA
 Latitude,Latitude,NA,NA,NA
 CIscore,CES 3 Score,overall,overall,score
 CIscoreP,CES 3 Percentile,overall,overall,percentile
-ozone,Ozone,pollution burden,exposures,score
+ozone,Ozone Score,pollution burden,exposures,score
 ozoneP,Ozone Percentile,pollution burden,exposures,percentile
-pm,PM2.5,pollution burden,exposures,score
+pm,PM 2.5 Score,pollution burden,exposures,score
 pmP,PM 2.5 Percentile,pollution burden,exposures,percentile
-diesel,Diesel PM,pollution burden,exposures,score
+diesel,Diesel PM Score,pollution burden,exposures,score
 dieselP,Diesel PM Percentile,pollution burden,exposures,percentile
-drink,Drinking Water,pollution burden,exposures,score
+drink,Drinking Water Score,pollution burden,exposures,score
 drinkP,Drinking Water Percentile,pollution burden,exposures,percentile
-pest,Pesticides,pollution burden,exposures,score
+pest,Pesticides Score,pollution burden,exposures,score
 pestP,Pesticides Percentile,pollution burden,exposures,percentile
-RSEIhaz,Tox Releases,pollution burden,exposures,score
-RSEIhazP,Tox Releases Percentile,pollution burden,exposures,percentile
-traffic,Traffic,pollution burden,exposures,score
+RSEIhaz,Toxic Releases Score,pollution burden,exposures,score
+RSEIhazP,Toxic Releases Percentile,pollution burden,exposures,percentile
+traffic,Traffic Score,pollution burden,exposures,score
 trafficP,Traffic Percentile,pollution burden,exposures,percentile
-cleanups,Cleanups,pollution burden,environmental effects,score
-cleanupsP,Cleanups Percentile,pollution burden,environmental effects,percentile
-gwthreats,Groundwater Threats,pollution burden,environmental effects,score
-gwthreatsP,GroundWater Threats Percentile,pollution burden,environmental effects,percentile
-haz,Haz Waste,pollution burden,environmental effects,score
-hazP,Haz Waste Percentile,pollution burden,environmental effects,percentile
-iwb,Imp Water Bodies,pollution burden,environmental effects,score
-iwbP,Imp Water Bodies Percentile,pollution burden,environmental effects,percentile
-swis,Solid Waste,pollution burden,environmental effects,score
+cleanups,Cleanup Sites Score,pollution burden,environmental effects,score
+cleanupsP,Cleanup Sites Percentile,pollution burden,environmental effects,percentile
+gwthreats,Groundwater Threats Score,pollution burden,environmental effects,score
+gwthreatsP,Groundwater Threats Percentile,pollution burden,environmental effects,percentile
+haz,Hazardous Waste Score,pollution burden,environmental effects,score
+hazP,Hazardous Waste Percentile,pollution burden,environmental effects,percentile
+iwb,Impaired Water Bodies Score,pollution burden,environmental effects,score
+iwbP,Impaired Water Bodies Percentile,pollution burden,environmental effects,percentile
+swis,Solid Waste Score,pollution burden,environmental effects,score
 swisP,Solid Waste Percentile,pollution burden,environmental effects,percentile
-Pollution,Pollution Burden,pollution burden,overall,score
-PollutionS,Pollution Burden Score,pollution burden,overall,score
-PollutionP,Pollution Burden Percentile,pollution burden,overall,percentile
-asthma,Asthma,population characteristics,sensitive populations,score
+Pollution,Pollution Burden Group,pollution burden,overall,other?
+PollutionS,Pollution Burden Group Score,pollution burden,overall,score
+PollutionP,Pollution Burden Group Percentile,pollution burden,overall,percentile
+asthma,Asthma Score,population characteristics,sensitive populations,score
 asthmaP,Asthma Percentile,population characteristics,sensitive populations,percentile
-lbw,Low Birth Weight,population characteristics,sensitive populations,score
+lbw,Low Birth Weight Score,population characteristics,sensitive populations,score
 lbwP,Low Birth Weight Percentile,population characteristics,sensitive populations,percentile
-cvd,Cardiovascular Disease,population characteristics,sensitive populations,score
+cvd,Cardiovascular Disease Score,population characteristics,sensitive populations,score
 cvdP,Cardiovascular Disease Percentile,population characteristics,sensitive populations,percentile
-edu,Education,population characteristics,socioeconomic factors,score
+edu,Education Score,population characteristics,socioeconomic factors,score
 eduP,Education Percentile,population characteristics,socioeconomic factors,percentile
-ling,Linguistic Isolation,population characteristics,socioeconomic factors,score
+ling,Linguistic Isolation Score,population characteristics,socioeconomic factors,score
 lingP,Linguistic Isolation Percentile,population characteristics,socioeconomic factors,percentile
-pov,Poverty,population characteristics,socioeconomic factors,score
+pov,Poverty Score,population characteristics,socioeconomic factors,score
 povP,Poverty Percentile,population characteristics,socioeconomic factors,percentile
-unemp,Unemployment,population characteristics,socioeconomic factors,score
+unemp,Unemployment Score,population characteristics,socioeconomic factors,score
 unempP,Unemployment Percentile,population characteristics,socioeconomic factors,percentile
-housingB,Housing Burden,population characteristics,socioeconomic factors,score
+housingB,Housing Burden Score,population characteristics,socioeconomic factors,score
 housingBP,Housing Burden Percentile,population characteristics,socioeconomic factors,percentile
-PopChar,Population Characteristics,population characteristics,overall,score
-PopCharSco,Population Characteristics Score,population characteristics,overall,score
-PopCharP,Population Characteristics Percentile,population characteristics,overall,percentile
+PopChar,Population Characteristics Group,population characteristics,overall,other?
+PopCharSco,Population Characteristics Group Score,population characteristics,overall,score
+PopCharP,Population Characteristics Group Percentile,population characteristics,overall,percentile
 Children_u,Children < 10 (%),demographic,demographic,percent
 Pop_11_64_,Pop 11-64 years (%),demographic,demographic,percent
 Elderly_ov,Elderly > 65 (%),demographic,demographic,percent

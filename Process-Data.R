@@ -170,7 +170,7 @@
         }
     # revise column names
         ces3_names <- read_csv('data_processed/ces_names.csv') %>% # manually processed this file to make more descriptive names for the fields
-            mutate(ces_variable = make_clean_names(name, 'parsed'))
+            mutate(ces_variable = make_clean_names(name)) #, 'parsed'))
         ces3_names_cleaned <- c(ces3_names %>% pull(ces_variable), 'geometry')
         names(ces3_poly) <- ces3_names_cleaned
     # save to geopackage file

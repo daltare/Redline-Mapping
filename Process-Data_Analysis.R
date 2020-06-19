@@ -100,10 +100,10 @@ options(scipen = 999)
         #     }        
         # modify the 'City' column to better keep track when joining with other datasets
             ces3_poly <- ces3_poly %>% 
-                rename('ces_city' = 'Nearby_City')
-        # clean names
-            ces3_poly <- ces3_poly %>% 
-                clean_names()
+                rename('ces_city' = 'nearby_city')
+        # # clean names
+        #     ces3_poly <- ces3_poly %>% 
+        #         clean_names()
 
 
 # get the intersection of the CES polygons and redline polygons ----

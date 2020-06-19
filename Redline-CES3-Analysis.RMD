@@ -53,7 +53,7 @@ output:
     ces_variables <- read_csv(here('data_processed', 
                                     'ces_names.csv'))
     ces_variables <- ces_variables %>% 
-        mutate(name_revised = make_clean_names(name))
+        mutate(ces_variable_name = make_clean_names(name))
     
 ces_measures_overall <- ces_variables %>% 
     filter(group == 'overall', 
@@ -179,9 +179,10 @@ The Population Characteristics category includes the following indicators:
             ces3_poly <- st_read(here('data_processed', 'ces3_poly.gpkg'), quiet = TRUE)
                 # st_crs(ces3_poly) # to check the reference system
             # modify the 'City' column to better keep track when joining with other datasets
-                ces3_poly <- ces3_poly %>% rename('ces_city' = 'Nearby_City')
-            # clean names
-                ces3_poly <- ces3_poly %>% clean_names()
+                ces3_poly <- ces3_poly %>% 
+                    rename('ces_city' = 'nearby_city')
+            # # clean names
+            #     ces3_poly <- ces3_poly %>% clean_names()
                 
         # Transform both to projected crs
             # st_crs(redline_polygons) # redline_polygons <- redline_polygons %>% st_transform(crs = projected_crs)
@@ -430,7 +431,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
     #                type == 'score')
     #     i_map <- 4
     #     ces_measure_name <- ces_measures_effects_scores$name[i_map]
-    #     ces_id <- ces_measures_effects_scores$name_revised[i_map]
+    #     ces_id <- ces_measures_effects_scores$ces_variable_name[i_map]
     
     
     var_name <- ces_id # paste0('weighted_score_', ces_id)
@@ -496,7 +497,8 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) + 
         geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) + 
         theme(legend.position="none") + 
-        labs(x = 'HOLC Grade', y = paste0(ces_measure_name, ' Raw Score')) + 
+        # labs(x = 'HOLC Grade', y = paste0(ces_measure_name, ' Raw Score')) + 
+        labs(x = 'HOLC Grade', y = ces_measure_name) + 
         geom_blank()
     # raw_scores_boxplot
 
@@ -536,7 +538,8 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
                            y = holc_city, color = holc_grade), 
                         height = 0.25) + 
             scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3)) +
-            labs(x = paste0(ces_measure_name, ' Raw Score'), y = 'City') +
+            # labs(x = paste0(ces_measure_name, ' Raw Score'), y = 'City') +
+            labs(x = ces_measure_name, y = 'City') +
             scale_y_discrete(limits = rev(levels(holc_poly_wt_score_departures$holc_city))) + 
             geom_blank()
         # raw_scores_point
@@ -565,7 +568,8 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
             scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4)) +
             scale_y_discrete(limits = rev(levels(holc_poly_wt_score_departures$holc_grade))) +
             facet_wrap(vars(holc_city)) + 
-            labs(x = paste0(ces_measure_name, ' Raw Score'), y = 'HOLC Grade') +
+            # labs(x = paste0(ces_measure_name, ' Raw Score'), y = 'HOLC Grade') +
+            labs(x = ces_measure_name, y = 'HOLC Grade') +
             geom_blank()
         # raw_scores_point_city
         
@@ -616,7 +620,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -636,7 +640,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -656,7 +660,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -676,7 +680,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -696,7 +700,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -717,7 +721,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -737,7 +741,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -757,7 +761,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>%
         filter(id == 'CIscore') %>%
-        pull(name_revised) %>%
+        pull(ces_variable_name) %>%
         {.}
 
     map_redline <- holc_map(city = holc_cities_list[i_city])
@@ -776,7 +780,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
         {.}
     ces_id <- ces_variables %>% 
         filter(id == 'CIscore') %>% 
-        pull(name_revised) %>% 
+        pull(ces_variable_name) %>% 
         {.}
 
 
@@ -806,7 +810,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EF 1}
     i_map <- 1
     ces_measure_name <- ces_measures_effects$name[i_map]
-    ces_id <- ces_measures_effects$name_revised[i_map]
+    ces_id <- ces_measures_effects$ces_variable_name[i_map]
 
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
@@ -827,7 +831,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EF 2}
     i_map <- 2
     ces_measure_name <- ces_measures_effects$name[i_map]
-    ces_id <- ces_measures_effects$name_revised[i_map]
+    ces_id <- ces_measures_effects$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -848,7 +852,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EF 3}
     i_map <- 3
     ces_measure_name <- ces_measures_effects$name[i_map]
-    ces_id <- ces_measures_effects$name_revised[i_map]
+    ces_id <- ces_measures_effects$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -869,7 +873,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EF 4}
     i_map <- 4
     ces_measure_name <- ces_measures_effects$name[i_map]
-    ces_id <- ces_measures_effects$name_revised[i_map]
+    ces_id <- ces_measures_effects$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -890,7 +894,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EF 5}
     i_map <- 5
     ces_measure_name <- ces_measures_effects$name[i_map]
-    ces_id <- ces_measures_effects$name_revised[i_map]
+    ces_id <- ces_measures_effects$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -913,7 +917,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 1}
     i_map <- 1
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -933,7 +937,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 2}
     i_map <- 2
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -954,7 +958,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 3}
     i_map <- 3
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -975,7 +979,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 4}
     i_map <- 4
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -996,7 +1000,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 5}
     i_map <- 5
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1017,7 +1021,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 6}
     i_map <- 6
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1038,7 +1042,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator EX 7}
     i_map <- 7
     ces_measure_name <- ces_measures_exposures$name[i_map]
-    ces_id <- ces_measures_exposures$name_revised[i_map]
+    ces_id <- ces_measures_exposures$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1061,7 +1065,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SP 1}
     i_map <- 1
     ces_measure_name <- ces_measures_sensitive_pops$name[i_map]
-    ces_id <- ces_measures_sensitive_pops$name_revised[i_map]
+    ces_id <- ces_measures_sensitive_pops$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1082,7 +1086,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SP 2}
     i_map <- 2
     ces_measure_name <- ces_measures_sensitive_pops$name[i_map]
-    ces_id <- ces_measures_sensitive_pops$name_revised[i_map]
+    ces_id <- ces_measures_sensitive_pops$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1103,7 +1107,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SP 3}
     i_map <- 3
     ces_measure_name <- ces_measures_sensitive_pops$name[i_map]
-    ces_id <- ces_measures_sensitive_pops$name_revised[i_map]
+    ces_id <- ces_measures_sensitive_pops$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1127,7 +1131,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SE 1}
     i_map <- 1
     ces_measure_name <- ces_measures_socioeconomic$name[i_map]
-    ces_id <- ces_measures_socioeconomic$name_revised[i_map]
+    ces_id <- ces_measures_socioeconomic$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1148,7 +1152,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SE 2}
     i_map <- 2
     ces_measure_name <- ces_measures_socioeconomic$name[i_map]
-    ces_id <- ces_measures_socioeconomic$name_revised[i_map]
+    ces_id <- ces_measures_socioeconomic$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1169,7 +1173,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SE 3}
     i_map <- 3
     ces_measure_name <- ces_measures_socioeconomic$name[i_map]
-    ces_id <- ces_measures_socioeconomic$name_revised[i_map]
+    ces_id <- ces_measures_socioeconomic$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1190,7 +1194,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SE 4}
     i_map <- 4
     ces_measure_name <- ces_measures_socioeconomic$name[i_map]
-    ces_id <- ces_measures_socioeconomic$name_revised[i_map]
+    ces_id <- ces_measures_socioeconomic$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1211,7 +1215,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 ```{r ces indicator SE 5}
     i_map <- 5
     ces_measure_name <- ces_measures_socioeconomic$name[i_map]
-    ces_id <- ces_measures_socioeconomic$name_revised[i_map]
+    ces_id <- ces_measures_socioeconomic$ces_variable_name[i_map]
     
     # map_ces <- ces3_poly_map(ces_id, ces_measure_name)
     # map_overlap <- ces_redline_overlap_map(ces_id, ces_measure_name)
@@ -1244,7 +1248,7 @@ ces_summary_plots <- function(ces_id, ces_measure_name) {
 # 
 # for (i_output in seq(nrow(ces_measures_combined))) {
 #     ces_measure_name <- ces_measures_combined$name[i_output]
-#     ces_id <- ces_measures_combined$name_revised[i_output]
+#     ces_id <- ces_measures_combined$ces_variable_name[i_output]
 #     var_name <- ces_id # paste0('weighted_score_', ces_id)
 #     
 #     # group by city and holc ID, then compute the weighted average score for each holc ID
