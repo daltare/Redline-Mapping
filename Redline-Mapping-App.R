@@ -42,6 +42,7 @@
         library(purrr)
         library(tidyr)
         library(ggplot2)
+        library(glue)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -52,6 +53,7 @@
         library(geojsonsf)
         library(rmapshaper)
         library(htmltools)
+        library(tmap)
     # workflow
         library(here)
     # shiny stuff
@@ -200,6 +202,9 @@
         analysis_citywide_scores <- st_read('data_processed-analysis/citywide_avg-area_weighted_scores.gpkg')
         analysis_z_scores <- st_read('data_processed-analysis/z_scores-area_weighted_scores.gpkg')
 
+    # California Counties
+        ca_counties <- st_read('data_processed\\CA_Counties.gpkg') %>% 
+            clean_names()
 
 # create widget for data range input (selecting month/year only) ----
 # see: https://stackoverflow.com/a/54922170
@@ -287,7 +292,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          #                    selected = c('A','B','C','D')),
                          hr(style="border: 1px solid darkgrey"),
                          h4('Redlining Data:'),
-                         tags$b('Filter For Sites Within HOLC Rated Polygons:'),
+                         tags$b('Filter For Sites Within HOLC Assessed Areas:'),
                          switchInput(inputId = 'holc_rating_sites_filter_on_off', 
                                      value = FALSE, 
                                      size = 'small'),
@@ -415,118 +420,171 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
             ),
         ),
     # Analysis Tab ----
-    tabPanel('Redline-CES Analysis', icon = icon('chart-bar'),
-             # p('Working on it...'),
-             h3('Redline-CalEnviroScreen Analysis'),
-             p('This section investigates potential correlations between: '),
-             tags$li('Residential Security (i.e., Redline) maps created by the federal government\'s Home Owners’ 
-             Loan Corporation (HOLC) in major California cities in the 1930s, and'),
-             tags$li('current measures of public health, environmental conditions, and socioeconomic 
-                     characteristics in areas assessed by the HOLC maps.'),
-             br(),
-             p('The HOLC maps evaluated mortgage lending risk in different neighborhoods within 
-             each city on a scale of A through D (A = "Best", B = "Still Desirable", C = "Definitely 
-             Declining", D = "Hazardous"), and relied in part on explicit assessments of the racial and 
-             ethnic makeup of each neighborhood. 
-               This process - now more commonly known as "Redlining" - likely had 
-               significant impacts on the trajectories of neighborhoods and their residents by 
-               creating systematic differences in access to public and private capital, with 
-               resulting disparities in pathways to home ownership, community development, 
-               and other economic and social opportunities. 
-               For more information about the history of Redlining and other studies of its effects, 
-               see the \"Background Information\" tab.'),
-                # systematically reduced or denied access to public and private 
-               # capital to neighborhoods and residents in areas classified in higher risk categories. 
-               # The resulitng inequalities in pathways to home ownership, community development, 
-               # and other economic opportunities between areas with different classifications likely 
-               # had significant impacts on the socioeconomic trajectories of those neighborhoods 
-               # and their residents. 
-             p('Indicators of current conditions come from ', 
-               tags$a(href = 'https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30', 
-               'CalEnviroScreen 3.0'), 
-               ' (CES), which assigns a score to each census tract in California for 12 indicators 
-               of pollution burden and 8 indicators of population characteristics associated with 
-               increased vulnerability to pollution\'s health effects. 
-               Scores increase with increasing pollution burden or vulnerability for 
-               the selected indicator (i.e., lower scores indicate census tracts with relatively low 
-               pollution burden or vulnerabilty, while higher scores indicate tracts with relatively 
-               high pollution burden or vulnerability). For more information about CalEnviroScreen 
-               3.0, see the ', 
-               tags$a(href = 'https://oehha.ca.gov/media/downloads/calenviroscreen/fact-sheet/ces30factsheetfinal.pdf',
-                            'Fact Sheet'),
-               ' and the ',
-               tags$a(href = 'https://oehha.ca.gov/calenviroscreen/indicators',
-                            'Indicators Overview'), 
-               'webpage.'),
-             hr(style="border: 3px solid darkgrey"),
-             h4('Inputs'),
-             p('Select a CES indicator and a city to display in the maps and plots below:'),
-             div(style="display:inline-block;vertical-align:top;",
-                 selectInput(inputId = 'analysis_indicator_selection',
-                             label = 'Select a CalEnviroScreen Indicator:',
-                             choices = ces_choices %>% filter(type == 'score') %>% pull(name),
-                             selected = ces_choices$name[1], 
-                             multiple = FALSE)),
-             div(style="display:inline-block;vertical-align:top;",
-                 HTML('&emsp;')),
-             div(style="display:inline-block;vertical-align:top;",
-                 selectInput(inputId = 'analysis_city_selection',
-                             label = 'Select a City:',
-                             choices = unique(redline_polygons$holc_city),
-                             selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
-                             multiple = FALSE)),
-             hr(style="border: 3px solid darkgrey"),
-             h4('Conversion of CES scores from census tracts to HOLC map polygons:'),
-             p('The areas delineated in the HOLC maps and the census tracts used to assign the CES 
-               scores have different coverages, as shown in the maps below. There are multiple 
-               methods that could be used to approximate a CES score for each polygon in the HOLC 
-               maps.'),
-             p('An area weighted average method identifies the portions of the CES polygons 
-               that overlap each HOLC polygon, then computes the area weighted average of those 
-               overlapping portions of CES polygons. The maps below demonstrate this method: the 
-               left pane of shows the polygons from the HOLC map for the selected city, the center 
-               pane shows the CES indicator scores (at the census tract level) with the HOLC 
-               map superimposed on top, and the right pane shows the portions of the 
-               CES polygons that overlap with the HOLC polygons (border colors represent HOLC 
-               rating). An additional map shows the overlapping CES polygons separated by the rating
-               of the HOLC polygon they overlap.'),
-             # (for example, if an HOLC polygon with an area of 200 units 
-             #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
-             #   overlapping area of 120 units, and B has a score of 50 and an overlapping area of 80 
-             #   units, the area weighted average score for the HOLC polygon is: 
-             #   [30 x 120 + 50 x 80] / 200 = 38')
+    tabPanel('Redline-CES Analysis', 
+             icon = icon('chart-bar'),
+             fluidRow(
+                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        # p('Working on it...'),
+                        h3('Redline-CalEnviroScreen Analysis'),
+                        #  --------------------- INTRODUCTORY TEXT ---------------------
+                        p('This section investigates potential correlations between: '),
+                        tags$li('Residential Security (i.e., Redline) maps created by the federal government\'s Home Owners’ 
+                        Loan Corporation (HOLC) in major California cities in the 1930s, and'),
+                        tags$li('current measures of public health, environmental conditions, and socioeconomic 
+                        characteristics in areas assessed by the HOLC maps.'),
+                        br(),
+                        p('The HOLC maps evaluated mortgage lending risk in different neighborhoods within 
+                         each city on a scale of A through D (A = "Best", B = "Still Desirable", C = "Definitely 
+                         Declining", D = "Hazardous"), and relied in part on explicit assessments of the racial and 
+                         ethnic makeup of each neighborhood. 
+                           This process - now more commonly known as "Redlining" - likely had 
+                           significant impacts on the trajectories of neighborhoods and their residents by 
+                           creating systematic differences in access to public and private capital, with 
+                           resulting disparities in pathways to home ownership, community development, 
+                           and other economic and social opportunities. 
+                           For more information about the history of Redlining and other studies of its effects, 
+                           see the \"Background Information\" tab.'),
+                        # systematically reduced or denied access to public and private 
+                        # capital to neighborhoods and residents in areas classified in higher risk categories. 
+                        # The resulitng inequalities in pathways to home ownership, community development, 
+                        # and other economic opportunities between areas with different classifications likely 
+                        # had significant impacts on the socioeconomic trajectories of those neighborhoods 
+                        # and their residents. 
+                        p('Indicators of current conditions come from ', 
+                          tags$a(href = 'https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30', 
+                                 'CalEnviroScreen 3.0'), 
+                          ' (CES), which assigns a score to each census tract in California for 12 indicators 
+                           of pollution burden and 8 indicators of population characteristics associated with 
+                           increased vulnerability to pollution\'s health effects. 
+                           Scores increase with increasing pollution burden or vulnerability for 
+                           the selected indicator (i.e., lower scores indicate census tracts with relatively low 
+                           pollution burden or vulnerabilty, while higher scores indicate tracts with relatively 
+                           high pollution burden or vulnerability). For more information about CalEnviroScreen 
+                           3.0, see the ', 
+                          tags$a(href = 'https://oehha.ca.gov/media/downloads/calenviroscreen/fact-sheet/ces30factsheetfinal.pdf',
+                                 'Fact Sheet'),
+                          ' and the ',
+                          tags$a(href = 'https://oehha.ca.gov/calenviroscreen/indicators',
+                                 'Indicators Overview'), 
+                          'webpage.'),
+                        hr(style="border: 3px solid darkgrey"),
+                        #  --------------------- INPUTS ---------------------
+                        h4('Inputs'),
+                        p('Select a CES indicator and a city to display in the maps and plots below:'),
+                        div(style="display:inline-block;vertical-align:top;",
+                            selectInput(inputId = 'analysis_indicator_selection',
+                                        label = 'Select a CalEnviroScreen Indicator:',
+                                        choices = ces_choices %>% filter(type == 'score') %>% pull(name),
+                                        selected = ces_choices$name[1], 
+                                        multiple = FALSE)),
+                        div(style="display:inline-block;vertical-align:top;",
+                            HTML('&emsp;')),
+                        div(style="display:inline-block;vertical-align:top;",
+                            selectInput(inputId = 'analysis_city_selection',
+                                        label = 'Select a City:',
+                                        choices = unique(redline_polygons$holc_city),
+                                        selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
+                                        multiple = FALSE)),
+                        hr(style="border: 3px solid darkgrey"),
+                        #  --------------------- ANALYSIS MAPS ---------------------
+                        h4('Conversion of CES scores from census tracts to HOLC map polygons:'),
+                        p('The areas delineated in the HOLC maps and the census tracts used to assign the CES 
+                           scores have different coverages, as shown in the maps below. There are multiple 
+                           methods that could be used to approximate a CES score for each polygon in the HOLC 
+                           maps.'),
+                        p('An area weighted average method identifies the portions of the CES polygons 
+                           that overlap each HOLC polygon, then computes the area weighted average of those 
+                           overlapping portions of CES polygons. The maps below demonstrate this method: the 
+                           left pane of shows the polygons from the HOLC map for the selected city, the center 
+                           pane shows the CES indicator scores (at the census tract level) with the HOLC 
+                           map superimposed on top, and the right pane shows the portions of the 
+                           CES polygons that overlap with the HOLC polygons (border colors represent HOLC 
+                           rating). An additional map shows the overlapping CES polygons separated by the rating
+                           of the HOLC polygon they overlap.'),
+                        # (for example, if an HOLC polygon with an area of 200 units 
+                        #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
+                        #   overlapping area of 120 units, and B has a score of 50 and an overlapping area of 80 
+                        #   units, the area weighted average score for the HOLC polygon is: 
+                        #   [30 x 120 + 50 x 80] / 200 = 38')  
+                 )
+             ),
              # INSERT MAPS
-             hr(style="border: 3px solid darkgrey"),
-             h4('Analysis of CES scores by HOLC grade:'),
-             # FACETED DOT PLOT - RAW SCORES
-             p('In the plots below, each point represents an individual polygon in the HOLC maps. 
-               The score for each point represents the aggregated CES score for that HOLC polygon, 
-               and the color represents the grade assigned to that HOLC polygon (A = green, B = 
-               blue, C = yellow, D = red).'),
-             p('The plot below shows the HOLC polygon scores, grouped by HOLC grade by city:'),
-             plotOutput('plot_raw_scores_cities'),
-             hr(style="border: 1px solid darkgrey"),
-             # FACETED DOT PLOT - DEPARTURES
-             p('For the plot below, an average score of all HOLC polygons within each city is computed, 
-               and that citywide average score is subtracted from each point in that city. This 
-               \"departure\" score makes it possible to compare the development of different HOLC 
-               rated areas within each city and helps take into account some of the differences in
-               trajectories of development between cities (e.g., regional patterns of economic 
-               development, gentrification, etc.).'),
-             plotOutput('plot_departures_cities'),
-             hr(style="border: 1px solid darkgrey"),
-             # BOX PLOT
-             p('The box plot below displays the distribution of the \"departure\" scores from the plot
-               above across all cities, grouped by HOLC grade. Each of the small grey dots represents an 
-               individual polygon from the HOLC maps (and a dot in the plot above). The notch in the 
-               center of each plot represents the 95% confidence interval for the true value of the 
-               median for that group.'),
-             plotOutput('plot_box_departures'),
-             hr(style="border: 1px solid darkgrey"),
-             # DOT PLOT OF AVERAGES
-             p('Finally, the plot below shows the average departure score for each HOLC class within
+             fluidRow(
+                 column(3, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_holc')
+                 ),
+                 column(3, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_overlap')  
+                 ),
+                 column(3, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_intersection')
+                 )
+             ),
+             # fluidRow(
+             #     column(4, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+             #            
+             #     )
+             # ),
+             #  --------------------- ANALYSIS PLOTS ---------------------
+             fluidRow(
+                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        hr(style="border: 3px solid darkgrey"),
+                        h4('Analysis of CES scores by HOLC grade:'),
+                        # DOT PLOTS BY CITY (RAW AND DEPARTURE SCORES - NOT FACETED)
+                        p('In the plots below, each point represents an individual polygon in the HOLC maps. 
+                           The score for each point represents the aggregated CES score for that HOLC polygon for the selected indicator, 
+                           and the color represents the grade assigned to that HOLC polygon (A = green, B = 
+                           blue, C = yellow, D = red).'),
+                        p('The left-side plot below shows the score for each HOLC polygon, grouped by by city. 
+                             The black circles represent the average score for each city, and the black lines 
+                             represent one standard deviation above and below the mean.'),
+                        p('The right-side plot shows the difference between each polygon\'s score and its
+                             respective city-wide average score (the city-wide average score is subtracted from 
+                             each polygon\'s score in that city). This 
+                            \"departure\" score makes it possible to compare the development of different HOLC 
+                            rated areas within each city and helps take into account some of the differences in
+                            trajectories of development between cities (e.g., regional patterns of economic 
+                            development, gentrification, etc.).'),
+                        p('The lower plot below shows those \"departure\" scores (from the right-side plot) separated
+                            by HOLC type'),
+                 )
+             ),
+             fluidRow(
+                 column(6, 
+                        style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        plotOutput('plot_point_raw')),
+                 column(6, 
+                        style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px', 
+                        plotOutput('plot_point_departures'))
+             ),
+             # fluidRow(
+             #     # plotOutput('plot_raw_scores_cities'),
+             # ),
+             fluidRow(
+                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        # hr(style="border: 1px solid darkgrey"),
+                        # FACETED DOT PLOT (BY CITY AND HOLC GRADE) - DEPARTURES
+                        plotOutput('plot_departures_cities'),
+                 )
+             ),
+             fluidRow(
+                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        hr(style="border: 1px solid darkgrey"),
+                        # BOX PLOT
+                        p('The box plot below displays the distribution of the \"departure\" scores (represented in the plot
+               above) across all cities, grouped by HOLC grade. Each of the dots represents an 
+               individual polygon from the HOLC maps (and corresponds to a dot in the plot above). The notch in the 
+               center of each box represents the approximate 95% confidence interval for the true value of the 
+               median for that group (if the notches of two boxes do not overlap, this suggests that the 
+                   medians are significantly different).'),
+                        plotOutput('plot_box_departures'),
+                        hr(style="border: 1px solid darkgrey"),
+                        # DOT PLOT OF AVERAGES
+                        p('The plot below shows the average departure score for each HOLC class within
                each city.'), # the size of the dots represent the number of HOLC polygons in that class/city?
-             plotOutput('plot_average_departures'),
+                        plotOutput('plot_average_departures')
+                 )
+             )
     ),
     # Background Info Tab ---- 
         tabPanel('Background Information', icon = icon('info-circle'), # icon = icon('book-reader')
@@ -1602,7 +1660,8 @@ server <- function(input, output, session) {
                                                    levels = c('A', 'B', 'C', 'D'))
             # Add polygons to map
                  l_map1 <- l_map1 %>% 
-                    addPolygons(data = redline_polygons %>%
+                    # addPolygons(data = redline_polygons %>%
+                    addPolylines(data = redline_polygons %>%
                                     st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet,
                                     # filter(holc_grade %in% input$holc_rating_sites_filter) %>%
                                     {.},
@@ -1616,7 +1675,7 @@ server <- function(input, output, session) {
                                 fillColor = 'lightgrey',
                                 # fillColor = ~redline_leaflet_pal(holc_grade),
                                 highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                                popup = ~paste0('<b>', '<u>', paste0('HOLC Rated Polygon (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                                 '<b>', 'City: ', '</b>', holc_city, '<br/>',
                                                 '<b>', 'Name: ', '</b>', holc_name, '<br/>',
                                                 '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
@@ -1890,7 +1949,7 @@ server <- function(input, output, session) {
                                     fillColor = ~ces_leaflet_pal(fill_variable),
                                     # fillColor = 'green',
                                     highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#,bringToFront = TRUE
-                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 (CES) Tract', '</u>','</b>','<br/>',
+                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 (CES)', '</u>','</b>','<br/>',
                                                     '<b>', 'Census Tract: ', '</b>', 
                                                     census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
                                                     '<br/>',
@@ -2326,7 +2385,7 @@ server <- function(input, output, session) {
                             # fillColor = 'lightblue',
                             fillColor = ~redline_leaflet_pal(holc_grade),
                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-                            popup = ~paste0('<b>', '<u>', paste0('HOLC Rated Polygon (', holc_year, ')'), '</u>', '</b>','<br/>',
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                             '<b>', 'City: ', '</b>', holc_city, '<br/>',
                                             '<b>', 'Name: ', '</b>', holc_name, '<br/>',
                                             '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
@@ -2447,12 +2506,12 @@ server <- function(input, output, session) {
     #         raw_scores_boxplot <- ggplot(data = analysis_raw_scores,
     #                                      aes(x = holc_grade,
     #                                          y = !!as.name(var_name))) +
-    #             geom_boxplot(aes(fill = holc_grade), notch = TRUE) +
+    #             geom_boxplot(aes(fill = holc_grade), notch = TRUE, outlier.shape = NA) +
     #             # scale_color_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.4)) +
     #             scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
     #             geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
     #             theme(legend.position="none") +
-    #             labs(x = 'HOLC Grade', y = paste0(measure_name, ' Raw Score')) +
+    #             labs(x = 'HOLC Grade', y = glue('{measure_name} Raw Score')) +
     #             geom_blank()
     #     # return the plot
     #         raw_scores_boxplot
@@ -2469,57 +2528,81 @@ server <- function(input, output, session) {
             departures_boxplot <- ggplot(data = analysis_departure_scores,
                                          aes(x = holc_grade,
                                              y = !!as.name(var_name))) +
-                geom_boxplot(aes(fill = holc_grade), notch = TRUE) +
+                geom_boxplot(aes(fill = holc_grade), notch = TRUE, outlier.shape = NA) +
                 # scale_color_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.4)) +
                 scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
                 geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
+                scale_x_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_grade)))) +
+                coord_flip() +
                 theme(legend.position = "none") +
-                labs(x = 'HOLC Grade', y = paste0(measure_name, ' Departure')) +
+                labs(x = 'HOLC Grade', 
+                     y = glue('{measure_name} Departure'),
+                     title = 'Departure from Citywide Average by HOLC Grade',
+                     subtitle = 'Each point represents a polygon in the HOLC maps. Departure is raw score for that polygon versus average score of all polygons in respective city') +
                 geom_blank()
         # return the plot
             departures_boxplot
     })
 
     
-    # # point plot - all cities - departures
-    # output$plot_point_departures <- renderPlot({
-    #     # get variable values
-    #         var_name <- ces_choices %>% 
-    #             filter(name == input$analysis_indicator_selection) %>% 
-    #             pull(ces_variable)
-    #         measure_name <- input$analysis_indicator_selection
-    #     # make plot
-    #         departures_point <- ggplot(analysis_departure_scores) +
-    #             geom_jitter(aes(x = !!as.name(var_name),
-    #                            y = holc_city, color = holc_grade),
-    #                         height = 0.25) +
-    #             scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3)) +
-    #             labs(x = paste0(measure_name, ' Departure'), y = 'City') +
-    #             scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_city)))) +
-    #             geom_blank()
-    #     # return the plot
-    #         departures_point
-    # })
+    # point plot - all cities - departures
+    output$plot_point_departures <- renderPlot({
+        # get variable values
+            var_name <- ces_choices %>%
+                filter(name == input$analysis_indicator_selection) %>%
+                pull(ces_variable)
+            measure_name <- input$analysis_indicator_selection
+        # make plot
+            departures_point <- ggplot(analysis_departure_scores) +
+                geom_jitter(aes(x = !!as.name(var_name),
+                               y = holc_city, color = holc_grade),
+                            height = 0.25) +
+                scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), name = 'HOLC Grade') +
+                labs(x = glue('{measure_name} Departure'), 
+                     y = 'City',
+                     title = glue('{measure_name} Departure from Citywide Average'),
+                     subtitle = 'Departure is raw score versus average score of all polygons in respective city') +
+                scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_city)))) +
+                geom_blank()
+        # return the plot
+            departures_point
+    })
         
-    # # point plot - all cities - raw scores
-    # output$plot_point_raw <- renderPlot({
-    #     # get variable values
-    #         var_name <- ces_choices %>% 
-    #             filter(name == input$analysis_indicator_selection) %>% 
-    #             pull(ces_variable)
-    #         measure_name <- input$analysis_indicator_selection
-    #     # make plot
-    #     raw_scores_point <- ggplot(analysis_raw_scores) +
-    #         geom_jitter(aes(x = !!as.name(var_name),
-    #                        y = holc_city, color = holc_grade),
-    #                     height = 0.25) +
-    #         scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3)) +
-    #         labs(x = paste0(measure_name), y = 'City') +
-    #         scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_city)))) +
-    #         geom_blank()
-    #     # return the plot
-    #         raw_scores_point
-    # })
+    # point plot - all cities - raw scores
+    output$plot_point_raw <- renderPlot({
+        # get variable values
+            var_name <- ces_choices %>%
+                filter(name == input$analysis_indicator_selection) %>%
+                pull(ces_variable)
+            measure_name <- input$analysis_indicator_selection
+        # make plot
+        raw_scores_point <- ggplot(data = analysis_raw_scores, 
+                                   mapping = aes(x = !!as.name(var_name),
+                                                 y = holc_city)) +
+            geom_jitter(mapping = aes(color = holc_grade),
+                        height = 0.25) +
+            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), name = 'HOLC Grade') +
+            labs(x = measure_name, 
+                 y = 'City', 
+                 title = glue('Raw {measure_name}'),
+                 subtitle = 'Black dots and lines represent mean +/- 1 standard deviation') +
+            scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_city)))) +
+            # draw a point at the mean for each city
+                # stat_summary(fun = mean, geom = 'point') + 
+            # draw a vertical line at the mean for each city
+                # stat_summary(fun = mean, 
+                #              geom = 'errorbar',
+                #              aes(xmax = ..x.., xmin = ..x..),
+                #              width = 0.5, size = 0.7, linetype = "solid", color = 'black') +
+            # draw the mean and standard deviation for each city (# of std deviations in the fun.args part)
+                stat_summary(fun.data = mean_sdl, 
+                             fun.args = list(mult = 1), 
+                             geom = 'pointrange', 
+                             color = 'black') +
+            geom_blank()
+        # return the plot
+            raw_scores_point
+    })
         
     # point plot - departures - by city (facet on cities)
     output$plot_departures_cities <- renderPlot({
@@ -2537,35 +2620,38 @@ server <- function(input, output, session) {
                                    name = 'HOLC Grade') +
                 scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_grade)))) +
                 facet_wrap(vars(holc_city), ncol = 4) +
-                labs(x = paste0(measure_name, ' Departure'), y = 'HOLC Grade') +
+                labs(x = glue('{measure_name} Departure'), 
+                     y = 'HOLC Grade',
+                     title = glue('{measure_name} Departure from Citywide Average'),
+                     subtitle = 'Departure is raw score versus average score of all polygons in respective city') +
                 geom_blank()
         # return the plot
             departures_point_city
     })
         
         
-    # point plot - raw scores - by city (facet on cities)
-    output$plot_raw_scores_cities <- renderPlot({
-        # get variable values
-            var_name <- ces_choices %>% 
-                filter(name == input$analysis_indicator_selection) %>% 
-                pull(ces_variable)
-            measure_name <- input$analysis_indicator_selection
-        # make plot
-            raw_scores_point_city <- ggplot(analysis_raw_scores) +
-                geom_point(aes(x = !!as.name(var_name),
-                               y = holc_grade,
-                               color = holc_grade)) +
-                scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4),
-                                   name = 'HOLC Grade') +
-                scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_grade)))) +
-                facet_wrap(vars(holc_city), ncol = 4) +
-                labs(x = measure_name,
-                     y = 'HOLC Grade') +
-                geom_blank()
-        # return the plot
-            raw_scores_point_city
-    })
+    # # point plot - raw scores - by city (facet on cities)
+    # output$plot_raw_scores_cities <- renderPlot({
+    #     # get variable values
+    #         var_name <- ces_choices %>% 
+    #             filter(name == input$analysis_indicator_selection) %>% 
+    #             pull(ces_variable)
+    #         measure_name <- input$analysis_indicator_selection
+    #     # make plot
+    #         raw_scores_point_city <- ggplot(analysis_raw_scores) +
+    #             geom_point(aes(x = !!as.name(var_name),
+    #                            y = holc_grade,
+    #                            color = holc_grade)) +
+    #             scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.4),
+    #                                name = 'HOLC Grade') +
+    #             scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_grade)))) +
+    #             facet_wrap(vars(holc_city), ncol = 4) +
+    #             labs(x = measure_name,
+    #                  y = 'HOLC Grade') +
+    #             geom_blank()
+    #     # return the plot
+    #         raw_scores_point_city
+    # })
    
     # plot average departure for each HOLC grade within each city
     output$plot_average_departures <- renderPlot({
@@ -2593,11 +2679,544 @@ server <- function(input, output, session) {
                 scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 1.0),
                                    name = 'HOLC Grade') +
                 scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores_summary$holc_city)))) +
-                labs(x = paste0(measure_name, ' Average Departure'), y = 'City') +
+                labs(x = glue('{measure_name} Average Departure'), 
+                     y = 'City',
+                     title = glue('Average {measure_name} Departure from Citywide Average by HOLC Grade'),
+                     subtitle = 'Departure is raw score versus average score of all polygons in respective city') +
                 theme(legend.position = 'bottom') +
                 geom_blank()
         # return the plot
             holc_city_means_plot
+    })
+    
+# MAPS (ANALYSIS) ----
+    # create a list of counties corresponding to the HOLC city maps
+    cities_counties <- list('Fresno' = 'Fresno',
+                            'Los Angeles' = 'Los Angeles',
+                            'Oakland' = 'Alameda',
+                            'Sacramento' = c('Sacramento', 'Yolo'),
+                            'San Diego' = 'San Diego',
+                            'San Francisco' = 'San Francisco',
+                            'San Jose' = 'Santa Clara',
+                            'Stockton' = 'San Joaquin')
+    
+    redline_analysis_data <- reactive({
+        return(redline_polygons %>%
+                   filter(holc_city == input$analysis_city_selection))
+    })
+    
+    ces_analysis_data <- reactive({
+        counties_selected <- ca_counties %>% 
+            filter(cnty_name %in% cities_counties[[input$analysis_city_selection]])
+        return(ces3_poly()[counties_selected, ]
+               # ces3_poly[redline_analysis_data(), ]
+               # ces3_poly %>% 
+               #     st_is_within_distance(y = redline_analysis_data(), dist = 10)
+               # filter(nearby_city == input$analysis_city_selection))
+        )
+    })
+    
+    output$analysis_map_holc <- renderLeaflet({
+        # get variable values
+            # var_name <- ces_choices %>% 
+            #     filter(name == input$analysis_indicator_selection) %>% 
+            #     pull(ces_variable)
+            # measure_name <- input$analysis_indicator_selection
+            # city <- input$analysis_city_selection
+
+        # specify the initial zoom level to use in the map
+            bounds_city <- attributes(st_geometry(redline_analysis_data() %>% 
+                                                      st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            
+        # create the new (empty) map
+            l_analysis_map_holc <- leaflet(options = leafletOptions(zoomControl = TRUE, 
+                                                       dragging = TRUE))
+        
+        # Basemap Options
+            # use default options
+                # l_analysis_map_holc <- leaflet() %>%
+                #     addTiles()
+            # use custom options
+                # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
+                basemap_options <- c('CartoDB.Positron')
+                for (provider in basemap_options) {
+                    l_analysis_map_holc <- l_analysis_map_holc %>%
+                        addProviderTiles(provider, group = provider)
+                }
+        
+        # Create the color palette for the Redline scores
+            redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'gold1', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+                                               domain = redline_polygons$holc_grade, 
+                                               levels = c('A', 'B', 'C', 'D'))
+        
+        # add the legend
+            l_analysis_map_holc <- l_analysis_map_holc %>% 
+                addLegend(position = 'bottomright', 
+                          pal = redline_leaflet_pal, 
+                          values = c('A', 'B', 'C', 'D'), 
+                          opacity = 1, 
+                          layerId = 'redline_legend', 
+                          group = 'Legend', 
+                          title = paste0('HOLC Polygons'))
+        
+        # Add controls to select the basemap and layers
+            l_analysis_map_holc <- l_analysis_map_holc %>% 
+                addLayersControl(# baseGroups = basemap_options,
+                                 overlayGroups = c('HOLC Polygons', 'Legend'),
+                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
+        
+        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
+            isolate(if (is.null(input$l_analysis_map_holc_bounds)) {
+                l_analysis_map_holc <- l_analysis_map_holc %>%
+                    fitBounds(lng1 = bounds_city[[1]],
+                              lat1 = bounds_city[[2]],
+                              lng2 = bounds_city[[3]],
+                              lat2 = bounds_city[[4]])
+            # }  else { 
+            #     # maintain the current view
+            #     l_analysis_map_holc <- l_analysis_map_holc %>%
+            #         setView(lng = mean(c(input$l_analysis_map_holc_bounds$west, input$l_analysis_map_holc_bounds$east)),
+            #                 lat = mean(c(input$l_analysis_map_holc_bounds$north, input$l_analysis_map_holc_bounds$south)),
+            #                 zoom = input$l_analysis_map_holc_zoom)
+            })
+            
+        # create a button to center the map on selected city
+            l_analysis_map_holc <- l_analysis_map_holc %>% 
+                addEasyButton(easyButton(
+                    icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
+                    onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+                                      round(bounds_city[[2]],4)-0.01, ', ',
+                                      round(bounds_city[[1]],4)-0.01, '],[',
+                                      round(bounds_city[[4]],4)+0.01, ', ',
+                                      round(bounds_city[[3]],4)+0.01, ']]); }'))))
+            
+        # Add the HOLC (redline) polygons
+            l_analysis_map_holc <- l_analysis_map_holc %>% 
+                addPolygons(data = redline_analysis_data() %>% 
+                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                {.},
+                            color = 'black', # "#444444",
+                            weight = 1.0,
+                            smoothFactor = 1.0,
+                            opacity = 1.0,
+                            # fill = FALSE,
+                            fillOpacity = 1.0,
+                            # fillColor = 'lightblue',
+                            fillColor = ~redline_leaflet_pal(holc_grade),
+                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+                                            '<b>', 'HOLC Form Link: ', '</b>', 
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
+                                            # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
+                                            ),
+                            group = 'HOLC Polygons'
+                )
+        
+        # output the map object
+            l_analysis_map_holc
+    })
+    
+    
+    output$analysis_map_overlap <- renderLeaflet({
+        # get variable values
+            # var_name <- ces_choices %>%
+            #     filter(name == input$analysis_indicator_selection) %>%
+            #     pull(ces_variable)
+            # measure_name <- input$analysis_indicator_selection
+            # city <- input$analysis_city_selection
+
+        # specify the initial zoom level to use in the map
+            bounds_city <- attributes(st_geometry(redline_analysis_data() %>% 
+                                                      st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            
+        # create the new (empty) map
+            analysis_map_overlap <- leaflet(options = leafletOptions(zoomControl = FALSE, 
+                                                       dragging = FALSE))
+            
+            analysis_map_overlap <- analysis_map_overlap %>% 
+                addMapPane("ces_polygons", zIndex = 410) %>% 
+                addMapPane("redline_polygons_pane", zIndex = 420)
+        
+        # Basemap Options
+            # use default options
+                # analysis_map_overlap <- leaflet() %>%
+                #     addTiles()
+            # use custom options
+                # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
+                basemap_options <- c('CartoDB.Positron')
+                for (provider in basemap_options) {
+                    analysis_map_overlap <- analysis_map_overlap %>%
+                        addProviderTiles(provider, group = provider)
+                }
+        
+        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
+            isolate(if (is.null(input$analysis_map_overlap_bounds)) {
+                analysis_map_overlap <- analysis_map_overlap %>%
+                    fitBounds(lng1 = bounds_city[[1]],
+                              lat1 = bounds_city[[2]],
+                              lng2 = bounds_city[[3]],
+                              lat2 = bounds_city[[4]])
+            } else { # maintain the current view
+                analysis_map_overlap <- analysis_map_overlap %>%
+                    setView(lng = mean(c(input$analysis_map_overlap_bounds$west, input$analysis_map_overlap_bounds$east)),
+                            lat = mean(c(input$analysis_map_overlap_bounds$north, input$analysis_map_overlap_bounds$south)),
+                            zoom = input$analysis_map_overlap_zoom)
+            })
+            
+        # # create a button to center the map on selected city
+        #     analysis_map_overlap <- analysis_map_overlap %>% 
+        #         addEasyButton(easyButton(
+        #             icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
+        #             onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+        #                               round(bounds_city[[2]],4)-0.01, ', ',
+        #                               round(bounds_city[[1]],4)-0.01, '],[',
+        #                               round(bounds_city[[4]],4)+0.01, ', ',
+        #                               round(bounds_city[[3]],4)+0.01, ']]); }'))))
+            
+        # Add CES polygons
+            # create the color palette for the CES polygons
+                parameter <- ces_choices %>%
+                    filter(name == input$analysis_indicator_selection) %>%
+                    pull(ces_variable)
+                ces_pal_domain <- as.data.frame(ces3_poly() %>% st_drop_geometry()) %>% 
+                    select(all_of(parameter)) %>% 
+                    pull(all_of(parameter))
+                # ces_fill_domain <- as.data.frame(ces_analysis_data() %>% st_drop_geometry()) %>% 
+                #     select(all_of(parameter)) %>% 
+                #     pull(all_of(parameter))
+                # create the palette
+                    ces_pal_color <- 'RdYlGn' # 'YlOrBr' #'Blues' #'Greys'
+                    ces_leaflet_pal <- colorNumeric(
+                        palette = ces_pal_color,
+                        domain = ces_pal_domain,
+                        reverse = TRUE
+                    )
+                # get the dataset
+                    ces3_poly <- ces_analysis_data() %>% 
+                        st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
+                        # mutate(fill_variable = ces_fill_domain)
+                # add polygons
+                    analysis_map_overlap <- analysis_map_overlap %>% 
+                        addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
+                                    options = pathOptions(pane = "ces_polygons"),
+                                    color = 'black', # 'grey', # "#444444", 
+                                    weight = 0.5, 
+                                    smoothFactor = 1.0,
+                                    opacity = 0.8, 
+                                    fillOpacity = 0.8,
+                                    # fillColor = ~colorNumeric('YlOrBr', Poll_pctl)(Poll_pctl), # view RColorBrewer palettes with: RColorBrewer::display.brewer.all()
+                                    # fillColor = ~ces_leaflet_pal(ces_fill_domain),
+                                    fillColor = ~ces_leaflet_pal(
+                                        eval(as.symbol(
+                                            ces_choices %>% 
+                                                filter(name == input$analysis_indicator_selection) %>% 
+                                                pull(ces_variable)
+                                            ))), # ces_fill_domain),
+                                    # fillColor = 'green',
+                                    highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#,bringToFront = TRUE
+                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 (CES)', '</u>','</b>','<br/>',
+                                                    '<b>', 'Census Tract: ', '</b>', 
+                                                    census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    '<b>', 'Area (??1000 sq m??): ', '</b>', 
+                                                    shape_area / 1000, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    # '<b>', 'Location: ', '</b>', 
+                                                    # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
+                                                    # ', ', 
+                                                    # california_county, # eval(as.symbol(ces_field_names %>% filter(id == 'California') %>% pull(ces_variable))),
+                                                    # ' County, ', 
+                                                    # zip, #eval(as.symbol(ces_field_names %>% filter(id == 'ZIP') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    # '<b>', 'Population (2010): ', '</b>', 
+                                                    # population_2010, # eval(as.symbol(ces_field_names %>% filter(id == 'pop2010') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    
+                                                    # SELECTED VARIABLE
+                                                    #' '<b>', #'<u>',
+                                                    #' 'Selected CES Score (and Percentile): ',
+                                                    #' #'</u>', 
+                                                    #' '</b>', '<br/>', '&emsp;',
+                                                    '<b>', glue('{input$analysis_indicator_selection}: '), '</b>',
+                                                    eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))),
+                                                    '<br/>', # '&emsp;', 
+                                                    '<b>', 
+                                                    str_replace(string = input$analysis_indicator_selection,
+                                                                                                      pattern = 'Score', 
+                                                                                                      replacement = 'Percentile: '),
+                                                    '</b>',
+                                                    eval(as.symbol(ces_field_names %>%
+                                                                           filter(name == str_replace(string = input$analysis_indicator_selection,
+                                                                                                      pattern = 'Score', 
+                                                                                                      replacement = 'Percentile')) %>%
+                                                                           pull(ces_variable)))
+                                    ),
+                                    group = 'CalEnviroScreen') 
+            
+            
+            
+            
+        # Add the HOLC (redline) polygon outlines
+            # Create the color palette for the Redline scores
+                redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'gold1', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+                                                   domain = redline_polygons$holc_grade, 
+                                                   levels = c('A', 'B', 'C', 'D'))
+            # add polygons
+            analysis_map_overlap <- analysis_map_overlap %>% 
+                # addPolygons(data = redline_analysis_data() %>% 
+                addPolylines(data = redline_analysis_data() %>% 
+                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                {.},
+                            options = pathOptions(pane = "redline_polygons_pane"),
+                            color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+                            weight = 2.0,
+                            smoothFactor = 1.0,
+                            opacity = 1.0,
+                            # fill = FALSE,
+                            fillOpacity = 0, # input$redline_fill_1,
+                            fillColor = 'lightgrey',
+                            # fillColor = ~redline_leaflet_pal(holc_grade),
+                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+                                            '<b>', 'HOLC Form Link: ', '</b>', 
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
+                                            # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
+                            ),
+                            group = 'HOLC Polygons'
+                )
+            
+        # add the legend
+            analysis_map_overlap <- analysis_map_overlap %>% 
+                addLegend(position = 'bottomright',
+                          pal = ces_leaflet_pal,
+                          values = ces_pal_domain, # ces3_poly$fill_variable,
+                          opacity = 1,
+                          layerId = 'ces_legend',
+                          bins = 4,
+                          group = 'Legend',
+                          title = paste0('CalEnviroScreen'))
+        
+        # Add controls to select the basemap and layers
+            analysis_map_overlap <- analysis_map_overlap %>% 
+                addLayersControl(# baseGroups = basemap_options,
+                                 overlayGroups = c('HOLC Polygons', 'CalEnviroScreen', 'Legend'),
+                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
+        
+        # output the map object
+            analysis_map_overlap
+    })
+
+    
+    output$analysis_map_intersection <- renderLeaflet({
+        # get variable values
+            # var_name <- ces_choices %>%
+            #     filter(name == input$analysis_indicator_selection) %>%
+            #     pull(ces_variable)
+            # measure_name <- input$analysis_indicator_selection
+            # city <- input$analysis_city_selection
+
+        # specify the initial zoom level to use in the map
+            bounds_city <- attributes(st_geometry(redline_analysis_data() %>% 
+                                                      st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            
+        # create the new (empty) map
+            analysis_map_intersection <- leaflet(options = leafletOptions(zoomControl = FALSE, 
+                                                       dragging = FALSE))
+            
+            analysis_map_intersection <- analysis_map_intersection %>% 
+                addMapPane("ces_polygons", zIndex = 410) %>% 
+                addMapPane("redline_polygons_pane", zIndex = 420)
+        
+        # Basemap Options
+            # use default options
+                # analysis_map_intersection <- leaflet() %>%
+                #     addTiles()
+            # use custom options
+                # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
+                basemap_options <- c('CartoDB.Positron')
+                for (provider in basemap_options) {
+                    analysis_map_intersection <- analysis_map_intersection %>%
+                        addProviderTiles(provider, group = provider)
+                }
+        
+        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
+            isolate(if (is.null(input$analysis_map_intersection_bounds)) {
+                analysis_map_intersection <- analysis_map_intersection %>%
+                    fitBounds(lng1 = bounds_city[[1]],
+                              lat1 = bounds_city[[2]],
+                              lng2 = bounds_city[[3]],
+                              lat2 = bounds_city[[4]])
+            } else { # maintain the current view
+                analysis_map_intersection <- analysis_map_intersection %>%
+                    setView(lng = mean(c(input$analysis_map_intersection_bounds$west, input$analysis_map_intersection_bounds$east)),
+                            lat = mean(c(input$analysis_map_intersection_bounds$north, input$analysis_map_intersection_bounds$south)),
+                            zoom = input$analysis_map_intersection_zoom)
+            })
+            
+        # # create a button to center the map on selected city
+        #     analysis_map_intersection <- analysis_map_intersection %>% 
+        #         addEasyButton(easyButton(
+        #             icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
+        #             onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+        #                               round(bounds_city[[2]],4)-0.01, ', ',
+        #                               round(bounds_city[[1]],4)-0.01, '],[',
+        #                               round(bounds_city[[4]],4)+0.01, ', ',
+        #                               round(bounds_city[[3]],4)+0.01, ']]); }'))))
+            
+        
+            
+        # Add CES polygons
+            # create the color palette for the CES polygons
+                parameter <- ces_choices %>%
+                    filter(name == input$analysis_indicator_selection) %>%
+                    pull(ces_variable)
+                ces_pal_domain <- as.data.frame(ces3_poly() %>% st_drop_geometry()) %>% 
+                    select(all_of(parameter)) %>% 
+                    pull(all_of(parameter))
+                # ces_fill_domain <- as.data.frame(analysis_clipped_ces %>% st_drop_geometry()) %>% 
+                #     select(all_of(parameter)) %>% 
+                #     pull(all_of(parameter))
+                # create the palette
+                    ces_pal_color <- 'RdYlGn' # 'YlOrBr' #'Blues' #'Greys'
+                    ces_leaflet_pal <- colorNumeric(
+                        palette = ces_pal_color,
+                        domain = ces_pal_domain,
+                        reverse = TRUE
+                    )
+                # get the dataset
+                    ces3_poly <- analysis_clipped_ces %>% 
+                        filter(holc_city == input$analysis_city_selection) %>% 
+                        st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
+                        # mutate(fill_variable = ces_fill_domain)
+                # add polygons
+                    analysis_map_intersection <- analysis_map_intersection %>% 
+                        addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
+                                    options = pathOptions(pane = "ces_polygons"),
+                                    color = 'black', # 'grey', # "#444444", 
+                                    weight = 0.5,
+                                    smoothFactor = 1.0,
+                                    opacity = 0.8, 
+                                    fillOpacity = 0.8,
+                                    # fillColor = ~colorNumeric('YlOrBr', Poll_pctl)(Poll_pctl), # view RColorBrewer palettes with: RColorBrewer::display.brewer.all()
+                                    fillColor = ~ces_leaflet_pal(
+                                        eval(as.symbol(
+                                            ces_choices %>% 
+                                                filter(name == input$analysis_indicator_selection) %>% 
+                                                pull(ces_variable)
+                                            ))), # ces_fill_domain),
+                                    # fillColor = 'green',
+                                    highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
+                                    popup = ~paste0('<b>', '<u>','Clipped CalEnviroScreen 3.0 (CES) Polygon', '</u>','</b>','<br/>',
+                                                    '<b>', 'Census Tract: ', '</b>', 
+                                                    census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    '<br/>',
+                                                    # '&emsp;', 
+                                                    '<b>', 'Overlap Area (1000 sq m): ', '</b>',
+                                                    clipped_area / 1000,
+                                                    '<br/>',
+                                                    # '<b>', 'Location: ', '</b>', 
+                                                    # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
+                                                    # ', ', 
+                                                    # california_county, # eval(as.symbol(ces_field_names %>% filter(id == 'California') %>% pull(ces_variable))),
+                                                    # ' County, ', 
+                                                    # zip, #eval(as.symbol(ces_field_names %>% filter(id == 'ZIP') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    # '<b>', 'Population (2010): ', '</b>', 
+                                                    # population_2010, # eval(as.symbol(ces_field_names %>% filter(id == 'pop2010') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    
+                                                    # SELECTED VARIABLE
+                                                    #' '<b>', #'<u>',
+                                                    #' 'Selected CES Score (and Percentile): ',
+                                                    #' #'</u>', 
+                                                    #' '</b>', '<br/>', '&emsp;',
+                                                    '<b>', glue('{input$analysis_indicator_selection}: '), '</b>',
+                                                    eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))),
+                                                    '<br/>', # '&emsp;', 
+                                                    '<b>', 
+                                                    str_replace(string = input$analysis_indicator_selection,
+                                                                                                      pattern = 'Score', 
+                                                                                                      replacement = 'Percentile: '),
+                                                    '</b>',
+                                                    eval(as.symbol(ces_field_names %>%
+                                                                           filter(name == str_replace(string = input$analysis_indicator_selection,
+                                                                                                      pattern = 'Score', 
+                                                                                                      replacement = 'Percentile')) %>%
+                                                                           pull(ces_variable)))
+                                    ),
+                                    group = 'CalEnviroScreen') 
+
+        # Add the HOLC (redline) polygon outlines
+            # Create the color palette for the Redline scores
+                redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'gold1', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+                                                   domain = redline_polygons$holc_grade, 
+                                                   levels = c('A', 'B', 'C', 'D'))
+            # add polygons
+            analysis_map_intersection <- analysis_map_intersection %>% 
+                # addPolygons(data = redline_analysis_data() %>% 
+                addPolylines(data = redline_analysis_data() %>% 
+                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                {.},
+                            options = pathOptions(pane = "redline_polygons_pane"),
+                            color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+                            weight = 2.0,
+                            smoothFactor = 1.0,
+                            opacity = 1.0,
+                            # fill = FALSE,
+                            fill = FALSE,
+                            # fillOpacity = 0, # input$redline_fill_1,
+                            # fillColor = 'lightgrey',
+                            # fillColor = ~redline_leaflet_pal(holc_grade),
+                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+                                            '<b>', 'HOLC Form Link: ', '</b>', 
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
+                                            # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
+                            ),
+                            group = 'HOLC Polygons'
+                )
+            
+        # add the legend
+            analysis_map_intersection <- analysis_map_intersection %>% 
+                addLegend(position = 'bottomright',
+                          pal = ces_leaflet_pal,
+                          values = ces_pal_domain, # ces3_poly$fill_variable,
+                          opacity = 1,
+                          layerId = 'ces_legend',
+                          bins = 4,
+                          group = 'Legend',
+                          title = paste0('CalEnviroScreen'))
+        
+        # Add controls to select the basemap and layers
+            analysis_map_intersection <- analysis_map_intersection %>% 
+                addLayersControl(# baseGroups = basemap_options,
+                                 overlayGroups = c('HOLC Polygons', 'CalEnviroScreen', 'Legend'),
+                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
+        
+        # output the map object
+            analysis_map_intersection
     })
     
 }
