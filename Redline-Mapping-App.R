@@ -43,6 +43,7 @@
         library(tidyr)
         library(ggplot2)
         library(glue)
+        library(units)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -68,7 +69,11 @@
         # st_crs(redline_polygons) <- 4326
         redline_polygons <- st_read('data_processed/redline_polygons.gpkg')
         # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
-            redline_polygons <- redline_polygons %>% st_transform(crs = projected_crs)
+            redline_polygons <- redline_polygons %>% 
+                st_transform(crs = projected_crs)
+            redline_polygons <- redline_polygons %>% 
+                mutate(area_calc_meters_sq = st_area(.)) %>% 
+                drop_units()
             # st_crs(redline_polygons)
             
     # List of the CES parameter choices to plot
@@ -487,20 +492,22 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                         multiple = FALSE)),
                         hr(style="border: 3px solid darkgrey"),
                         #  --------------------- ANALYSIS MAPS ---------------------
-                        h4('Conversion of CES scores from census tracts to HOLC map polygons:'),
+                        h4('Aggregation of CES Scores by HOLC Map Polygons:'),
                         p('The areas delineated in the HOLC maps and the census tracts used to assign the CES 
                            scores have different coverages, as shown in the maps below. There are multiple 
                            methods that could be used to approximate a CES score for each polygon in the HOLC 
-                           maps.'),
+                           maps, such as area weighted average, nearest centroid, or weighted average
+                          by road length.'),
                         p('An area weighted average method identifies the portions of the CES polygons 
                            that overlap each HOLC polygon, then computes the area weighted average of those 
-                           overlapping portions of CES polygons. The maps below demonstrate this method: the 
-                           left pane of shows the polygons from the HOLC map for the selected city, the center 
-                           pane shows the CES indicator scores (at the census tract level) with the HOLC 
-                           map superimposed on top, and the right pane shows the portions of the 
-                           CES polygons that overlap with the HOLC polygons (border colors represent HOLC 
-                           rating). An additional map shows the overlapping CES polygons separated by the rating
-                           of the HOLC polygon they overlap.'),
+                           overlapping portions of CES polygons. The maps below demonstrate this method: (1) the 
+                           left pane shows the polygons from the HOLC map for the selected city, (2) the 
+                           second pane (from left) shows the CES indicator scores (at the census tract level) 
+                           with the HOLC map superimposed on top (border colors represent HOLC rating), 
+                           (3) the third pane (from left) shows the portions of the CES polygons that 
+                           overlap with the HOLC polygons, and (4) the right pane shows the aggregated CES
+                           scores for each HOLC polygon.'),
+                        p('NOTE: use the left side map to pan/zoom all maps')
                         # (for example, if an HOLC polygon with an area of 200 units 
                         #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
                         #   overlapping area of 120 units, and B has a score of 50 and an overlapping area of 80 
@@ -510,21 +517,50 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
              ),
              # INSERT MAPS
              fluidRow(
-                 column(3, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        leafletOutput('analysis_map_holc')
+                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_holc') %>% withSpinner(color="#0dc5c1")
                  ),
-                 column(3, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        leafletOutput('analysis_map_overlap')  
+                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_overlap') %>% withSpinner(color="#0dc5c1")
                  ),
-                 column(3, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        leafletOutput('analysis_map_intersection')
+                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_intersection') %>% withSpinner(color="#0dc5c1")
+                 ),
+                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                        leafletOutput('analysis_map_weighted_avg') %>% withSpinner(color="#0dc5c1")
                  )
              ),
-             # fluidRow(
-             #     column(4, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-             #            
-             #     )
-             # ),
+             fluidRow(
+                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                     hr(style="border: 1px solid darkgrey"),
+                     p('The maps below show the aggregated CES score for each HOLC polygon, separated 
+                       by HOLC grade (NOTE: use the upper-left pane to pan/zoom).')
+                 )
+             ), 
+             fluidRow(
+                 # A
+                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 2,
+                        p(tags$b('HOLC Grade: A')),
+                        leafletOutput('analysis_map_facet_A', height = 300) %>% withSpinner(color="#0dc5c1")
+                 ),
+                 # B
+                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 0,
+                        p(tags$b('HOLC Grade: B')),
+                        leafletOutput('analysis_map_facet_B', height = 300) %>% withSpinner(color="#0dc5c1")
+                 )
+             ),
+             fluidRow(
+                 # C
+                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 2,
+                        p(tags$b('HOLC Grade: C')),
+                        leafletOutput('analysis_map_facet_C', height = 300) %>% withSpinner(color="#0dc5c1")
+                 ),
+                 # D
+                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 0,
+                        p(tags$b('HOLC Grade: D')),
+                        leafletOutput('analysis_map_facet_D', height = 300) %>% withSpinner(color="#0dc5c1")
+                 )
+             ),
              #  --------------------- ANALYSIS PLOTS ---------------------
              fluidRow(
                  column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
@@ -1677,8 +1713,8 @@ server <- function(input, output, session) {
                                 highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
                                 popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                                 '<b>', 'City: ', '</b>', holc_city, '<br/>',
-                                                '<b>', 'Name: ', '</b>', holc_name, '<br/>',
-                                                '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                                '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                                '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                                 '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
                                                 # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>',
                                                 '<b>', 'HOLC Form Link: ', '</b>',
@@ -1847,7 +1883,7 @@ server <- function(input, output, session) {
         #                         popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
         #                                         '<b>', 'City: ', '</b>', city, '<br/>',
         #                                         '<b>', 'Name: ', '</b>', name, '<br/>',
-        #                                         '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+        #                                         '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
         #                                         '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
         #                                         # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>',
         #                                         '<b>', paste0('HOLC Form Link (', year, '): '), '</b>',
@@ -2387,8 +2423,8 @@ server <- function(input, output, session) {
                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
                             popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                             '<b>', 'City: ', '</b>', holc_city, '<br/>',
-                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
-                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
@@ -2428,7 +2464,7 @@ server <- function(input, output, session) {
     #                             popup = ~paste0('<b>', '<u>', 'HOLC Rated Polygon', '</u>', '</b>','<br/>',
     #                                             '<b>', 'City: ', '</b>', city, '<br/>',
     #                                             '<b>', 'Name: ', '</b>', name, '<br/>',
-    #                                             '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+    #                                             '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
     #                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
     #                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
     #                                             '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', 
@@ -2729,18 +2765,18 @@ server <- function(input, output, session) {
                                                       st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
             
         # create the new (empty) map
-            l_analysis_map_holc <- leaflet(options = leafletOptions(zoomControl = TRUE, 
+            analysis_map_holc <- leaflet(options = leafletOptions(zoomControl = TRUE, 
                                                        dragging = TRUE))
         
         # Basemap Options
             # use default options
-                # l_analysis_map_holc <- leaflet() %>%
+                # analysis_map_holc <- leaflet() %>%
                 #     addTiles()
             # use custom options
                 # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
                 basemap_options <- c('CartoDB.Positron')
                 for (provider in basemap_options) {
-                    l_analysis_map_holc <- l_analysis_map_holc %>%
+                    analysis_map_holc <- analysis_map_holc %>%
                         addProviderTiles(provider, group = provider)
                 }
         
@@ -2750,7 +2786,7 @@ server <- function(input, output, session) {
                                                levels = c('A', 'B', 'C', 'D'))
         
         # add the legend
-            l_analysis_map_holc <- l_analysis_map_holc %>% 
+            analysis_map_holc <- analysis_map_holc %>% 
                 addLegend(position = 'bottomright', 
                           pal = redline_leaflet_pal, 
                           values = c('A', 'B', 'C', 'D'), 
@@ -2760,28 +2796,28 @@ server <- function(input, output, session) {
                           title = paste0('HOLC Polygons'))
         
         # Add controls to select the basemap and layers
-            l_analysis_map_holc <- l_analysis_map_holc %>% 
+            analysis_map_holc <- analysis_map_holc %>% 
                 addLayersControl(# baseGroups = basemap_options,
                                  overlayGroups = c('HOLC Polygons', 'Legend'),
                                  options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
         
         # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
-            isolate(if (is.null(input$l_analysis_map_holc_bounds)) {
-                l_analysis_map_holc <- l_analysis_map_holc %>%
+            isolate(if (is.null(input$analysis_map_holc_bounds)) {
+                analysis_map_holc <- analysis_map_holc %>%
                     fitBounds(lng1 = bounds_city[[1]],
                               lat1 = bounds_city[[2]],
                               lng2 = bounds_city[[3]],
                               lat2 = bounds_city[[4]])
             # }  else { 
             #     # maintain the current view
-            #     l_analysis_map_holc <- l_analysis_map_holc %>%
-            #         setView(lng = mean(c(input$l_analysis_map_holc_bounds$west, input$l_analysis_map_holc_bounds$east)),
-            #                 lat = mean(c(input$l_analysis_map_holc_bounds$north, input$l_analysis_map_holc_bounds$south)),
-            #                 zoom = input$l_analysis_map_holc_zoom)
+            #     analysis_map_holc <- analysis_map_holc %>%
+            #         setView(lng = mean(c(input$analysis_map_holc_bounds$west, input$analysis_map_holc_bounds$east)),
+            #                 lat = mean(c(input$analysis_map_holc_bounds$north, input$analysis_map_holc_bounds$south)),
+            #                 zoom = input$analysis_map_holc_zoom)
             })
             
         # create a button to center the map on selected city
-            l_analysis_map_holc <- l_analysis_map_holc %>% 
+            analysis_map_holc <- analysis_map_holc %>% 
                 addEasyButton(easyButton(
                     icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
                     onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
@@ -2791,7 +2827,7 @@ server <- function(input, output, session) {
                                       round(bounds_city[[3]],4)+0.01, ']]); }'))))
             
         # Add the HOLC (redline) polygons
-            l_analysis_map_holc <- l_analysis_map_holc %>% 
+            analysis_map_holc <- analysis_map_holc %>% 
                 addPolygons(data = redline_analysis_data() %>% 
                                 st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
                                 # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
@@ -2807,9 +2843,12 @@ server <- function(input, output, session) {
                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
                             popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                             '<b>', 'City: ', '</b>', holc_city, '<br/>',
-                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
-                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE),
+                                            '<br/>',
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
@@ -2819,7 +2858,7 @@ server <- function(input, output, session) {
                 )
         
         # output the map object
-            l_analysis_map_holc
+            analysis_map_holc
     })
     
     
@@ -2899,6 +2938,8 @@ server <- function(input, output, session) {
                     )
                 # get the dataset
                     ces3_poly <- ces_analysis_data() %>% 
+                        mutate(area_calc_meters_sq = st_area(.)) %>% 
+                        drop_units() %>% 
                         st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
                         # mutate(fill_variable = ces_fill_domain)
                 # add polygons
@@ -2924,8 +2965,8 @@ server <- function(input, output, session) {
                                                     '<b>', 'Census Tract: ', '</b>', 
                                                     census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
                                                     '<br/>',
-                                                    '<b>', 'Area (??1000 sq m??): ', '</b>', 
-                                                    shape_area / 1000, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
                                                     '<br/>',
                                                     # '<b>', 'Location: ', '</b>', 
                                                     # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
@@ -2978,7 +3019,7 @@ server <- function(input, output, session) {
                                 {.},
                             options = pathOptions(pane = "redline_polygons_pane"),
                             color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-                            weight = 2.0,
+                            weight = 1.0,
                             smoothFactor = 1.0,
                             opacity = 1.0,
                             # fill = FALSE,
@@ -2988,9 +3029,12 @@ server <- function(input, output, session) {
                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
                             popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                             '<b>', 'City: ', '</b>', holc_city, '<br/>',
-                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
-                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE),
+                                            '<br/>',
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
@@ -3100,6 +3144,8 @@ server <- function(input, output, session) {
                 # get the dataset
                     ces3_poly <- analysis_clipped_ces %>% 
                         filter(holc_city == input$analysis_city_selection) %>% 
+                        mutate(area_calc_meters_sq = st_area(.)) %>% 
+                        drop_units() %>% 
                         st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
                         # mutate(fill_variable = ces_fill_domain)
                 # add polygons
@@ -3120,13 +3166,13 @@ server <- function(input, output, session) {
                                             ))), # ces_fill_domain),
                                     # fillColor = 'green',
                                     highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
-                                    popup = ~paste0('<b>', '<u>','Clipped CalEnviroScreen 3.0 (CES) Polygon', '</u>','</b>','<br/>',
+                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 (CES) (Clipped)', '</u>','</b>','<br/>',
                                                     '<b>', 'Census Tract: ', '</b>', 
                                                     census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
                                                     '<br/>',
                                                     # '&emsp;', 
-                                                    '<b>', 'Overlap Area (1000 sq m): ', '</b>',
-                                                    clipped_area / 1000,
+                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
                                                     '<br/>',
                                                     # '<b>', 'Location: ', '</b>', 
                                                     # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
@@ -3176,7 +3222,7 @@ server <- function(input, output, session) {
                                 {.},
                             options = pathOptions(pane = "redline_polygons_pane"),
                             color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-                            weight = 2.0,
+                            weight = 1.0,
                             smoothFactor = 1.0,
                             opacity = 1.0,
                             # fill = FALSE,
@@ -3187,9 +3233,12 @@ server <- function(input, output, session) {
                             highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
                             popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
                                             '<b>', 'City: ', '</b>', holc_city, '<br/>',
-                                            '<b>', 'Name: ', '</b>', holc_name, '<br/>',
-                                            '<b>', 'Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE),
+                                            '<br/>',
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
@@ -3215,10 +3264,489 @@ server <- function(input, output, session) {
                                  overlayGroups = c('HOLC Polygons', 'CalEnviroScreen', 'Legend'),
                                  options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
         
+        # Hide some groups by default (can be turned on with the layers control box on the map)
+            analysis_map_intersection <- analysis_map_intersection %>% 
+                hideGroup(c('Legend')) #, 'HOLC Polygons'))
+            
         # output the map object
             analysis_map_intersection
     })
     
+    output$analysis_map_weighted_avg <- renderLeaflet({
+        # get variable values
+            # var_name <- ces_choices %>%
+            #     filter(name == input$analysis_indicator_selection) %>%
+            #     pull(ces_variable)
+            # measure_name <- input$analysis_indicator_selection
+            # city <- input$analysis_city_selection
+
+        # specify the initial zoom level to use in the map
+            bounds_city <- attributes(st_geometry(redline_analysis_data() %>% 
+                                                      st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            
+        # create the new (empty) map
+            analysis_map_weighted_avg <- leaflet(options = leafletOptions(zoomControl = FALSE, 
+                                                       dragging = FALSE))
+            
+            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                addMapPane("ces_polygons", zIndex = 410) %>% 
+                addMapPane("redline_polygons_pane", zIndex = 420)
+        
+        # Basemap Options
+            # use default options
+                # analysis_map_weighted_avg <- leaflet() %>%
+                #     addTiles()
+            # use custom options
+                # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
+                basemap_options <- c('CartoDB.Positron')
+                for (provider in basemap_options) {
+                    analysis_map_weighted_avg <- analysis_map_weighted_avg %>%
+                        addProviderTiles(provider, group = provider)
+                }
+        
+        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
+            isolate(if (is.null(input$analysis_map_weighted_avg_bounds)) {
+                analysis_map_weighted_avg <- analysis_map_weighted_avg %>%
+                    fitBounds(lng1 = bounds_city[[1]],
+                              lat1 = bounds_city[[2]],
+                              lng2 = bounds_city[[3]],
+                              lat2 = bounds_city[[4]])
+            } else { # maintain the current view
+                analysis_map_weighted_avg <- analysis_map_weighted_avg %>%
+                    setView(lng = mean(c(input$analysis_map_weighted_avg_bounds$west, input$analysis_map_weighted_avg_bounds$east)),
+                            lat = mean(c(input$analysis_map_weighted_avg_bounds$north, input$analysis_map_weighted_avg_bounds$south)),
+                            zoom = input$analysis_map_weighted_avg_zoom)
+            })
+            
+        # # create a button to center the map on selected city
+        #     analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+        #         addEasyButton(easyButton(
+        #             icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
+        #             onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+        #                               round(bounds_city[[2]],4)-0.01, ', ',
+        #                               round(bounds_city[[1]],4)-0.01, '],[',
+        #                               round(bounds_city[[4]],4)+0.01, ', ',
+        #                               round(bounds_city[[3]],4)+0.01, ']]); }'))))
+            
+        
+            
+        # Add Area Weighted Average Polygons (Weighted Average of CES Scores)
+            # create the color palette for the polygons
+                parameter <- ces_choices %>%
+                    filter(name == input$analysis_indicator_selection) %>%
+                    pull(ces_variable)
+                ces_pal_domain <- as.data.frame(ces3_poly() %>% st_drop_geometry()) %>% 
+                    select(all_of(parameter)) %>% 
+                    pull(all_of(parameter))
+                # ces_fill_domain <- as.data.frame(analysis_clipped_ces %>% st_drop_geometry()) %>% 
+                #     select(all_of(parameter)) %>% 
+                #     pull(all_of(parameter))
+                # create the palette
+                    ces_pal_color <- 'RdYlGn' # 'YlOrBr' #'Blues' #'Greys'
+                    ces_leaflet_pal <- colorNumeric(
+                        palette = ces_pal_color,
+                        domain = ces_pal_domain,
+                        reverse = TRUE
+                    )
+                # get the dataset
+                    ces3_poly <- analysis_raw_scores %>% 
+                        filter(holc_city == input$analysis_city_selection) %>% 
+                        mutate(area_calc_meters_sq = st_area(.)) %>% 
+                        drop_units() %>% 
+                        st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
+                        # mutate(fill_variable = ces_fill_domain)
+                # add polygons
+                    analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                        addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
+                                    options = pathOptions(pane = "ces_polygons"),
+                                    color = 'grey', # 'grey', # "#444444", 
+                                    weight = 0.5,
+                                    smoothFactor = 1.0,
+                                    opacity = 0.8, 
+                                    fillOpacity = 0.8,
+                                    # fillColor = ~colorNumeric('YlOrBr', Poll_pctl)(Poll_pctl), # view RColorBrewer palettes with: RColorBrewer::display.brewer.all()
+                                    fillColor = ~ces_leaflet_pal(
+                                        eval(as.symbol(
+                                            ces_choices %>% 
+                                                filter(name == input$analysis_indicator_selection) %>% 
+                                                pull(ces_variable)
+                                            ))), # ces_fill_domain),
+                                    # fillColor = 'green',
+                                    highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
+                                    popup = ~paste0('<b>', '<u>','Area Weighted Average CalEnviroScreen (CES) Score', '</u>','</b>','<br/>',
+                                                    # '<b>', 'Census Tract: ', '</b>', 
+                                                    # census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    # '&emsp;', 
+                                                    # '<b>', 'Area (1000 sq m): ', '</b>',
+                                                    # round(clipped_area / 1000, 0),
+                                                    # '<br/>',
+                                                    # '<b>', 'Location: ', '</b>', 
+                                                    # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
+                                                    # ', ', 
+                                                    # california_county, # eval(as.symbol(ces_field_names %>% filter(id == 'California') %>% pull(ces_variable))),
+                                                    # ' County, ', 
+                                                    # zip, #eval(as.symbol(ces_field_names %>% filter(id == 'ZIP') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    # '<b>', 'Population (2010): ', '</b>', 
+                                                    # population_2010, # eval(as.symbol(ces_field_names %>% filter(id == 'pop2010') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    
+                                                    # HOLC POLYGON INFO
+                                                    '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                                    # '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                                    '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                                    '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                    '<br/>',
+                                                    
+                                                    
+                                                    # SELECTED VARIABLE
+                                                    #' '<b>', #'<u>',
+                                                    #' 'Selected CES Score (and Percentile): ',
+                                                    #' #'</u>', 
+                                                    #' '</b>', '<br/>', '&emsp;',
+                                                    '<b>', glue('Weighted Average {input$analysis_indicator_selection}: '), '</b>',
+                                                    round(eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))), 1)
+                                    ),
+                                    group = 'Weighted Average Score') 
+
+        # Add the HOLC (redline) polygon outlines
+            # Create the color palette for the Redline scores
+                redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'gold1', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+                                                   domain = redline_polygons$holc_grade, 
+                                                   levels = c('A', 'B', 'C', 'D'))
+            # add polygons
+            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                # addPolygons(data = redline_analysis_data() %>% 
+                addPolylines(data = redline_analysis_data() %>% 
+                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                {.},
+                            options = pathOptions(pane = "redline_polygons_pane"),
+                            color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+                            weight = 1.0,
+                            smoothFactor = 1.0,
+                            opacity = 1.0,
+                            # fill = FALSE,
+                            fill = FALSE,
+                            # fillOpacity = 0, # input$redline_fill_1,
+                            # fillColor = 'lightgrey',
+                            # fillColor = ~redline_leaflet_pal(holc_grade),
+                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                            '<br/>',
+                                            # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+                                            '<b>', 'HOLC Form Link: ', '</b>', 
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
+                                            # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
+                            ),
+                            group = 'HOLC Polygons'
+                )
+            
+        # add the legend
+            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                addLegend(position = 'bottomright',
+                          pal = ces_leaflet_pal,
+                          values = ces_pal_domain, # ces3_poly$fill_variable,
+                          opacity = 1,
+                          layerId = 'ces_legend',
+                          bins = 4,
+                          group = 'Legend',
+                          title = paste0('CalEnviroScreen'))
+        
+        # Add controls to select the basemap and layers
+            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                addLayersControl(# baseGroups = basemap_options,
+                                 overlayGroups = c('HOLC Polygons', 'Weighted Average Score', 'Legend'),
+                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
+            
+        # Hide some groups by default (can be turned on with the layers control box on the map)
+            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                hideGroup(c('Legend')) #, 'HOLC Polygons'))
+        
+        # output the map object
+            analysis_map_weighted_avg
+    })
+    
+    # Observer to respond to zoom / pan of left side map and apply to other 3 maps
+    # from: https://github.com/rstudio/leaflet/issues/347
+        observe({
+            coords_analysis <- input$analysis_map_holc_bounds
+            if (!is.null(coords_analysis)) {
+                proxy_analysis_1 <- leafletProxy('analysis_map_overlap') %>%
+                    fitBounds(coords_analysis$west,
+                              coords_analysis$south,
+                              coords_analysis$east,
+                              coords_analysis$north)
+
+                proxy_analysis_2 <- leafletProxy('analysis_map_intersection') %>%
+                    fitBounds(coords_analysis$west,
+                              coords_analysis$south,
+                              coords_analysis$east,
+                              coords_analysis$north)
+
+                proxy_analysis_3 <- leafletProxy('analysis_map_weighted_avg') %>%
+                    fitBounds(coords_analysis$west,
+                              coords_analysis$south,
+                              coords_analysis$east,
+                              coords_analysis$north)
+            }
+        })
+    
+    
+    # output$analysis_map_facet <- renderLeaflet({    
+    analysis_map_facet <- function(map_grade, allow_zoom_pan) {
+        # map_facet <- renderLeaflet({
+            
+        # get variable values
+            # var_name <- ces_choices %>%
+            #     filter(name == input$analysis_indicator_selection) %>%
+            #     pull(ces_variable)
+            # measure_name <- input$analysis_indicator_selection
+            # city <- input$analysis_city_selection
+
+        # specify the initial zoom level to use in the map
+            bounds_city <- attributes(st_geometry(redline_analysis_data() %>% 
+                                                      st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
+            
+        # create the new (empty) map
+            map_facet <- leaflet(options = leafletOptions(zoomControl = allow_zoom_pan, 
+                                                          dragging = allow_zoom_pan))
+            
+            map_facet <- map_facet %>% 
+                addMapPane("ces_polygons", zIndex = 410) %>% 
+                addMapPane("redline_polygons_pane", zIndex = 420)
+        
+        # Basemap Options
+            # use default options
+                # map_facet <- leaflet() %>%
+                #     addTiles()
+            # use custom options
+                # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
+                basemap_options <- c('CartoDB.Positron')
+                for (provider in basemap_options) {
+                    map_facet <- map_facet %>%
+                        addProviderTiles(provider, group = provider)
+                }
+        
+        # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
+            isolate(if (is.null(input$map_facet_bounds)) {
+                map_facet <- map_facet %>%
+                    fitBounds(lng1 = bounds_city[[1]],
+                              lat1 = bounds_city[[2]],
+                              lng2 = bounds_city[[3]],
+                              lat2 = bounds_city[[4]])
+            } # else { # maintain the current view
+            #     map_facet <- map_facet %>%
+            #         setView(lng = mean(c(input$map_facet_bounds$west, input$map_facet_bounds$east)),
+            #                 lat = mean(c(input$map_facet_bounds$north, input$map_facet_bounds$south)),
+            #                 zoom = input$map_facet_zoom)
+            # }
+            )
+            
+        # # create a button to center the map on selected city
+        #     map_facet <- map_facet %>% 
+        #         addEasyButton(easyButton(
+        #             icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
+        #             onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+        #                               round(bounds_city[[2]],4)-0.01, ', ',
+        #                               round(bounds_city[[1]],4)-0.01, '],[',
+        #                               round(bounds_city[[4]],4)+0.01, ', ',
+        #                               round(bounds_city[[3]],4)+0.01, ']]); }'))))
+            
+        # Create the color palette for the Redline scores
+            redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'gold1', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
+                                               domain = redline_polygons$holc_grade, 
+                                               levels = c('A', 'B', 'C', 'D'))
+            
+        # Add Area Weighted Average Polygons (Weighted Average of CES Scores)
+            # create the color palette for the polygons
+                parameter <- ces_choices %>%
+                    filter(name == input$analysis_indicator_selection) %>%
+                    pull(ces_variable)
+                ces_pal_domain <- as.data.frame(ces3_poly() %>% st_drop_geometry()) %>% 
+                    select(all_of(parameter)) %>% 
+                    pull(all_of(parameter))
+                # ces_fill_domain <- as.data.frame(analysis_clipped_ces %>% st_drop_geometry()) %>% 
+                #     select(all_of(parameter)) %>% 
+                #     pull(all_of(parameter))
+                # create the palette
+                    ces_pal_color <- 'RdYlGn' # 'YlOrBr' #'Blues' #'Greys'
+                    ces_leaflet_pal <- colorNumeric(
+                        palette = ces_pal_color,
+                        domain = ces_pal_domain,
+                        reverse = TRUE
+                    )
+                # get the dataset
+                    ces3_poly <- analysis_raw_scores %>% 
+                        filter(holc_grade == map_grade) %>% 
+                        filter(holc_city == input$analysis_city_selection) %>% 
+                        mutate(area_calc_meters_sq = st_area(.)) %>% 
+                        drop_units() %>% 
+                        st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
+                        # mutate(fill_variable = ces_fill_domain)
+                # add polygons
+                    map_facet <- map_facet %>% 
+                        addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
+                                    options = pathOptions(pane = "ces_polygons"),
+                                    color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+                                    weight = 0.5,
+                                    smoothFactor = 1.0,
+                                    opacity = 1.0,
+                                    fillOpacity = 0.9,
+                                    # fillColor = ~colorNumeric('YlOrBr', Poll_pctl)(Poll_pctl), # view RColorBrewer palettes with: RColorBrewer::display.brewer.all()
+                                    fillColor = ~ces_leaflet_pal(
+                                        eval(as.symbol(
+                                            ces_choices %>% 
+                                                filter(name == input$analysis_indicator_selection) %>% 
+                                                pull(ces_variable)
+                                            ))), # ces_fill_domain),
+                                    # fillColor = 'green',
+                                    highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
+                                    popup = ~paste0('<b>', '<u>','Area Weighted Average CalEnviroScreen (CES) Score', '</u>','</b>','<br/>',
+                                                    # '<b>', 'Census Tract: ', '</b>', 
+                                                    # census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    # '&emsp;', 
+                                                    # '<b>', 'Area (1000 sq m): ', '</b>',
+                                                    # round(clipped_area / 1000, 0),
+                                                    # '<br/>',
+                                                    # '<b>', 'Location: ', '</b>', 
+                                                    # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
+                                                    # ', ', 
+                                                    # california_county, # eval(as.symbol(ces_field_names %>% filter(id == 'California') %>% pull(ces_variable))),
+                                                    # ' County, ', 
+                                                    # zip, #eval(as.symbol(ces_field_names %>% filter(id == 'ZIP') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    # '<b>', 'Population (2010): ', '</b>', 
+                                                    # population_2010, # eval(as.symbol(ces_field_names %>% filter(id == 'pop2010') %>% pull(ces_variable))),
+                                                    # '<br/>',
+                                                    
+                                                    # HOLC POLYGON INFO
+                                                    '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                                    # '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                                    '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                                    '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                    '<br/>',
+                                                    
+                                                    
+                                                    # SELECTED VARIABLE
+                                                    #' '<b>', #'<u>',
+                                                    #' 'Selected CES Score (and Percentile): ',
+                                                    #' #'</u>', 
+                                                    #' '</b>', '<br/>', '&emsp;',
+                                                    '<b>', glue('Weighted Average {input$analysis_indicator_selection}: '), '</b>',
+                                                    round(eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))), 1)
+                                    ),
+                                    group = 'Weighted Average Score') 
+
+        # Add the HOLC (redline) polygon outlines
+            # # add polygons
+            # map_facet <- map_facet %>% 
+            #     # addPolygons(data = redline_analysis_data() %>% 
+            #     addPolylines(data = redline_analysis_data() %>% 
+            #                      filter(holc_grade == map_grade) %>% 
+            #                      st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+            #                      # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+            #                      {.},
+            #                 options = pathOptions(pane = "redline_polygons_pane"),
+            #                 color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+            #                 weight = 0.5,
+            #                 smoothFactor = 1.0,
+            #                 opacity = 1.0,
+            #                 # fill = FALSE,
+            #                 fill = FALSE,
+            #                 # fillOpacity = 0, # input$redline_fill_1,
+            #                 # fillColor = 'lightgrey',
+            #                 # fillColor = ~redline_leaflet_pal(holc_grade),
+            #                 highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+            #                 popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
+            #                                 '<b>', 'City: ', '</b>', holc_city, '<br/>',
+            #                                 '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+            #                                 '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
+            #                                 '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+            #                                 '<b>', 'Area (1000 sq meters): ', '</b>', 
+            #                                 format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+            #                                 '<br/>',
+            #                                 # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+            #                                 '<b>', 'HOLC Form Link: ', '</b>', 
+            #                                 paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
+            #                                 # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
+            #                 ),
+            #                group = 'HOLC Polygons'
+            #    )
+            
+        # add the legend
+            map_facet <- map_facet %>% 
+                addLegend(position = 'bottomright',
+                          pal = ces_leaflet_pal,
+                          values = ces_pal_domain, # ces3_poly$fill_variable,
+                          opacity = 1,
+                          layerId = 'ces_legend',
+                          bins = 4,
+                          group = 'Legend',
+                          title = paste0('CalEnviroScreen'))
+        
+        # Add controls to select the basemap and layers
+            map_facet <- map_facet %>% 
+                addLayersControl(# baseGroups = basemap_options,
+                                 overlayGroups = c('Weighted Average Score', 'Legend'), # 'HOLC Polygons'
+                                 options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
+            
+        # Hide some groups by default (can be turned on with the layers control box on the map)
+            map_facet <- map_facet %>% 
+                hideGroup(c('Legend')) #, 'HOLC Polygons'))
+        
+        # output the map object
+            return(map_facet)
+            
+    }
+    
+    output$analysis_map_facet_A <- renderLeaflet({analysis_map_facet('A', TRUE)})
+    output$analysis_map_facet_B <- renderLeaflet({analysis_map_facet('B', FALSE)})
+    output$analysis_map_facet_C <- renderLeaflet({analysis_map_facet('C', FALSE)})
+    output$analysis_map_facet_D <- renderLeaflet({analysis_map_facet('D', FALSE)})
+
+
+# Observer to respond to zoom / pan of upper left side map and apply to other 3 maps
+    # from: https://github.com/rstudio/leaflet/issues/347
+        observe({
+            coords_analysis_facet <- input$analysis_map_facet_A_bounds
+            if (!is.null(coords_analysis_facet)) {
+                proxy_analysis_facet_1 <- leafletProxy('analysis_map_facet_B') %>%
+                    fitBounds(coords_analysis_facet$west,
+                              coords_analysis_facet$south,
+                              coords_analysis_facet$east,
+                              coords_analysis_facet$north)
+
+                proxy_analysis_facet_2 <- leafletProxy('analysis_map_facet_C') %>%
+                    fitBounds(coords_analysis_facet$west,
+                              coords_analysis_facet$south,
+                              coords_analysis_facet$east,
+                              coords_analysis_facet$north)
+
+                proxy_analysis_facet_3 <- leafletProxy('analysis_map_facet_D') %>%
+                    fitBounds(coords_analysis_facet$west,
+                              coords_analysis_facet$south,
+                              coords_analysis_facet$east,
+                              coords_analysis_facet$north)
+            }
+        })
+
 }
 
 shinyApp(ui, server)
