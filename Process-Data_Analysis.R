@@ -41,7 +41,8 @@ options(scipen = 999)
                                          'redline_polygons.gpkg'))
             # st_crs(redline_polygons) # to check the reference system
         # transform to projected CRS
-            redline_polygons <- redline_polygons %>% st_transform(projected_crs)        
+            redline_polygons <- redline_polygons %>% 
+                st_transform(projected_crs)        
         # # fix self-intersecting polygons (if needed)
         #     if (sum(!st_is_valid(redline_polygons)) > 0) {
         #         redline_polygons <- sf::st_buffer(redline_polygons, dist = 0)
@@ -213,7 +214,7 @@ options(scipen = 999)
     # write to output file
         st_write(obj = df_wide_raw_scores,
                  here('data_processed-analysis', 
-                      'area_weighted_scores.gpkg'),
+                      'holc_area_weighted_scores.gpkg'),
                  append = FALSE)
     
 # pivot the citywide average scores to a wide data frame (1 row per city)
@@ -301,7 +302,7 @@ options(scipen = 999)
                       'z_scores-area_weighted_scores.gpkg'),
                  append = FALSE)
 
-#######################################################################################-
+######################################################################################-
 # ALTERNATE METHOD (using wide datasets) ----------------------------------------------
         
 # first compute the contribution of each component CES poly to the total for eac holc polygon
@@ -316,7 +317,7 @@ options(scipen = 999)
         summarize(across(c(ces_3_score:other_percent), sum)) %>% 
         drop_units() %>%
         ungroup() %>% 
-        mutate(score_type = 'Area Weighted Average') %>% 
+        mutate(score_type = 'area weighted average') %>% 
         relocate(score_type, .after = holc_grade) %>% 
         {.}
     # # check: Fresno A1
@@ -347,7 +348,7 @@ options(scipen = 999)
         group_by(holc_city) %>% 
         summarize(across(c(ces_3_score:other_percent), mean)) %>% 
         ungroup() %>% 
-        mutate(score_type = 'Citywide Average') %>%
+        mutate(score_type = 'citywide average') %>%
         {.}
     # check:
         mean(holc_area_weighted_scores %>% filter(holc_city == 'Fresno') %>% pull(ces_3_score)) # 62.00244
@@ -357,4 +358,285 @@ options(scipen = 999)
     holc_area_weighted_departures <- holc_area_weighted_scores %>% 
         # !!!!!!!!!! NOT FINISHED !!!!!!!!!!!!!!
         {.}
+    
+    
+    
+    
+#######################################################################################-
+# CENTROID METHOD ----------------------------------------------------------------------
+    # compute centroids of redline polygons
+        redline_polygons_centroid <- redline_polygons %>% 
+            st_centroid(.)
+        # write to output file
+            st_write(obj = redline_polygons_centroid,
+                     here('data_processed-analysis', 
+                          'redline_polygons_centroid.gpkg'),
+                     append = FALSE)
+        
+    # compute centroids of CES polygons
+        ces3_poly_centroid <- ces3_poly %>% 
+            st_centroid(.)
+        # write to output file
+            # for the output geopackage file, just get centroids of CES tracts in relevant counties
+                # get selected california counties
+                    ca_counties <- st_read('data_processed\\CA_Counties.gpkg') %>% 
+                        clean_names() %>% 
+                        filter(cnty_name %in% c('Fresno', 'Los Angeles', 'Alameda', 'Sacramento', 
+                                                'Yolo', 'San Diego', 'San Francisco', 
+                                                'Santa Clara','San Joaquin'))
+                    
+            st_write(obj = ces3_poly_centroid[ca_counties,] %>% select(census_tract, geom),
+                     here('data_processed-analysis', 
+                          'ces_centroids.gpkg'),
+                     append = FALSE)
+
+    # connect the centroid of each redline polygon to the nearest centroid of a CES polygon
+        redline_nearest_feature <- st_nearest_feature(redline_polygons_centroid, ces3_poly_centroid)
+    
+    # OUTPUT - get the CES polygon that matches each HOLC polygon, based on the centroid matching
+        holc_centroid_scores <- redline_polygons %>% 
+            bind_cols(ces3_poly %>% 
+                          slice(redline_nearest_feature) %>% 
+                          st_drop_geometry()
+                      ) %>% 
+            # rearrange and select/remove columns
+            select(holc_city, holc_grade, holc_id, holc_id_2, ces_3_score:other_percent, geom) %>% 
+            mutate(score_type = 'centroid matched score') %>% 
+            relocate(score_type, .after = holc_id_2)
+        # write to output file
+        st_write(obj = holc_centroid_scores,
+                 here('data_processed-analysis', 
+                      'holc_centroid_scores.gpkg'),
+                 append = FALSE)
+    # get the lines connecting the holc polygons to their matched ces polygons
+        # draw lines
+            connecting_lines <- st_nearest_points(redline_polygons_centroid, 
+                                                  ces3_poly_centroid %>% slice(redline_nearest_feature), 
+                                                  pairwise = TRUE)
+        # write to output file
+        st_write(obj = connecting_lines,
+                 here('data_processed-analysis', 
+                      'holc_centroid_ces_connecting_lines.gpkg'),
+                 append = FALSE)
+    # # check - plot (first 10)
+    #     plot(st_geometry(redline_polygons)[1:10], col = 'red')
+    #     plot(st_geometry(redline_polygons_centroid)[1:10], add = T, col = 'green')
+    #     plot(st_geometry(ces3_poly)[redline_nearest_feature[1:10]], add = T) #, col = 'blue')
+    #     plot(st_geometry(ces3_poly_centroid)[redline_nearest_feature[1:10]], add = T, col = 'black')
+    #     # plot(st_geometry(redline_nearest_ces_centroid)[1:10], col = 'red', add = T)
+    #     plot(connecting_lines[1:10], add = TRUE)
+
+    # compute departure scores
+        # pivot from wide to long
+            holc_centroid_scores_long <- holc_centroid_scores %>% 
+                st_drop_geometry() %>% 
+                select(holc_city:holc_id_2, ces_3_score:other_percent) %>% 
+                pivot_longer(cols = ces_3_score:other_percent, 
+                             names_to = 'ces_measure',
+                             values_to = 'ces_score') %>% 
+                {.}
+    # compute the city-wide average HOLC score for each CES measure
+        holc_centroid_scores_long <- holc_centroid_scores_long %>% 
+            group_by(holc_city, ces_measure) %>% 
+            mutate(citywide_average_score = mean(ces_score)) %>% 
+            ungroup() %>% 
+            {.}
+    # compute the departure for each HOLC polygon's CES scores from their respective citywide average score
+        holc_centroid_scores_long <- holc_centroid_scores_long %>% 
+            mutate(departure_score = ces_score - citywide_average_score) %>% 
+            {.}
+    
+    # compute the z score of the departures for each HOLC polygon
+        holc_centroid_scores_long <- holc_centroid_scores_long %>% 
+            group_by(holc_city, ces_measure) %>% 
+            mutate(std_dev_departure_city_measure = sd(departure_score)) %>% 
+            mutate(z_score_departure_city_measure = departure_score / std_dev_departure_city_measure) %>% 
+            # summarize(citywide_average) %>% 
+            ungroup() %>% 
+            {.}  
+    # PIVOT THESE DATASETS TO WIDE FORMAT, JOIN WITH HOLC POLYGON GEOMETRY, WRITE TO GEOPACKAGE FILES
+        # pivot the departure scores to a wide data frame
+            df_wide_centroid_departure_scores <- holc_centroid_scores_long %>% 
+                select(holc_city:holc_id_2, ces_measure, departure_score) %>% 
+                pivot_wider(id_cols = holc_city:holc_id_2, 
+                            names_from = ces_measure, 
+                            values_from = departure_score) %>% 
+                mutate(score_type = 'departure (centroid score)') %>% 
+                relocate(score_type, .after = holc_id_2) %>%
+                {.} 
+            df_wide_centroid_departure_scores <- left_join(x = redline_polygons %>% 
+                                                      select(holc_city, holc_grade, holc_id, 
+                                                             holc_id_2, geom),
+                                                  y = df_wide_centroid_departure_scores,
+                                                  by = c('holc_city', 'holc_grade', 'holc_id', 'holc_id_2'))
+            # write to output file
+                st_write(obj = df_wide_centroid_departure_scores,
+                         here('data_processed-analysis', 
+                              'departure-centroid_scores.gpkg'),
+                         append = FALSE)
+        
+        # pivot the z-scores to a wide data frame
+        df_wide_centroid_z_scores <- holc_centroid_scores_long %>% 
+                select(holc_city:holc_id_2, ces_measure, z_score_departure_city_measure) %>% 
+                pivot_wider(id_cols = holc_city:holc_id_2, 
+                            names_from = ces_measure, 
+                            values_from = z_score_departure_city_measure) %>% 
+                mutate(score_type = 'departure z-score (centroid score)') %>% 
+                relocate(score_type, .after = holc_id_2) %>%
+                {.} 
+            df_wide_centroid_z_scores <- left_join(x = redline_polygons %>% 
+                                                      select(holc_city, holc_grade, holc_id, 
+                                                             holc_id_2, geom),
+                                                  y = df_wide_centroid_z_scores,
+                                                  by = c('holc_city', 'holc_grade', 'holc_id', 'holc_id_2'))
+            # write to output file
+                st_write(obj = df_wide_centroid_z_scores,
+                         here('data_processed-analysis', 
+                              'z_scores-centroid_scores.gpkg'),
+                         append = FALSE)
+
+# look at correlations between the scores calculated with the centroid method versus scores calculated with
+# the area weighted average method
+    area_weighted_scores <- st_read(here('data_processed-analysis', 
+                                         'holc_area_weighted_scores.gpkg'))
+    centroid_scores <- st_read(here('data_processed-analysis', 
+                                         'holc_centroid_scores.gpkg'))
+        
+    check_df <- area_weighted_scores %>% 
+        select(holc_city:holc_id_2, ces_3_score) %>% 
+        st_drop_geometry() %>% 
+        rename(ces_3_score_area_wt = ces_3_score)
+    check_df <- check_df %>% left_join(centroid_scores %>% 
+                                           select(holc_city:holc_id_2, ces_3_score) %>% 
+                                           st_drop_geometry() %>% 
+                                           rename(ces_3_score_centroid = ces_3_score))
+    check_scatter <- ggplot(data = check_df, 
+                            mapping = aes(x = ces_3_score_area_wt,
+                                          y = ces_3_score_centroid)) +
+        geom_point() + 
+        geom_abline(slope = 1) +
+        xlim(c(0,100)) + 
+        ylim(c(0,100))
+    check_scatter
+    
+    correlation_spearman_test <- cor.test(x = check_df$ces_3_score_area_wt, 
+                                          y = check_df$ces_3_score_centroid, 
+                                          method = 'spearman')
+        correlation_spearman_test
+            # p-value < 0.00000000000000022
+            # rho: 0.9663347
+
+    # compare departure scores
+    area_weighted_scores_departure <- st_read(here('data_processed-analysis', 
+                                                   'departure-area_weighted_scores.gpkg'))
+    centroid_scores_departure <- st_read(here('data_processed-analysis', 
+                                              'departure-centroid_scores.gpkg'))
+    check_df_departure <- area_weighted_scores_departure %>% 
+        select(holc_city:holc_id_2, ces_3_score) %>% 
+        st_drop_geometry() %>% 
+        rename(ces_3_score_area_wt_dep = ces_3_score)
+    check_df_departure <- check_df_departure %>% left_join(centroid_scores_departure %>% 
+                                           select(holc_city:holc_id_2, ces_3_score) %>% 
+                                           st_drop_geometry() %>% 
+                                           rename(ces_3_score_centroid_dep = ces_3_score))
+    check_scatter_departure <- ggplot(data = check_df_departure, 
+                            mapping = aes(x = ces_3_score_area_wt_dep,
+                                          y = ces_3_score_centroid_dep)) +
+        geom_point() + 
+        geom_abline(slope = 1) +
+        xlim(c(-50,50)) + 
+        ylim(c(-50,50))
+    check_scatter_departure
+    correlation_spearman_test_dep <- cor.test(x = check_df_departure$ces_3_score_area_wt_dep, 
+                                          y = check_df_departure$ces_3_score_centroid_dep, 
+                                          method = 'spearman')
+    correlation_spearman_test_dep 
+        # p-value < 0.00000000000000022
+        # rho: 0.9389074 
+        
+######################################################################################-
+# ROAD LENGTH METHOD ------------------------------------------------------------------
+        get_roads <- function(county) {
+            rd_county <- tigris::roads(state = 'CA', county = county)
+            rd_county <- st_as_sf(rd_county)
+            rd_county <- rd_county %>% st_transform(3310)
+            return(rd_county)
+        }
+        
+        rd_sac <- get_roads('Sacramento')
+        rd_yolo <- get_roads('Yolo')
+        
+        
+            st_crs(rd_sac)
+            st_crs(redline_polygons)
+        # PLOT
+        plot(st_geometry(rd_yolo)) # %>% slice(1:10000)))
+        plot(st_geometry(rd_sac), add = TRUE, col = 'yellow')
+        plot(st_geometry(redline_polygons %>% filter(holc_city == 'Sacramento')), add = TRUE, col = 'red')
+        
+        rd_sac <- bind_rows(rd_sac, rd_yolo)
+        rd_overlap <- rd_sac[redline_polygons %>% filter(holc_city == 'Sacramento'), ]
+        plot(st_geometry(rd_overlap))
+        plot(st_geometry(redline_polygons %>% filter(holc_city == 'Sacramento')), add = TRUE, col = 'red')
+        
+        rd_intersection <- st_intersection(redline_polygons %>% filter(holc_city == 'Sacramento'), 
+                                           rd_sac)
+        plot(st_geometry(rd_intersection))
+        
+        
+        # USE THIS !!!!!!!!!!!!!!!!!!!!
+            # SAC
+            rd_ces_intersection <- st_intersection(ces_clipped_to_holc %>% filter(holc_city == 'Sacramento'),
+                                                   rd_sac)
+            rd_ces_intersection <- rd_ces_intersection %>% 
+                mutate(length = st_length(geom))
+            
+            plot(st_geometry(ces_clipped_to_holc %>% filter(holc_city == 'Sacramento')))
+            plot(st_geometry(rd_ces_intersection), add = T)
+            
+            # FRESNO
+            rd_fr <- get_roads('Fresno')
+            rd_fr_intersection <- st_intersection(ces_clipped_to_holc %>% 
+                                                      filter(holc_city == 'Fresno'),
+                                                   rd_fr)
+            rd_fr_intersection <- rd_fr_intersection %>% 
+                mutate(length = st_length(geom))
+            
+            plot(st_geometry(ces_clipped_to_holc %>% filter(holc_city == 'Fresno')))
+            plot(st_geometry(rd_fr_intersection), add = T)
+            
+            # calculate length of roads within each overlapping portion of a CES polygon
+                rd_fr_summary <- rd_fr_intersection %>% 
+                    group_by(census_tract, holc_id_2) %>% 
+                    mutate(tract_rd_length = sum(length)) %>% 
+                    ungroup()
+            # calculate length of roads within each HOLC polygon   
+                rd_fr_summary <- rd_fr_summary %>% 
+                    group_by(holc_id_2) %>% 
+                    mutate(holc_rd_length = sum(length)) %>% 
+                    ungroup()
+            # 
+            rd_fr_summary <- rd_fr_summary %>% 
+                group_by(census_tract, holc_id_2) %>%
+                mutate(score_portion = tract_rd_length/ holc_rd_length)
+            
+            
+            
+            rd_fr_holc_summary <-  rd_fr_intersection %>% 
+                group_by(holc_id_2) %>% 
+                summarize(holc_rd_length = sum(length))
+            
+            rd_fr_holc_summary_2 <-  rd_fr_intersection %>% 
+                
+        
+        
+# create a list of counties corresponding to the HOLC city maps
+    cities_counties <- list('Fresno' = 'Fresno',
+                            'Los Angeles' = 'Los Angeles',
+                            'Oakland' = 'Alameda',
+                            'Sacramento' = c('Sacramento', 'Yolo'),
+                            'San Diego' = 'San Diego',
+                            'San Francisco' = 'San Francisco',
+                            'San Jose' = 'Santa Clara',
+                            'Stockton' = 'San Joaquin')       
     

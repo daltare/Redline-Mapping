@@ -202,10 +202,21 @@
             
     # read data for the Redline-CES analysis
         analysis_clipped_ces <- st_read('data_processed-analysis/ces_clipped_to_holc_bounds.gpkg')
-        analysis_raw_scores <- st_read('data_processed-analysis/area_weighted_scores.gpkg')
+        analysis_raw_scores <- st_read('data_processed-analysis/holc_area_weighted_scores.gpkg')
         analysis_departure_scores <- st_read('data_processed-analysis/departure-area_weighted_scores.gpkg')
         analysis_citywide_scores <- st_read('data_processed-analysis/citywide_avg-area_weighted_scores.gpkg')
         analysis_z_scores <- st_read('data_processed-analysis/z_scores-area_weighted_scores.gpkg')
+        
+        # centroid scores / info
+            analysis_centroid_scores <- st_read('data_processed-analysis/holc_centroid_scores.gpkg')
+            analysis_centroid_departure_scores <- st_read('data_processed-analysis/departure-centroid_scores.gpkg')
+            analysis_ces_centroids <- st_read('data_processed-analysis/ces_centroids.gpkg')
+            analysis_holc_centroids <- st_read('data_processed-analysis/redline_polygons_centroid.gpkg')
+            analysis_centroid_connecting_lines <- st_read('data_processed-analysis/holc_centroid_ces_connecting_lines.gpkg')
+            
+           
+
+
 
     # California Counties
         ca_counties <- st_read('data_processed\\CA_Counties.gpkg') %>% 
@@ -472,10 +483,15 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                           tags$a(href = 'https://oehha.ca.gov/calenviroscreen/indicators',
                                  'Indicators Overview'), 
                           'webpage.'),
-                        hr(style="border: 3px solid darkgrey"),
-                        #  --------------------- INPUTS ---------------------
-                        h4('Inputs'),
-                        p('Select a CES indicator and a city to display in the maps and plots below:'),
+                        p('Because the geographic unit of analysis of the HOLC maps and the CES indicators is not 
+                          consistent, this analysis starts by calculating an aggregated CES indicator score 
+                          for each polygon in the HOLC maps (for a given CES indicator). This aggregation process
+                          is described in more detail in the section below and shown in the accompanying maps. The 
+                          aggregated scores at the HOLC polygon level are then used in the plots in the following 
+                          section to analyze potential patterns and relationships between current conditions 
+                          and historical HOLC ratings.'), 
+                        p('Select a CES indicator to analyze, and a method for aggregating CES scores at the 
+                          HOLC polygon level:'),
                         div(style="display:inline-block;vertical-align:top;",
                             selectInput(inputId = 'analysis_indicator_selection',
                                         label = 'Select a CalEnviroScreen Indicator:',
@@ -484,13 +500,25 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                         multiple = FALSE)),
                         div(style="display:inline-block;vertical-align:top;",
                             HTML('&emsp;')),
-                        div(style="display:inline-block;vertical-align:top;",
-                            selectInput(inputId = 'analysis_city_selection',
-                                        label = 'Select a City:',
-                                        choices = unique(redline_polygons$holc_city),
-                                        selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
+                        div(style="display:inline-block;vertical-align:top;", 
+                            selectInput(inputId = 'analysis_aggregation_method', 
+                                        label = 'Select a CES Score Aggregation Method:',
+                                        choices = c('Area Weighted Average', 'Nearest Centroid'),
+                                        selected = c('Area Weighted Average'),
                                         multiple = FALSE)),
                         hr(style="border: 3px solid darkgrey"),
+                        #  --------------------- INPUTS ---------------------
+                        # h4('Inputs'),
+                        # p('Select a CES indicator to analyze, and a city to display in the maps below:'),
+                        # div(style="display:inline-block;vertical-align:top;",
+                        #     HTML('&emsp;')),
+                        # div(style="display:inline-block;vertical-align:top;",
+                        #     selectInput(inputId = 'analysis_city_selection',
+                        #                 label = 'Select a City (applies to maps only):',
+                        #                 choices = unique(redline_polygons$holc_city),
+                        #                 selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
+                        #                 multiple = FALSE)),
+                        # hr(style="border: 3px solid darkgrey"),
                         #  --------------------- ANALYSIS MAPS ---------------------
                         h4('Aggregation of CES Scores by HOLC Map Polygons:'),
                         p('The areas delineated in the HOLC maps and the census tracts used to assign the CES 
@@ -507,6 +535,21 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                            (3) the third pane (from left) shows the portions of the CES polygons that 
                            overlap with the HOLC polygons, and (4) the right pane shows the aggregated CES
                            scores for each HOLC polygon.'),
+                        p('The nearest centroid method matches each HOLC polygon with a single CES polygon by
+                          matching the centroid of each HOLC polygon with the nearest centroid of a CES polygon.
+                          If this method is selected, the map in the third pane (from left) shows the centroids of
+                          all HOLC polgons (points colored by HOLC grade) and CES polygons (grey colored points) and
+                          the nearest HOLC-CES centroid pairs (grey lines).'),
+                        p('Select a city to display in the maps below:'),
+                        # div(style="display:inline-block;vertical-align:top;",
+                        #     HTML('&emsp;')),
+                        # div(style="display:inline-block;vertical-align:top;",
+                            selectInput(inputId = 'analysis_city_selection',
+                                        label = 'Select a City to View (applies to maps only):',
+                                        choices = unique(redline_polygons$holc_city),
+                                        selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
+                                        multiple = FALSE),
+                            # ),
                         p('NOTE: use the left side map to pan/zoom all maps')
                         # (for example, if an HOLC polygon with an area of 200 units 
                         #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
@@ -527,14 +570,15 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         leafletOutput('analysis_map_intersection') %>% withSpinner(color="#0dc5c1")
                  ),
                  column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
-                        leafletOutput('analysis_map_weighted_avg') %>% withSpinner(color="#0dc5c1")
+                        leafletOutput('analysis_map_aggregated_scores') %>% withSpinner(color="#0dc5c1")
                  )
              ),
              fluidRow(
                  column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
                      hr(style="border: 1px solid darkgrey"),
-                     p('The maps below show the aggregated CES score for each HOLC polygon, separated 
-                       by HOLC grade (NOTE: use the upper-left pane to pan/zoom).')
+                     p('The maps below show the aggregated CES score for each HOLC polygon (from the 
+                       right-side plot above), separated by HOLC grade (NOTE: use the upper-left 
+                       pane to pan/zoom).')
                  )
              ), 
              fluidRow(
@@ -582,7 +626,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                             trajectories of development between cities (e.g., regional patterns of economic 
                             development, gentrification, etc.).'),
                         p('The lower plot below shows those \"departure\" scores (from the right-side plot) separated
-                            by HOLC type'),
+                            by HOLC grade.'),
                  )
              ),
              fluidRow(
@@ -613,7 +657,29 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                center of each box represents the approximate 95% confidence interval for the true value of the 
                median for that group (if the notches of two boxes do not overlap, this suggests that the 
                    medians are significantly different).'),
-                        plotOutput('plot_box_departures'),
+                        plotOutput('plot_box_departures')
+                        )
+                 ),
+             fluidRow(
+                 column(12, style='padding-left:100px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        div(style="display:inline-block;vertical-align:center;",
+                            p(tags$b('Adjust axis range: '))),
+                        div(style="display:inline-block;vertical-align:center;",
+                            HTML('&emsp;')),
+                        div(style="display:inline-block;vertical-align:center;",
+                            numericInput(inputId = 'boxplot_axis_min', 
+                                         label = 'Axis Minimum Value: ',
+                                         value = NULL)),
+                        div(style="display:inline-block;vertical-align:center;",
+                            HTML('&emsp;')),
+                        div(style="display:inline-block;vertical-align:center;",
+                            numericInput(inputId = 'boxplot_axis_max', 
+                                         label = 'Axis Maximum Value: ', 
+                                         value = NULL))
+                 )
+             ),
+             fluidRow(
+                  column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
                         hr(style="border: 1px solid darkgrey"),
                         # DOT PLOT OF AVERAGES
                         p('The plot below shows the average departure score for each HOLC class within
@@ -2539,7 +2605,11 @@ server <- function(input, output, session) {
     #             pull(ces_variable)
     #         measure_name <- input$analysis_indicator_selection
     #     # make plot
-    #         raw_scores_boxplot <- ggplot(data = analysis_raw_scores,
+    #         raw_scores_boxplot <- ggplot(data = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                            #     analysis_raw_scores
+                                            # } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                            #     analysis_centroid_scores
+                                            # }, 
     #                                      aes(x = holc_grade,
     #                                          y = !!as.name(var_name))) +
     #             geom_boxplot(aes(fill = holc_grade), notch = TRUE, outlier.shape = NA) +
@@ -2553,6 +2623,14 @@ server <- function(input, output, session) {
     #         raw_scores_boxplot
     # })
 
+    # reset axis min/max values on change in indicator selection
+        observeEvent(input$analysis_indicator_selection,{
+            reset('boxplot_axis_min')
+            reset('boxplot_axis_max')
+            # input$boxplot_axis_min <- NULL
+            # input$boxplot_axis_max <- NULL
+        })
+        
     # box plot - departures
     output$plot_box_departures <- renderPlot({
         # get variable values
@@ -2560,22 +2638,35 @@ server <- function(input, output, session) {
                 filter(name == input$analysis_indicator_selection) %>% 
                 pull(ces_variable)
             measure_name <- input$analysis_indicator_selection
+            if (!is.null(input$boxplot_axis_min)) {axis_min <- input$boxplot_axis_min} else {axis_min <- na_dbl}
+            if (!is.null(input$boxplot_axis_max)) {axis_max <- input$boxplot_axis_max} else {axis_max <- na_dbl}
+            
         # make plot
-            departures_boxplot <- ggplot(data = analysis_departure_scores,
-                                         aes(x = holc_grade,
-                                             y = !!as.name(var_name))) +
+            departures_boxplot <- ggplot(data = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                analysis_departure_scores
+                                            } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                                analysis_centroid_departure_scores
+                                            }, 
+                                         mapping = aes(x = holc_grade,
+                                                       y = !!as.name(var_name))) +
                 geom_boxplot(aes(fill = holc_grade), notch = TRUE, outlier.shape = NA) +
                 # scale_color_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.4)) +
                 scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
                 geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
                 scale_x_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_grade)))) +
-                coord_flip() +
+                coord_flip(ylim = c(axis_min, axis_max)) +
+                # NOTE: if not flipping the coordinates, use coord_cartesian(ylim = c(axis_min, axis_max))
                 theme(legend.position = "none") +
                 labs(x = 'HOLC Grade', 
-                     y = glue('{measure_name} Departure'),
-                     title = 'Departure from Citywide Average by HOLC Grade',
-                     subtitle = 'Each point represents a polygon in the HOLC maps. Departure is raw score for that polygon versus average score of all polygons in respective city') +
+                     y = glue('Aggregated {measure_name} Departure'),
+                     title = glue('HOLC Polygon Aggregated CES Score ({input$analysis_aggregation_method}) Departure from Citywide Average, by HOLC Grade'),
+                     subtitle = 'Each point represents a polygon in the HOLC maps. Departure is aggregated score for that polygon versus average score of all polygons in respective city') +
                 geom_blank()
+            # get and set the axis limits
+            # departures_boxplot <- departures_boxplot + 
+            #     coord_cartesian(ylim = c(x_min, x_max))
+                
+
         # return the plot
             departures_boxplot
     })
@@ -2589,16 +2680,28 @@ server <- function(input, output, session) {
                 pull(ces_variable)
             measure_name <- input$analysis_indicator_selection
         # make plot
-            departures_point <- ggplot(analysis_departure_scores) +
-                geom_jitter(aes(x = !!as.name(var_name),
-                               y = holc_city, color = holc_grade),
+            departures_point <- ggplot(data = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                analysis_departure_scores
+                                            } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                                analysis_centroid_departure_scores
+                                            }, 
+                                       mapping = aes(x = !!as.name(var_name),
+                                                     y = holc_city)) +
+                geom_jitter(aes(color = holc_grade), 
                             height = 0.25) +
                 scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), name = 'HOLC Grade') +
-                labs(x = glue('{measure_name} Departure'), 
+                labs(x = glue('Aggregated {measure_name} Departure'), 
                      y = 'City',
-                     title = glue('{measure_name} Departure from Citywide Average'),
+                     title = glue('Aggregated {measure_name} Departure from Citywide Average'),
                      subtitle = 'Departure is raw score versus average score of all polygons in respective city') +
                 scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_city)))) +
+                stat_summary(fun.data = mean_sdl, 
+                             fun.args = list(mult = 1), 
+                             geom = 'pointrange', 
+                             color = 'black', 
+                             size = 0.3,
+                             # alpha = 0.5
+                             ) +
                 geom_blank()
         # return the plot
             departures_point
@@ -2612,15 +2715,19 @@ server <- function(input, output, session) {
                 pull(ces_variable)
             measure_name <- input$analysis_indicator_selection
         # make plot
-        raw_scores_point <- ggplot(data = analysis_raw_scores, 
+        raw_scores_point <- ggplot(data = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                analysis_raw_scores
+                                            } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                                analysis_centroid_scores
+                                            },
                                    mapping = aes(x = !!as.name(var_name),
                                                  y = holc_city)) +
             geom_jitter(mapping = aes(color = holc_grade),
                         height = 0.25) +
             scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), name = 'HOLC Grade') +
-            labs(x = measure_name, 
+            labs(x = glue('Aggregated {measure_name}'), 
                  y = 'City', 
-                 title = glue('Raw {measure_name}'),
+                 title = glue('HOLC Polygon Aggregated {measure_name} ({input$analysis_aggregation_method})'),
                  subtitle = 'Black dots and lines represent mean +/- 1 standard deviation') +
             scale_y_discrete(limits = rev(levels(factor(analysis_raw_scores$holc_city)))) +
             # draw a point at the mean for each city
@@ -2634,7 +2741,10 @@ server <- function(input, output, session) {
                 stat_summary(fun.data = mean_sdl, 
                              fun.args = list(mult = 1), 
                              geom = 'pointrange', 
-                             color = 'black') +
+                             color = 'black', 
+                             size = 0.3,
+                             # alpha = 0.5
+                             ) +
             geom_blank()
         # return the plot
             raw_scores_point
@@ -2648,7 +2758,11 @@ server <- function(input, output, session) {
                 pull(ces_variable)
             measure_name <- input$analysis_indicator_selection
         # make plot
-            departures_point_city <- ggplot(analysis_departure_scores) +
+            departures_point_city <- ggplot(data = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                analysis_departure_scores
+                                            } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                                analysis_centroid_departure_scores
+                                            }) +
                 geom_point(aes(x = !!as.name(var_name),
                                y = holc_grade,
                                color = holc_grade)) +
@@ -2656,10 +2770,10 @@ server <- function(input, output, session) {
                                    name = 'HOLC Grade') +
                 scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores$holc_grade)))) +
                 facet_wrap(vars(holc_city), ncol = 4) +
-                labs(x = glue('{measure_name} Departure'), 
+                labs(x = glue('Aggregated {measure_name} Departure'), 
                      y = 'HOLC Grade',
-                     title = glue('{measure_name} Departure from Citywide Average'),
-                     subtitle = 'Departure is raw score versus average score of all polygons in respective city') +
+                     title = glue('HOLC Polygon Aggregated {measure_name} ({input$analysis_aggregation_method}) Departure from Citywide Average'),
+                     subtitle = 'Departure is aggregated score versus average score of all polygons in respective city') +
                 geom_blank()
         # return the plot
             departures_point_city
@@ -2674,7 +2788,11 @@ server <- function(input, output, session) {
     #             pull(ces_variable)
     #         measure_name <- input$analysis_indicator_selection
     #     # make plot
-    #         raw_scores_point_city <- ggplot(analysis_raw_scores) +
+    #         raw_scores_point_city <- ggplot(data = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                            #     analysis_raw_scores
+                                            # } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                            #     analysis_centroid_scores
+                                            # }) +
     #             geom_point(aes(x = !!as.name(var_name),
     #                            y = holc_grade,
     #                            color = holc_grade)) +
@@ -2697,7 +2815,12 @@ server <- function(input, output, session) {
                 pull(ces_variable)
             measure_name <- input$analysis_indicator_selection
         # compute average departures (for each HOLC grade within each city)
-            analysis_departure_scores_summary <- analysis_departure_scores %>%
+            analysis_departure_scores_summary <- if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                analysis_departure_scores
+            } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                analysis_centroid_departure_scores
+            }
+            analysis_departure_scores_summary <- analysis_departure_scores_summary %>%
                 group_by(holc_city, holc_grade) %>%
                 summarize(city_holc_dep_average = mean(!!as.name(var_name)),
                           city_holc_dep_median = median(!!as.name(var_name))) %>% 
@@ -2715,10 +2838,10 @@ server <- function(input, output, session) {
                 scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 1.0),
                                    name = 'HOLC Grade') +
                 scale_y_discrete(limits = rev(levels(factor(analysis_departure_scores_summary$holc_city)))) +
-                labs(x = glue('{measure_name} Average Departure'), 
+                labs(x = glue('Aggregated {measure_name} Average Departure'), 
                      y = 'City',
-                     title = glue('Average {measure_name} Departure from Citywide Average by HOLC Grade'),
-                     subtitle = 'Departure is raw score versus average score of all polygons in respective city') +
+                     title = glue('Average HOLC Polygon Aggregated {measure_name} Departure from Citywide Average by HOLC Grade'),
+                     subtitle = 'Departure is aggregated score versus average score of all polygons in respective city') +
                 theme(legend.position = 'bottom') +
                 geom_blank()
         # return the plot
@@ -3019,7 +3142,7 @@ server <- function(input, output, session) {
                                 {.},
                             options = pathOptions(pane = "redline_polygons_pane"),
                             color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-                            weight = 1.0,
+                            weight = 2.0,
                             smoothFactor = 1.0,
                             opacity = 1.0,
                             # fill = FALSE,
@@ -3083,7 +3206,11 @@ server <- function(input, output, session) {
             
             analysis_map_intersection <- analysis_map_intersection %>% 
                 addMapPane("ces_polygons", zIndex = 410) %>% 
-                addMapPane("redline_polygons_pane", zIndex = 420)
+                addMapPane("redline_polygons_pane", zIndex = 420) %>% 
+                addMapPane('connecting_lines_pane', zIndex = 421) %>% 
+                addMapPane('holc_centroids_pane', zIndex = 422) %>%
+                addMapPane('ces_centroids_pane', zIndex = 423)
+
         
         # Basemap Options
             # use default options
@@ -3141,6 +3268,8 @@ server <- function(input, output, session) {
                         domain = ces_pal_domain,
                         reverse = TRUE
                     )
+                # area weighted plot versus centroid plot
+                if (input$analysis_aggregation_method == 'Area Weighted Average') { 
                 # get the dataset
                     ces3_poly <- analysis_clipped_ces %>% 
                         filter(holc_city == input$analysis_city_selection) %>% 
@@ -3148,6 +3277,12 @@ server <- function(input, output, session) {
                         drop_units() %>% 
                         st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
                         # mutate(fill_variable = ces_fill_domain)
+                } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                    ces3_poly <- ces_analysis_data() %>% 
+                        mutate(area_calc_meters_sq = st_area(.)) %>% 
+                        drop_units() %>% 
+                        st_transform(crs = geographic_crs) 
+                } 
                 # add polygons
                     analysis_map_intersection <- analysis_map_intersection %>% 
                         addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
@@ -3166,14 +3301,21 @@ server <- function(input, output, session) {
                                             ))), # ces_fill_domain),
                                     # fillColor = 'green',
                                     highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
-                                    popup = ~paste0('<b>', '<u>','CalEnviroScreen 3.0 (CES) (Clipped)', '</u>','</b>','<br/>',
+                                    popup = ~paste0('<b>', '<u>', 
+                                                    'CalEnviroScreen 3.0 (CES)', 
+                                                    if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                        ' (Clipped)'
+                                                        }, 
+                                                    '</u>','</b>','<br/>',
                                                     '<b>', 'Census Tract: ', '</b>', 
                                                     census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
                                                     '<br/>',
                                                     # '&emsp;', 
-                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
-                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
-                                                    '<br/>',
+                                                    if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                        paste0('<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                               format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                               '<br/>')
+                                                    }, 
                                                     # '<b>', 'Location: ', '</b>', 
                                                     # nearby_city, # eval(as.symbol(ces_field_names %>% filter(id == 'City') %>% pull(ces_variable))),
                                                     # ', ', 
@@ -3222,7 +3364,7 @@ server <- function(input, output, session) {
                                 {.},
                             options = pathOptions(pane = "redline_polygons_pane"),
                             color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-                            weight = 1.0,
+                            weight = 2.0,
                             smoothFactor = 1.0,
                             opacity = 1.0,
                             # fill = FALSE,
@@ -3236,9 +3378,11 @@ server <- function(input, output, session) {
                                             '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
                                             '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
-                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
-                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE),
-                                            '<br/>',
+                                            if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                paste0('<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                       format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE),
+                                                       '<br/>')
+                                            },
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
@@ -3246,6 +3390,72 @@ server <- function(input, output, session) {
                             ),
                             group = 'HOLC Polygons'
                 )
+            
+        # add centroid info if selected
+            # HOLC Centroids
+            if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                analysis_map_intersection <- analysis_map_intersection %>%
+                    addCircleMarkers(data = analysis_holc_centroids %>% 
+                                         filter(holc_city == input$analysis_city_selection) %>% 
+                                         st_transform(crs = geographic_crs),
+                                     options = pathOptions(pane = 'holc_centroids_pane'),
+                                     radius = 3,
+                                     stroke = TRUE,
+                                     color = 'black',
+                                     weight = 0.5,
+                                     opacity = 1.0,
+                                     fill = TRUE,
+                                     fillColor = ~redline_leaflet_pal(holc_grade), # 'black',
+                                     fillOpacity = 1,
+                                     popup = ~paste0('<b>', '<u>', paste0('HOLC Polygon Centroid'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            # '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>'
+                                            ),
+                                     group = 'HOLC Centroids'
+                                     )
+            }
+            
+            # CES Centroids
+            if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                analysis_map_intersection <- analysis_map_intersection %>%
+                    addCircleMarkers(data = analysis_ces_centroids[ces_analysis_data(), ] %>% 
+                                         st_transform(crs = geographic_crs),
+                                     options = pathOptions(pane = 'ces_centroids_pane'),
+                                     radius = 3,
+                                     stroke = TRUE,
+                                     color = 'grey',
+                                     weight = 0.5,
+                                     opacity = 1.0,
+                                     fill = TRUE,
+                                     fillColor = 'grey',
+                                     fillOpacity = 1,
+                                     popup = ~paste0('<b>', '<u>', paste0('CES Polygon Centroid'), '</u>', '</b>','<br/>',
+                                            '<b>', 'Census Tract: ', '</b>', census_tract, '<br/>'
+                                            ),
+                                     group = 'CES Centroids'
+                                     )
+            }
+            
+            # Connecting Lines
+            if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                analysis_map_intersection <- analysis_map_intersection %>%
+                    addPolylines(data = analysis_centroid_connecting_lines[ces_analysis_data(), ] %>% 
+                                     st_transform(crs = geographic_crs),
+                                 options = pathOptions(pane = 'connecting_lines_pane'),
+                                 stroke = TRUE,
+                                 color = 'grey',
+                                 weight = 2,
+                                 opacity = 1.0,
+                                 # fill = TRUE,
+                                 # fillColor = 'black',
+                                 # fillOpacity = 1,
+                                 popup = ~paste0('<b>', paste0('HOLC-CES Centroid Match'), '</b>','<br/>'
+                                 ),
+                                 group = 'HOLC-CES Centroid Match'
+                    )
+            }
             
         # add the legend
             analysis_map_intersection <- analysis_map_intersection %>% 
@@ -3261,7 +3471,11 @@ server <- function(input, output, session) {
         # Add controls to select the basemap and layers
             analysis_map_intersection <- analysis_map_intersection %>% 
                 addLayersControl(# baseGroups = basemap_options,
-                                 overlayGroups = c('HOLC Polygons', 'CalEnviroScreen', 'Legend'),
+                                    overlayGroups = if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                                        c('HOLC Polygons', 'CalEnviroScreen', 'Legend')
+                                    } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                                        c('HOLC Polygons', 'CalEnviroScreen', 'Legend', 'HOLC Centroids', 'CES Centroids', 'HOLC-CES Centroid Match')
+                                    },
                                  options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
         
         # Hide some groups by default (can be turned on with the layers control box on the map)
@@ -3272,7 +3486,7 @@ server <- function(input, output, session) {
             analysis_map_intersection
     })
     
-    output$analysis_map_weighted_avg <- renderLeaflet({
+    output$analysis_map_aggregated_scores <- renderLeaflet({
         # get variable values
             # var_name <- ces_choices %>%
             #     filter(name == input$analysis_indicator_selection) %>%
@@ -3285,41 +3499,41 @@ server <- function(input, output, session) {
                                                       st_transform(crs = geographic_crs)))$bbox # have to convert to geographic coordinate system for leaflet
             
         # create the new (empty) map
-            analysis_map_weighted_avg <- leaflet(options = leafletOptions(zoomControl = FALSE, 
+            analysis_map_aggregated_scores <- leaflet(options = leafletOptions(zoomControl = FALSE, 
                                                        dragging = FALSE))
             
-            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+            analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
                 addMapPane("ces_polygons", zIndex = 410) %>% 
                 addMapPane("redline_polygons_pane", zIndex = 420)
         
         # Basemap Options
             # use default options
-                # analysis_map_weighted_avg <- leaflet() %>%
+                # analysis_map_aggregated_scores <- leaflet() %>%
                 #     addTiles()
             # use custom options
                 # basemap_options <- c('Esri.WorldTopoMap', 'CartoDB.Positron', 'Esri.WorldGrayCanvas','Esri.WorldImagery','Esri.WorldStreetMap')
                 basemap_options <- c('CartoDB.Positron')
                 for (provider in basemap_options) {
-                    analysis_map_weighted_avg <- analysis_map_weighted_avg %>%
+                    analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>%
                         addProviderTiles(provider, group = provider)
                 }
         
         # Set the bounds of the map dynamically - initial view is based on the full extent of the selected city, after that the map is based on the most recent bounds when a new option is selected
-            isolate(if (is.null(input$analysis_map_weighted_avg_bounds)) {
-                analysis_map_weighted_avg <- analysis_map_weighted_avg %>%
+            isolate(if (is.null(input$analysis_map_aggregated_scores_bounds)) {
+                analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>%
                     fitBounds(lng1 = bounds_city[[1]],
                               lat1 = bounds_city[[2]],
                               lng2 = bounds_city[[3]],
                               lat2 = bounds_city[[4]])
             } else { # maintain the current view
-                analysis_map_weighted_avg <- analysis_map_weighted_avg %>%
-                    setView(lng = mean(c(input$analysis_map_weighted_avg_bounds$west, input$analysis_map_weighted_avg_bounds$east)),
-                            lat = mean(c(input$analysis_map_weighted_avg_bounds$north, input$analysis_map_weighted_avg_bounds$south)),
-                            zoom = input$analysis_map_weighted_avg_zoom)
+                analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>%
+                    setView(lng = mean(c(input$analysis_map_aggregated_scores_bounds$west, input$analysis_map_aggregated_scores_bounds$east)),
+                            lat = mean(c(input$analysis_map_aggregated_scores_bounds$north, input$analysis_map_aggregated_scores_bounds$south)),
+                            zoom = input$analysis_map_aggregated_scores_zoom)
             })
             
         # # create a button to center the map on selected city
-        #     analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+        #     analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
         #         addEasyButton(easyButton(
         #             icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
         #             onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
@@ -3349,14 +3563,19 @@ server <- function(input, output, session) {
                         reverse = TRUE
                     )
                 # get the dataset
-                    ces3_poly <- analysis_raw_scores %>% 
+                    ces3_poly <- if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                            analysis_raw_scores
+                        } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                            analysis_centroid_scores
+                        }
+                    ces3_poly <- ces3_poly %>%
                         filter(holc_city == input$analysis_city_selection) %>% 
                         mutate(area_calc_meters_sq = st_area(.)) %>% 
                         drop_units() %>% 
                         st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
-                        # mutate(fill_variable = ces_fill_domain)
+                    # mutate(fill_variable = ces_fill_domain)
                 # add polygons
-                    analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+                    analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
                         addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
                                     options = pathOptions(pane = "ces_polygons"),
                                     color = 'grey', # 'grey', # "#444444", 
@@ -3373,7 +3592,9 @@ server <- function(input, output, session) {
                                             ))), # ces_fill_domain),
                                     # fillColor = 'green',
                                     highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
-                                    popup = ~paste0('<b>', '<u>','Area Weighted Average CalEnviroScreen (CES) Score', '</u>','</b>','<br/>',
+                                    popup = ~paste0('<b>', '<u>','HOLC Aggregated CalEnviroScreen (CES) Score (', 
+                                                    input$analysis_aggregation_method, ')',
+                                                    '</u>','</b>','<br/>',
                                                     # '<b>', 'Census Tract: ', '</b>', 
                                                     # census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
                                                     # '<br/>',
@@ -3397,9 +3618,12 @@ server <- function(input, output, session) {
                                                     # '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
                                                     '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                                     '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
-                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
-                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
-                                                    '<br/>',
+                                                    if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                        paste0(
+                                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                            '<br/>')
+                                                    },
                                                     
                                                     
                                                     # SELECTED VARIABLE
@@ -3407,12 +3631,12 @@ server <- function(input, output, session) {
                                                     #' 'Selected CES Score (and Percentile): ',
                                                     #' #'</u>', 
                                                     #' '</b>', '<br/>', '&emsp;',
-                                                    '<b>', glue('Weighted Average {input$analysis_indicator_selection}: '), '</b>',
+                                                    '<b>', glue('Aggregated {input$analysis_indicator_selection} ({input$analysis_aggregation_method}): '), '</b>',
                                                     round(eval(as.symbol(ces_field_names %>% 
                                                                        filter(name == input$analysis_indicator_selection) %>%
-                                                                       pull(ces_variable))), 1)
+                                                                       pull(ces_variable))), 2)
                                     ),
-                                    group = 'Weighted Average Score') 
+                                    group = 'HOLC Aggregated Score') 
 
         # Add the HOLC (redline) polygon outlines
             # Create the color palette for the Redline scores
@@ -3420,7 +3644,7 @@ server <- function(input, output, session) {
                                                    domain = redline_polygons$holc_grade, 
                                                    levels = c('A', 'B', 'C', 'D'))
             # add polygons
-            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+            analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
                 # addPolygons(data = redline_analysis_data() %>% 
                 addPolylines(data = redline_analysis_data() %>% 
                                 st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
@@ -3428,7 +3652,7 @@ server <- function(input, output, session) {
                                 {.},
                             options = pathOptions(pane = "redline_polygons_pane"),
                             color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-                            weight = 1.0,
+                            weight = 2.0,
                             smoothFactor = 1.0,
                             opacity = 1.0,
                             # fill = FALSE,
@@ -3442,9 +3666,12 @@ server <- function(input, output, session) {
                                             '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
                                             '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
-                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
-                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
-                                            '<br/>',
+                                            if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                paste0(
+                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                    '<br/>')
+                                            },
                                             # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
                                             '<b>', 'HOLC Form Link: ', '</b>', 
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
@@ -3454,7 +3681,7 @@ server <- function(input, output, session) {
                 )
             
         # add the legend
-            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+            analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
                 addLegend(position = 'bottomright',
                           pal = ces_leaflet_pal,
                           values = ces_pal_domain, # ces3_poly$fill_variable,
@@ -3465,17 +3692,17 @@ server <- function(input, output, session) {
                           title = paste0('CalEnviroScreen'))
         
         # Add controls to select the basemap and layers
-            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+            analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
                 addLayersControl(# baseGroups = basemap_options,
-                                 overlayGroups = c('HOLC Polygons', 'Weighted Average Score', 'Legend'),
+                                 overlayGroups = c('HOLC Polygons', 'HOLC Aggregated Score', 'Legend'),
                                  options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
             
         # Hide some groups by default (can be turned on with the layers control box on the map)
-            analysis_map_weighted_avg <- analysis_map_weighted_avg %>% 
+            analysis_map_aggregated_scores <- analysis_map_aggregated_scores %>% 
                 hideGroup(c('Legend')) #, 'HOLC Polygons'))
         
         # output the map object
-            analysis_map_weighted_avg
+            analysis_map_aggregated_scores
     })
     
     # Observer to respond to zoom / pan of left side map and apply to other 3 maps
@@ -3495,7 +3722,7 @@ server <- function(input, output, session) {
                               coords_analysis$east,
                               coords_analysis$north)
 
-                proxy_analysis_3 <- leafletProxy('analysis_map_weighted_avg') %>%
+                proxy_analysis_3 <- leafletProxy('analysis_map_aggregated_scores') %>%
                     fitBounds(coords_analysis$west,
                               coords_analysis$south,
                               coords_analysis$east,
@@ -3505,7 +3732,7 @@ server <- function(input, output, session) {
     
     
     # output$analysis_map_facet <- renderLeaflet({    
-    analysis_map_facet <- function(map_grade, allow_zoom_pan) {
+    analysis_map_facet <- function(map_grade, allow_zoom_pan, show_center_button) {
         # map_facet <- renderLeaflet({
             
         # get variable values
@@ -3554,15 +3781,17 @@ server <- function(input, output, session) {
             # }
             )
             
-        # # create a button to center the map on selected city
-        #     map_facet <- map_facet %>% 
-        #         addEasyButton(easyButton(
-        #             icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
-        #             onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
-        #                               round(bounds_city[[2]],4)-0.01, ', ',
-        #                               round(bounds_city[[1]],4)-0.01, '],[',
-        #                               round(bounds_city[[4]],4)+0.01, ', ',
-        #                               round(bounds_city[[3]],4)+0.01, ']]); }'))))
+        # create a button to center the map on selected city
+            if (show_center_button == TRUE) {
+                map_facet <- map_facet %>%
+                    addEasyButton(easyButton(
+                        icon="fa-globe", title=glue('Zoom to {input$analysis_city_selection}'),
+                        onClick=JS(paste0('function(btn, map){ map.fitBounds([[',
+                                          round(bounds_city[[2]],4)-0.01, ', ',
+                                          round(bounds_city[[1]],4)-0.01, '],[',
+                                          round(bounds_city[[4]],4)+0.01, ', ',
+                                          round(bounds_city[[3]],4)+0.01, ']]); }'))))
+            }
             
         # Create the color palette for the Redline scores
             redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'gold1', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
@@ -3588,7 +3817,12 @@ server <- function(input, output, session) {
                         reverse = TRUE
                     )
                 # get the dataset
-                    ces3_poly <- analysis_raw_scores %>% 
+                    ces3_poly <- if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                            analysis_raw_scores
+                        } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                            analysis_centroid_scores
+                        }
+                    ces3_poly <- ces3_poly %>% 
                         filter(holc_grade == map_grade) %>% 
                         filter(holc_city == input$analysis_city_selection) %>% 
                         mutate(area_calc_meters_sq = st_area(.)) %>% 
@@ -3600,7 +3834,7 @@ server <- function(input, output, session) {
                         addPolygons(data = ces3_poly, # ces3_poly %>% filter(California_County == cities_counties[[input$city_selected_1]]), 
                                     options = pathOptions(pane = "ces_polygons"),
                                     color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-                                    weight = 0.5,
+                                    weight = 1,
                                     smoothFactor = 1.0,
                                     opacity = 1.0,
                                     fillOpacity = 0.9,
@@ -3613,7 +3847,10 @@ server <- function(input, output, session) {
                                             ))), # ces_fill_domain),
                                     # fillColor = 'green',
                                     highlightOptions = highlightOptions(color = "white", weight = 2), # fill = TRUE, fillColor = "white"),#, bringToFront = TRUE
-                                    popup = ~paste0('<b>', '<u>','Area Weighted Average CalEnviroScreen (CES) Score', '</u>','</b>','<br/>',
+                                    popup = ~paste0('<b>', '<u>',
+                                                    'HOLC Aggregated CalEnviroScreen (CES) Score (', 
+                                                    input$analysis_aggregation_method, ')',
+                                                    '</u>','</b>','<br/>',
                                                     # '<b>', 'Census Tract: ', '</b>', 
                                                     # census_tract, #eval(as.symbol(ces_field_names %>% filter(id == 'tract') %>% pull(ces_variable))),
                                                     # '<br/>',
@@ -3637,9 +3874,12 @@ server <- function(input, output, session) {
                                                     # '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
                                                     '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                                     '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
-                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
-                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
-                                                    '<br/>',
+                                                    if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                        paste0(
+                                                            '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                            format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                            '<br/>')
+                                                    },
                                                     
                                                     
                                                     # SELECTED VARIABLE
@@ -3647,12 +3887,13 @@ server <- function(input, output, session) {
                                                     #' 'Selected CES Score (and Percentile): ',
                                                     #' #'</u>', 
                                                     #' '</b>', '<br/>', '&emsp;',
-                                                    '<b>', glue('Weighted Average {input$analysis_indicator_selection}: '), '</b>',
+                                                    '<b>', glue('Aggregated {input$analysis_indicator_selection} ({input$analysis_aggregation_method}): '), 
+                                                    '</b>',
                                                     round(eval(as.symbol(ces_field_names %>% 
                                                                        filter(name == input$analysis_indicator_selection) %>%
-                                                                       pull(ces_variable))), 1)
+                                                                       pull(ces_variable))), 2)
                                     ),
-                                    group = 'Weighted Average Score') 
+                                    group = 'HOLC Aggregated Score') 
 
         # Add the HOLC (redline) polygon outlines
             # # add polygons
@@ -3704,7 +3945,7 @@ server <- function(input, output, session) {
         # Add controls to select the basemap and layers
             map_facet <- map_facet %>% 
                 addLayersControl(# baseGroups = basemap_options,
-                                 overlayGroups = c('Weighted Average Score', 'Legend'), # 'HOLC Polygons'
+                                 overlayGroups = c('HOLC Aggregated Score', 'Legend'), # 'HOLC Polygons'
                                  options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
             
         # Hide some groups by default (can be turned on with the layers control box on the map)
@@ -3715,11 +3956,11 @@ server <- function(input, output, session) {
             return(map_facet)
             
     }
-    
-    output$analysis_map_facet_A <- renderLeaflet({analysis_map_facet('A', TRUE)})
-    output$analysis_map_facet_B <- renderLeaflet({analysis_map_facet('B', FALSE)})
-    output$analysis_map_facet_C <- renderLeaflet({analysis_map_facet('C', FALSE)})
-    output$analysis_map_facet_D <- renderLeaflet({analysis_map_facet('D', FALSE)})
+
+    output$analysis_map_facet_A <- renderLeaflet({analysis_map_facet(map_grade = 'A', allow_zoom_pan = TRUE, show_center_button = TRUE)})
+    output$analysis_map_facet_B <- renderLeaflet({analysis_map_facet(map_grade = 'B', allow_zoom_pan = FALSE, show_center_button = FALSE)})
+    output$analysis_map_facet_C <- renderLeaflet({analysis_map_facet(map_grade = 'C', allow_zoom_pan = FALSE, show_center_button = FALSE)})
+    output$analysis_map_facet_D <- renderLeaflet({analysis_map_facet(map_grade = 'D', allow_zoom_pan = FALSE, show_center_button = FALSE)})
 
 
 # Observer to respond to zoom / pan of upper left side map and apply to other 3 maps
