@@ -385,7 +385,7 @@ options(scipen = 999)
                                                 'Yolo', 'San Diego', 'San Francisco', 
                                                 'Santa Clara','San Joaquin'))
                     
-            st_write(obj = ces3_poly_centroid[ca_counties,] %>% select(census_tract, geom),
+            st_write(obj = ces3_poly_centroid[ca_counties,], # %>% select(census_tract, geom),
                      here('data_processed-analysis', 
                           'ces_centroids.gpkg'),
                      append = FALSE)

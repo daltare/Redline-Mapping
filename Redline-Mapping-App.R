@@ -203,12 +203,14 @@
     # read data for the Redline-CES analysis
         analysis_clipped_ces <- st_read('data_processed-analysis/ces_clipped_to_holc_bounds.gpkg')
         analysis_raw_scores <- st_read('data_processed-analysis/holc_area_weighted_scores.gpkg')
+            analysis_raw_scores <- analysis_raw_scores %>% mutate(geom_centroid = st_centroid(.))
         analysis_departure_scores <- st_read('data_processed-analysis/departure-area_weighted_scores.gpkg')
         analysis_citywide_scores <- st_read('data_processed-analysis/citywide_avg-area_weighted_scores.gpkg')
         analysis_z_scores <- st_read('data_processed-analysis/z_scores-area_weighted_scores.gpkg')
         
         # centroid scores / info
             analysis_centroid_scores <- st_read('data_processed-analysis/holc_centroid_scores.gpkg')
+                analysis_centroid_scores <- analysis_centroid_scores %>% mutate(geom_centroid = st_centroid(.))
             analysis_centroid_departure_scores <- st_read('data_processed-analysis/departure-centroid_scores.gpkg')
             analysis_ces_centroids <- st_read('data_processed-analysis/ces_centroids.gpkg')
             analysis_holc_centroids <- st_read('data_processed-analysis/redline_polygons_centroid.gpkg')
@@ -273,7 +275,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                      label = 'Zoom To:', 
                                      choices = c('Statewide', unique(redline_polygons$holc_city)), 
                                      selected = 'Statewide'), # 'All'
-                         hr(style="border: 1px solid darkgrey"),
+                         hr(style = "border: 1px solid darkgrey"),
                          h4('CalEPA Regulated Sites:'),
                          # checkboxGroupInput(inputId = 'site_type_1', 
                          #                    label = 'Select CalEPA Regulated Site Types:', 
@@ -306,7 +308,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          #                                   'C (Definitely Declining)' = 'C',
                          #                                   'D (Hazardous)' = 'D'),
                          #                    selected = c('A','B','C','D')),
-                         hr(style="border: 1px solid darkgrey"),
+                         hr(style = "border: 1px solid darkgrey"),
                          h4('Redlining Data:'),
                          tags$b('Filter For Sites Within HOLC Assessed Areas:'),
                          switchInput(inputId = 'holc_rating_sites_filter_on_off', 
@@ -329,7 +331,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                                                   'Sacramento', 'San Diego', 'San Francisco',
                                                   'San Jose', 'Stockton'),
                                      multiple = TRUE),
-                         hr(style="border: 1px solid darkgrey"),
+                         hr(style = "border: 1px solid darkgrey"),
                          h4('Environmental, Public Health, & Socieconomic Data:'),
                          selectInput(inputId = 'ces_parameter', 
                                      label = 'Select CalEnviroScreen (CES) Parameter:', 
@@ -339,7 +341,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          #             label = 'Filter Sites By Score of Selected CES Parameter:', 
                          #             min = 0, max = 100, value = c(0,100)),
                          uiOutput('ces_range_filter'),
-                         hr(style="border: 1px solid darkgrey"),
+                         hr(style = "border: 1px solid darkgrey"),
                          h4('CalEPA Regulatory Actions:'),
                          dateRangeInput2(inputId = "sites_date_range", 
                                          label = "Select Date Range For Inspections, Violations, & Enforcement Actions:*", 
@@ -371,7 +373,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          #             label = 'Filter Sites By Program Type:',
                          #             multiple = TRUE,
                          #             choices = program_types_distinct)
-                         hr(style="border: 1px solid darkgrey"),
+                         hr(style = "border: 1px solid darkgrey"),
                          h4('Additional Map Layers:'),
                          selectInput(inputId = 'additional_map_layers',
                                      label = 'Select Layers:',
@@ -388,7 +390,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                 # Main panel for displaying outputs 
                 mainPanel(
                     fluidRow(
-                        div(style="display:inline-block;vertical-align:top;",
+                        div(style = "display:inline-block;vertical-align:top;",
                             # actionButton("toggleSidebar", "Toggle sidebar"),
                             actionButton("showpanel", "Show/Hide Sidebar", 
                                          class = "buttonstyle", icon = icon('bars'), 
@@ -403,21 +405,21 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         )
                     ),
                     fluidRow(
-                        column(6, 
+                        column(width = 6, 
                                #tags$h5('CalEPA Data:', style = 'padding:4px;'),
                                p(tags$b('CalEPA Data:'), style = 'padding:1px;'),
                                leafletOutput(outputId = 'map1', height = 700) %>% withSpinner(color="#0dc5c1")),
-                        column(6, 
+                        column(width = 6, 
                                # tags$h5('HOLC (Redline) Data:', style = 'padding:4px;'),
                                p(tags$b('HOLC (Redline) Data:'), style = 'padding:1px;'),
                                leafletOutput(outputId = 'map2', height = 700) %>% withSpinner(color="#0dc5c1"))
                     ),
                     fluidRow(
-                        hr(style="border: 3px solid darkgrey"),
+                        hr(style = "border: 3px solid darkgrey"),
                         h4('Tabular Data For Selected Sites & Regulatory Actions:')
                     ),
                     fluidRow(
-                        div(style="display:inline-block;vertical-align:top;",
+                        div(style = "display:inline-block;vertical-align:top;",
                             p('Download all supporting regulatory data: ', style = 'display:inline'), HTML('&emsp;'),
                             downloadButton('downloadInspections', 'Inspection Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;'),
                             downloadButton('downloadViolations', 'Violation Data', class = "buttonstyle", style = 'display:inline'), HTML('&emsp;'),
@@ -426,7 +428,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                     ),
                     fluidRow(
                         hr(),
-                        div(style="display:inline-block;vertical-align:top;",
+                        div(style = "display:inline-block;vertical-align:top;",
                             p('Download data in the table below: ', style = 'display:inline'), HTML('&emsp;'),  
                             downloadButton('download_summary', 'Download Data', class = "buttonstyle"), HTML('&emsp;')
                         ),
@@ -439,16 +441,36 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
     tabPanel('Redline-CES Analysis', 
              icon = icon('chart-bar'),
              fluidRow(
-                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                 column(width = 12, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px', 
+                        offset = 0,
                         # p('Working on it...'),
                         h3('Redline-CalEnviroScreen Analysis'),
                         #  --------------------- INTRODUCTORY TEXT ---------------------
-                        p('This section investigates potential correlations between: '),
-                        tags$li('Residential Security (i.e., Redline) maps created by the federal government\'s Home Owners’ 
-                        Loan Corporation (HOLC) in major California cities in the 1930s, and'),
-                        tags$li('current measures of public health, environmental conditions, and socioeconomic 
-                        characteristics in areas assessed by the HOLC maps.'),
-                        br(),
+                        p('This section investigates potential correlations between: (1) Residential 
+                          Security (i.e., Redline) maps created by the federal government\'s 
+                          Home Owners’ Loan Corporation (HOLC) in major California cities in 
+                          the 1930s, and (2) current measures of public health, environmental 
+                          conditions, and socioeconomic characteristics in areas assessed by the 
+                          HOLC maps.'),
+                        # p('This section investigates potential correlations between: '),
+             #            )
+             #     ),
+             # fluidRow(
+             #     column(width = 12, 
+             #            style = 'padding-left:20px; padding-right:9px; padding-top:0px; padding-bottom:5px',
+             #            offset = 0,
+             #            tags$li('Residential Security (i.e., Redline) maps created by the federal government\'s Home Owners’ 
+             #            Loan Corporation (HOLC) in major California cities in the 1930s, and'),
+             #            tags$li('current measures of public health, environmental conditions, and socioeconomic 
+             #            characteristics in areas assessed by the HOLC maps.'),
+             #            br()
+             #     )
+             # ),
+             # fluidRow(
+             #     column(width = 12, 
+             #            style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+             #            offset = 0,
                         p('The HOLC maps evaluated mortgage lending risk in different neighborhoods within 
                          each city on a scale of A through D (A = "Best", B = "Still Desirable", C = "Definitely 
                          Declining", D = "Hazardous"), and relied in part on explicit assessments of the racial and 
@@ -489,43 +511,46 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                           is described in more detail in the section below and shown in the accompanying maps. The 
                           aggregated scores at the HOLC polygon level are then used in the plots in the following 
                           section to analyze potential patterns and relationships between current conditions 
-                          and historical HOLC ratings.'), 
-                        p('Select a CES indicator to analyze, and a method for aggregating CES scores at the 
-                          HOLC polygon level:'),
-                        div(style="display:inline-block;vertical-align:top;",
+                          and historical HOLC ratings.'),
+                        # hr(),
+                        h4('Inputs'),
+                        p('For the analysis below, select a CES indicator to analyze, and a method for aggregating CES scores at the 
+                          HOLC polygon level:')
+                        )
+                 ), 
+                fluidRow(
+                    #  --------------------- INPUTS ---------------------
+                    column(width = 11,
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        offset = 1,
+                        div(style = "display:inline-block;vertical-align:top;",
                             selectInput(inputId = 'analysis_indicator_selection',
-                                        label = 'Select a CalEnviroScreen Indicator:',
+                                        label = 'Select a CES Indicator:',
                                         choices = ces_choices %>% filter(type == 'score') %>% pull(name),
                                         selected = ces_choices$name[1], 
                                         multiple = FALSE)),
-                        div(style="display:inline-block;vertical-align:top;",
+                        div(style = "display:inline-block;vertical-align:top;",
                             HTML('&emsp;')),
-                        div(style="display:inline-block;vertical-align:top;", 
+                        div(style = "display:inline-block;vertical-align:top;", 
                             selectInput(inputId = 'analysis_aggregation_method', 
                                         label = 'Select a CES Score Aggregation Method:',
                                         choices = c('Area Weighted Average', 'Nearest Centroid'),
                                         selected = c('Area Weighted Average'),
-                                        multiple = FALSE)),
-                        hr(style="border: 3px solid darkgrey"),
-                        #  --------------------- INPUTS ---------------------
-                        # h4('Inputs'),
-                        # p('Select a CES indicator to analyze, and a city to display in the maps below:'),
-                        # div(style="display:inline-block;vertical-align:top;",
-                        #     HTML('&emsp;')),
-                        # div(style="display:inline-block;vertical-align:top;",
-                        #     selectInput(inputId = 'analysis_city_selection',
-                        #                 label = 'Select a City (applies to maps only):',
-                        #                 choices = unique(redline_polygons$holc_city),
-                        #                 selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
-                        #                 multiple = FALSE)),
-                        # hr(style="border: 3px solid darkgrey"),
+                                        multiple = FALSE))
+                    )
+                ),
+             fluidRow(
+                    column(width = 12,
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        offset = 0,
                         #  --------------------- ANALYSIS MAPS ---------------------
+                        hr(style = "border: 3px solid darkgrey"),
                         h4('Aggregation of CES Scores by HOLC Map Polygons:'),
                         p('The areas delineated in the HOLC maps and the census tracts used to assign the CES 
                            scores have different coverages, as shown in the maps below. There are multiple 
                            methods that could be used to approximate a CES score for each polygon in the HOLC 
-                           maps, such as area weighted average, nearest centroid, or weighted average
-                          by road length.'),
+                           maps, such as area weighted average or nearest centroid'),
+                           # ', or weighted average by road length.'),
                         p('An area weighted average method identifies the portions of the CES polygons 
                            that overlap each HOLC polygon, then computes the area weighted average of those 
                            overlapping portions of CES polygons. The maps below demonstrate this method: (1) the 
@@ -536,21 +561,25 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                            overlap with the HOLC polygons, and (4) the right pane shows the aggregated CES
                            scores for each HOLC polygon.'),
                         p('The nearest centroid method matches each HOLC polygon with a single CES polygon by
-                          matching the centroid of each HOLC polygon with the nearest centroid of a CES polygon.
-                          If this method is selected, the map in the third pane (from left) shows the centroids of
-                          all HOLC polgons (points colored by HOLC grade) and CES polygons (grey colored points) and
-                          the nearest HOLC-CES centroid pairs (grey lines).'),
-                        p('Select a city to display in the maps below:'),
-                        # div(style="display:inline-block;vertical-align:top;",
+                          matching that HOLC polygon\'s centroid with the nearest centroid of a CES polygon.
+                          When this method is selected, the map in the third pane from left (3) shows the centroids of
+                          all HOLC polgons (shown as points colored by HOLC grade), centroids of CES polygons 
+                          (shows as grey colored points), and the matched HOLC-CES centroid pairs (showns as 
+                          grey lines).'),
+                        # p('Select a city to display in the maps below:'),
+                        # div(style = "display:inline-block;vertical-align:top;",
                         #     HTML('&emsp;')),
-                        # div(style="display:inline-block;vertical-align:top;",
+                        div(style = "display:inline-block;vertical-align:top;",
                             selectInput(inputId = 'analysis_city_selection',
-                                        label = 'Select a City to View (applies to maps only):',
+                                        label = 'Select a City to Display in the Maps Below:',
                                         choices = unique(redline_polygons$holc_city),
                                         selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
-                                        multiple = FALSE),
-                            # ),
-                        p('NOTE: use the left side map to pan/zoom all maps')
+                                        multiple = FALSE)#,
+                            ),
+                        # div(style = "display:inline-block;vertical-align:top;",
+                        #     HTML('&emsp;')),
+                        div(style = "display:inline-block;vertical-align:top;",
+                            p(tags$b('(NOTE: use the left side pane to pan/zoom all panes)')))
                         # (for example, if an HOLC polygon with an area of 200 units 
                         #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
                         #   overlapping area of 120 units, and B has a score of 50 and an overlapping area of 80 
@@ -560,55 +589,104 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
              ),
              # INSERT MAPS
              fluidRow(
-                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                 column(width =  3, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px; text-align:center;',
+                        p(tags$b('(1) HOLC Polygons:')),
                         leafletOutput('analysis_map_holc') %>% withSpinner(color="#0dc5c1")
                  ),
-                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                 column(width =  3, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px; text-align:center',
+                        p(tags$b('(2) HOLC & CES Polygons:')),
                         leafletOutput('analysis_map_overlap') %>% withSpinner(color="#0dc5c1")
                  ),
-                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                 column(width =  3, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px; text-align:center',
+                        uiOutput('map_3_text'),
                         leafletOutput('analysis_map_intersection') %>% withSpinner(color="#0dc5c1")
                  ),
-                 column(3, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px',
+                 column(width =  3, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px; text-align:center',
+                        p(tags$b('(4) Aggregated CES Scores by HOLC Polygon:')),
                         leafletOutput('analysis_map_aggregated_scores') %>% withSpinner(color="#0dc5c1")
                  )
              ),
              fluidRow(
-                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                     hr(style="border: 1px solid darkgrey"),
+                 column(width = 12, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                     hr(style = "border: 1px solid darkgrey"),
                      p('The maps below show the aggregated CES score for each HOLC polygon (from the 
-                       right-side plot above), separated by HOLC grade (NOTE: use the upper-left 
-                       pane to pan/zoom).')
+                       right-side plot above), separated by HOLC grade.')
                  )
              ), 
              fluidRow(
+                 # title
+                 column(width = 10, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:2px; padding-bottom:2px', 
+                        offset = 2,
+                        div(style = "display:inline-block;vertical-align:top;",
+                            p(tags$b('Aggregated CES Scores by HOLC Polygon (use the upper-left 
+                       pane to pan/zoom all panes):')),
+                            # h5('Aggregated CES Scores by HOLC Polygon:')
+                            # h4('Aggregated CES Scores by HOLC Polygon:')
+                        )# ,
+                        # div(style = "display:inline-block;vertical-align:top;",
+                        #     HTML('&emsp;')
+                        # ),
+                        # div(style = "display:inline-block;vertical-align:top;",
+                        #     checkboxInput(inputId = 'facet_map_labels', 
+                        #                   label = 'Show score labels', 
+                        #                   value = FALSE)
+                        # )
+                 )
+             ),
+             fluidRow(
                  # A
-                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 2,
-                        p(tags$b('HOLC Grade: A')),
+                 column(width = 4, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:0px; padding-bottom:0px; text-align:center;', 
+                        offset = 2,
+                        p(tags$b('HOLC Grade A (Best)')),
                         leafletOutput('analysis_map_facet_A', height = 300) %>% withSpinner(color="#0dc5c1")
                  ),
                  # B
-                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 0,
-                        p(tags$b('HOLC Grade: B')),
+                 column(width = 4, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:0px; padding-bottom:0px; text-align:center;', 
+                        offset = 0,
+                        p(tags$b('HOLC Grade B (Still Desirable)')),
                         leafletOutput('analysis_map_facet_B', height = 300) %>% withSpinner(color="#0dc5c1")
                  )
              ),
              fluidRow(
                  # C
-                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 2,
-                        p(tags$b('HOLC Grade: C')),
+                 column(width = 4, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:10px; padding-bottom:0px; text-align:center;', 
+                        offset = 2,
+                        p(tags$b('HOLC Grade C (Definitely Declining)')),
                         leafletOutput('analysis_map_facet_C', height = 300) %>% withSpinner(color="#0dc5c1")
                  ),
                  # D
-                 column(4, style='padding-left:2px; padding-right:2px; padding-top:5px; padding-bottom:5px', offset = 0,
-                        p(tags$b('HOLC Grade: D')),
+                 column(width = 4, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:10px; padding-bottom:0px; text-align:center;', 
+                        offset = 0,
+                        p(tags$b('HOLC Grade D (Hazardous)')),
                         leafletOutput('analysis_map_facet_D', height = 300) %>% withSpinner(color="#0dc5c1")
+                 )
+             ),
+             fluidRow(
+                 column(width = 10, 
+                        style = 'padding-left:2px; padding-right:2px; padding-top:2px; padding-bottom:2px', 
+                        offset = 2,
+                        div(style = "display:inline-block;vertical-align:top;",
+                            checkboxInput(inputId = 'facet_map_labels',
+                                          label = 'Show score labels',
+                                          value = FALSE)
+                        )
                  )
              ),
              #  --------------------- ANALYSIS PLOTS ---------------------
              fluidRow(
-                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        hr(style="border: 3px solid darkgrey"),
+                 column(width = 12, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        hr(style = "border: 3px solid darkgrey"),
                         h4('Analysis of CES scores by HOLC grade:'),
                         # DOT PLOTS BY CITY (RAW AND DEPARTURE SCORES - NOT FACETED)
                         p('In the plots below, each point represents an individual polygon in the HOLC maps. 
@@ -630,26 +708,28 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                  )
              ),
              fluidRow(
-                 column(6, 
-                        style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                 column(width = 6, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
                         plotOutput('plot_point_raw')),
-                 column(6, 
-                        style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px', 
+                 column(width = 6, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px', 
                         plotOutput('plot_point_departures'))
              ),
              # fluidRow(
              #     # plotOutput('plot_raw_scores_cities'),
              # ),
              fluidRow(
-                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        # hr(style="border: 1px solid darkgrey"),
+                 column(width = 12, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        # hr(style = "border: 1px solid darkgrey"),
                         # FACETED DOT PLOT (BY CITY AND HOLC GRADE) - DEPARTURES
                         plotOutput('plot_departures_cities'),
                  )
              ),
              fluidRow(
-                 column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        hr(style="border: 1px solid darkgrey"),
+                 column(width = 12, 
+                        style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        hr(style = "border: 1px solid darkgrey"),
                         # BOX PLOT
                         p('The box plot below displays the distribution of the \"departure\" scores (represented in the plot
                above) across all cities, grouped by HOLC grade. Each of the dots represents an 
@@ -661,26 +741,28 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         )
                  ),
              fluidRow(
-                 column(12, style='padding-left:100px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        div(style="display:inline-block;vertical-align:center;",
+                 column(width = 12, 
+                        style = 'padding-left:100px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        div(style = "display:inline-block;vertical-align:center;",
                             p(tags$b('Adjust axis range: '))),
-                        div(style="display:inline-block;vertical-align:center;",
+                        div(style = "display:inline-block;vertical-align:center;",
                             HTML('&emsp;')),
-                        div(style="display:inline-block;vertical-align:center;",
+                        div(style = "display:inline-block;vertical-align:center;",
                             numericInput(inputId = 'boxplot_axis_min', 
                                          label = 'Axis Minimum Value: ',
                                          value = NULL)),
-                        div(style="display:inline-block;vertical-align:center;",
+                        div(style = "display:inline-block;vertical-align:center;",
                             HTML('&emsp;')),
-                        div(style="display:inline-block;vertical-align:center;",
+                        div(style = "display:inline-block;vertical-align:center;",
                             numericInput(inputId = 'boxplot_axis_max', 
                                          label = 'Axis Maximum Value: ', 
                                          value = NULL))
                  )
              ),
              fluidRow(
-                  column(12, style='padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
-                        hr(style="border: 1px solid darkgrey"),
+                  column(width = 12, 
+                         style = 'padding-left:9px; padding-right:9px; padding-top:5px; padding-bottom:5px',
+                        hr(style = "border: 1px solid darkgrey"),
                         # DOT PLOT OF AVERAGES
                         p('The plot below shows the average departure score for each HOLC class within
                each city.'), # the size of the dots represent the number of HOLC polygons in that class/city?
@@ -829,6 +911,15 @@ server <- function(input, output, session) {
         toggle(id = 'site_type_1',
                condition = input$sites_source == 'Select By Type (Source: CalEPA Geoserver)')
       })
+    
+    # create text output for map panel 3
+        output$map_3_text <- renderUI({
+            if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                p(tags$b('(3) HOLC / CES Polygon Overlap:'))
+            } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                p(tags$b('(3) HOLC / CES Centroid Matching:'))
+            }
+        })
 
     # get reactive values (to isolate from each other and prevent map from completely rebuilding when an input is changed) 
         # regional board boundary containing the selected city ----
@@ -3425,14 +3516,30 @@ server <- function(input, output, session) {
                                      options = pathOptions(pane = 'ces_centroids_pane'),
                                      radius = 3,
                                      stroke = TRUE,
-                                     color = 'grey',
+                                     color = 'grey', # 'black', # 'darkgrey', # 'grey',
                                      weight = 0.5,
                                      opacity = 1.0,
                                      fill = TRUE,
-                                     fillColor = 'grey',
+                                     fillColor = 'grey', # 'black', # 'darkgrey', # 'grey',
                                      fillOpacity = 1,
                                      popup = ~paste0('<b>', '<u>', paste0('CES Polygon Centroid'), '</u>', '</b>','<br/>',
-                                            '<b>', 'Census Tract: ', '</b>', census_tract, '<br/>'
+                                            '<b>', 'Census Tract: ', '</b>', census_tract, '<br/>',
+                                            # SELECTED VARIABLE
+                                                    '<b>', glue('{input$analysis_indicator_selection}: '), '</b>',
+                                                    eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))),
+                                                    '<br/>', # '&emsp;', 
+                                                    '<b>', 
+                                                    str_replace(string = input$analysis_indicator_selection,
+                                                                                                      pattern = 'Score', 
+                                                                                                      replacement = 'Percentile: '),
+                                                    '</b>',
+                                                    eval(as.symbol(ces_field_names %>%
+                                                                           filter(name == str_replace(string = input$analysis_indicator_selection,
+                                                                                                      pattern = 'Score', 
+                                                                                                      replacement = 'Percentile')) %>%
+                                                                           pull(ces_variable)))
                                             ),
                                      group = 'CES Centroids'
                                      )
@@ -3445,7 +3552,7 @@ server <- function(input, output, session) {
                                      st_transform(crs = geographic_crs),
                                  options = pathOptions(pane = 'connecting_lines_pane'),
                                  stroke = TRUE,
-                                 color = 'grey',
+                                 color = 'grey', # 'black', # '#666666', # 'grey',
                                  weight = 2,
                                  opacity = 1.0,
                                  # fill = TRUE,
@@ -3880,8 +3987,6 @@ server <- function(input, output, session) {
                                                             format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
                                                             '<br/>')
                                                     },
-                                                    
-                                                    
                                                     # SELECTED VARIABLE
                                                     #' '<b>', #'<u>',
                                                     #' 'Selected CES Score (and Percentile): ',
@@ -3893,43 +3998,16 @@ server <- function(input, output, session) {
                                                                        filter(name == input$analysis_indicator_selection) %>%
                                                                        pull(ces_variable))), 2)
                                     ),
-                                    group = 'HOLC Aggregated Score') 
-
-        # Add the HOLC (redline) polygon outlines
-            # # add polygons
-            # map_facet <- map_facet %>% 
-            #     # addPolygons(data = redline_analysis_data() %>% 
-            #     addPolylines(data = redline_analysis_data() %>% 
-            #                      filter(holc_grade == map_grade) %>% 
-            #                      st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
-            #                      # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
-            #                      {.},
-            #                 options = pathOptions(pane = "redline_polygons_pane"),
-            #                 color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
-            #                 weight = 0.5,
-            #                 smoothFactor = 1.0,
-            #                 opacity = 1.0,
-            #                 # fill = FALSE,
-            #                 fill = FALSE,
-            #                 # fillOpacity = 0, # input$redline_fill_1,
-            #                 # fillColor = 'lightgrey',
-            #                 # fillColor = ~redline_leaflet_pal(holc_grade),
-            #                 highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
-            #                 popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
-            #                                 '<b>', 'City: ', '</b>', holc_city, '<br/>',
-            #                                 '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
-            #                                 '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
-            #                                 '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
-            #                                 '<b>', 'Area (1000 sq meters): ', '</b>', 
-            #                                 format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
-            #                                 '<br/>',
-            #                                 # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
-            #                                 '<b>', 'HOLC Form Link: ', '</b>', 
-            #                                 paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
-            #                                 # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
-            #                 ),
-            #                group = 'HOLC Polygons'
-            #    )
+                                    group = 'HOLC Aggregated Score'# ,
+                                    # label = ~paste0('<b>', glue('Aggregated {input$analysis_indicator_selection} ({input$analysis_aggregation_method}): '), 
+                                    #                 '</b>',
+                                    #                 round(eval(as.symbol(ces_field_names %>%
+                                    #                                          filter(name == input$analysis_indicator_selection) %>%
+                                    #                                          pull(ces_variable))), 2)
+                                    # )# ,
+                                    # labelOptions = labelOptions(noHide = if(input$facet_map_labels == TRUE) {TRUE} else {FALSE},
+                                    #                             textOnly = TRUE)
+                        ) 
             
         # add the legend
             map_facet <- map_facet %>% 
@@ -3962,6 +4040,70 @@ server <- function(input, output, session) {
     output$analysis_map_facet_C <- renderLeaflet({analysis_map_facet(map_grade = 'C', allow_zoom_pan = FALSE, show_center_button = FALSE)})
     output$analysis_map_facet_D <- renderLeaflet({analysis_map_facet(map_grade = 'D', allow_zoom_pan = FALSE, show_center_button = FALSE)})
 
+    # proxy to add / remove labels
+        observe({
+                # get the dataset
+                    ces3_poly <- if (input$analysis_aggregation_method == 'Area Weighted Average') {
+                            analysis_raw_scores
+                        } else if (input$analysis_aggregation_method == 'Nearest Centroid') {
+                            analysis_centroid_scores
+                        }
+                    ces3_poly <- ces3_poly %>% 
+                        # filter(holc_grade == map_grade) %>% 
+                        filter(holc_city == input$analysis_city_selection) %>% 
+                        # mutate(area_calc_meters_sq = st_area(.)) %>% 
+                        # drop_units() %>% 
+                        st_transform(crs = geographic_crs) # %>% # have to convert to geographic coordinate system for leaflet,
+                        # mutate(fill_variable = ces_fill_domain)
+                    
+            leafletProxy('analysis_map_facet_A') %>%
+                clearMarkers() %>% 
+                addLabelOnlyMarkers(data = ces3_poly %>% 
+                                        filter(holc_grade == 'A') %>% 
+                                        st_set_geometry(.$geom_centroid$geom) %>% 
+                                        st_transform(crs = geographic_crs), 
+                                    label = ~round(eval(as.symbol(ces_field_names %>%
+                                                                      filter(name == input$analysis_indicator_selection) %>%
+                                                                      pull(ces_variable))), 2),
+                                    labelOptions = labelOptions(noHide = if(input$facet_map_labels == TRUE) {TRUE} else {FALSE},
+                                                                textOnly = TRUE))
+            leafletProxy('analysis_map_facet_B') %>%
+                clearMarkers() %>% 
+                addLabelOnlyMarkers(data = ces3_poly %>% 
+                                        filter(holc_grade == 'B') %>% 
+                                        st_set_geometry(.$geom_centroid$geom) %>% 
+                                        st_transform(crs = geographic_crs), 
+                                    label = ~round(eval(as.symbol(ces_field_names %>%
+                                                                      filter(name == input$analysis_indicator_selection) %>%
+                                                                      pull(ces_variable))), 2),
+                                    labelOptions = labelOptions(noHide = if(input$facet_map_labels == TRUE) {TRUE} else {FALSE},
+                                                                textOnly = TRUE))
+            
+            leafletProxy('analysis_map_facet_C') %>%
+                clearMarkers() %>% 
+                addLabelOnlyMarkers(data = ces3_poly %>% 
+                                        filter(holc_grade == 'C') %>% 
+                                        st_set_geometry(.$geom_centroid$geom) %>% 
+                                        st_transform(crs = geographic_crs), 
+                                    label = ~round(eval(as.symbol(ces_field_names %>%
+                                                                      filter(name == input$analysis_indicator_selection) %>%
+                                                                      pull(ces_variable))), 2),
+                                    labelOptions = labelOptions(noHide = if(input$facet_map_labels == TRUE) {TRUE} else {FALSE},
+                                                                textOnly = TRUE))
+            
+            leafletProxy('analysis_map_facet_D') %>%
+                clearMarkers() %>% 
+                addLabelOnlyMarkers(data = ces3_poly %>% 
+                                        filter(holc_grade == 'D') %>% 
+                                        st_set_geometry(.$geom_centroid$geom) %>% 
+                                        st_transform(crs = geographic_crs), 
+                                    label = ~round(eval(as.symbol(ces_field_names %>%
+                                                                      filter(name == input$analysis_indicator_selection) %>%
+                                                                      pull(ces_variable))), 2),
+                                    labelOptions = labelOptions(noHide = if(input$facet_map_labels == TRUE) {TRUE} else {FALSE},
+                                                                textOnly = TRUE))
+        })
+    
 
 # Observer to respond to zoom / pan of upper left side map and apply to other 3 maps
     # from: https://github.com/rstudio/leaflet/issues/347
