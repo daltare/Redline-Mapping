@@ -221,7 +221,7 @@
 
 
     # California Counties
-        ca_counties <- st_read('data_processed\\CA_Counties.gpkg') %>% 
+        ca_counties <- st_read('data_processed/CA_Counties.gpkg') %>% 
             clean_names()
 
 # create widget for data range input (selecting month/year only) ----
