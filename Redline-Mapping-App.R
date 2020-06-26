@@ -44,6 +44,7 @@
         library(ggplot2)
         library(glue)
         library(units)
+        library(Hmisc)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -579,7 +580,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         # div(style = "display:inline-block;vertical-align:top;",
                         #     HTML('&emsp;')),
                         div(style = "display:inline-block;vertical-align:top;",
-                            p(tags$b('(NOTE: use the left side pane to pan/zoom all panes)')))
+                            p(tags$b('(NOTE: use the left side pane to pan/zoom all panes | hover or click on map elements for more information)')))
                         # (for example, if an HOLC polygon with an area of 200 units 
                         #   overlaps portions of CES polygons A and B, where A has a score of 30 and an 
                         #   overlapping area of 120 units, and B has a score of 50 and an overlapping area of 80 
@@ -1851,7 +1852,7 @@ server <- function(input, output, session) {
                 redline_leaflet_pal <- colorFactor(palette = c('green', 'blue', 'yellow', 'red'), # 'YlOrBr'   # c("#FACD7B","#D1A149","#916714","#6B4703")
                                                    domain = redline_polygons$holc_grade,
                                                    levels = c('A', 'B', 'C', 'D'))
-            # Add polygons to map
+            # Add HOLC polygons to map
                  l_map1 <- l_map1 %>% 
                     # addPolygons(data = redline_polygons %>%
                     addPolylines(data = redline_polygons %>%
@@ -1877,7 +1878,8 @@ server <- function(input, output, session) {
                                                 '<b>', 'HOLC Form Link: ', '</b>',
                                                 paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>'), '<br/>',
                                                 '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts),
-                                group = 'HOLC Polygons'
+                                group = 'HOLC Polygons',
+                                label = ~glue('HOLC Polygon (Grade {holc_grade})')
                                 )
 
         # # Add the 303d polygons
@@ -2101,7 +2103,9 @@ server <- function(input, output, session) {
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Violation Records: ', '</b>', violations_count, '<br/>', # chr(149),
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcement_actions_count # chr(149),
                                          ),
-                                         group = 'CalEPA Regulated Sites')
+                                         group = 'CalEPA Regulated Sites',
+                                         label = ~glue('CalEPA Regulated Site (Site Name: {site_name})')
+                                         )
                 } else {
                     leafletProxy('map1') %>%
                         clearGroup('CalEPA Regulated Sites')
@@ -2364,7 +2368,13 @@ server <- function(input, output, session) {
                                                     other_percent # eval(as.symbol(ces_field_names %>% filter(id == 'Other_pct') %>% pull(ces_variable))),
                                     ),
                                     # # popupOptions = popupOptions(textsize = '15px'),
-                                    group = 'CalEnviroScreen') %>% 
+                                    group = 'CalEnviroScreen',
+                                    label = ~paste0('CES Polygon (', input$ces_parameter, ': ', 
+                                                    eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$ces_parameter) %>%
+                                                                       pull(ces_variable))), 
+                                                    ')')
+                                    ) %>% 
                         clearControls() %>%
                         addLegend(position = 'bottomright',
                                   pal = ces_leaflet_pal,
@@ -2418,7 +2428,9 @@ server <- function(input, output, session) {
                                                          '<b>', 'Listed Pollutants: ', '</b>', pollutant, '<br/>',
                                                          '<b>', 'Listing Comments: ', '</b>', comments,  '<br/>',
                                                          '<b>', 'Potential Sources: ', '</b>', sources),
-                                         group = '303d Listed Waterbodies')
+                                         group = '303d Listed Waterbodies',
+                                         label = ~glue('303d Listed Waterbody (Name: {wbname})')
+                            )
                     })
                 } else {
                     leafletProxy('map1') %>%
@@ -2449,7 +2461,9 @@ server <- function(input, output, session) {
                                                          '<b>', 'County: ', '</b>', d_prin_cnt,'<br/>',
                                                          '<b>', 'Population: ', '</b>', d_populati,'<br/>'),
                                          # <b>', 'Verified: ', '</b>', verified_s), # verified_status
-                                         group = 'Drinking Water Provider Service Areas')
+                                         group = 'Drinking Water Provider Service Areas',
+                                         label = ~glue('Drinking Water Provider Service Area Boundary (Name: {name})')
+                                         )
 
                      })
                  } else {
@@ -2480,7 +2494,9 @@ server <- function(input, output, session) {
                                         popup = ~paste0('<b>', '<u>', 'State Water Board Region Boundary', '</u>', '</b>','<br/>',
                                                         '<b>', 'Region Name: ', '</b>', RB_NAME, '<br/>',
                                                         '<b>', 'Region Number: ', '</b>', RB_OFF),
-                                        group = 'State Water Board Region Boundaries')
+                                        group = 'State Water Board Region Boundaries',
+                                        label = ~glue('State Water Board Region Boundary ({RB_NAME})')
+                                        )
                     })
                 } else {
                     leafletProxy('map1') %>%
@@ -2587,7 +2603,8 @@ server <- function(input, output, session) {
                                             '<b>', 'HOLC Form Link: ', '</b>', 
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>'), '<br/>',
                                             '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts),
-                            group = 'HOLC Polygons'
+                            group = 'HOLC Polygons',
+                            label = ~glue('HOLC Polygon (Grade {holc_grade})')
                 )
         
         # output the map object
@@ -2913,7 +2930,9 @@ server <- function(input, output, session) {
             }
             analysis_departure_scores_summary <- analysis_departure_scores_summary %>%
                 group_by(holc_city, holc_grade) %>%
-                summarize(city_holc_dep_average = mean(!!as.name(var_name)),
+                # summarize(city_holc_dep_average = mean(!!as.name(var_name)),
+                #           city_holc_dep_median = median(!!as.name(var_name))) %>% 
+                summarise(city_holc_dep_average = mean(!!as.name(var_name)),
                           city_holc_dep_median = median(!!as.name(var_name))) %>% 
                 ungroup() %>% 
                 {.}
@@ -3068,7 +3087,8 @@ server <- function(input, output, session) {
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
                                             # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
                                             ),
-                            group = 'HOLC Polygons'
+                            group = 'HOLC Polygons',
+                            label = ~glue('HOLC Polygon (Grade {holc_grade})')
                 )
         
         # output the map object
@@ -3214,7 +3234,18 @@ server <- function(input, output, session) {
                                                                                                       replacement = 'Percentile')) %>%
                                                                            pull(ces_variable)))
                                     ),
-                                    group = 'CalEnviroScreen') 
+                                    group = 'CalEnviroScreen',
+                                    label = ~paste0('CES Polygon (', input$analysis_indicator_selection, ': ', 
+                                                    eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))), 
+                                                    ')')
+                        )
+                                # paste0(glue('Aggregated {input$analysis_indicator_selection}: '), # ({input$analysis_aggregation_method}): '),
+                                #                     round(eval(as.symbol(ces_field_names %>%
+                                #                                              filter(name == input$analysis_indicator_selection) %>%
+                                #                                              pull(ces_variable))), 2)
+                                #     )
             
             
             
@@ -3254,7 +3285,8 @@ server <- function(input, output, session) {
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
                                             # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
                             ),
-                            group = 'HOLC Polygons'
+                            group = 'HOLC Polygons',
+                            label = ~glue('HOLC Polygon (Grade {holc_grade})')
                 )
             
         # add the legend
@@ -3439,7 +3471,16 @@ server <- function(input, output, session) {
                                                                                                       replacement = 'Percentile')) %>%
                                                                            pull(ces_variable)))
                                     ),
-                                    group = 'CalEnviroScreen') 
+                                    group = 'CalEnviroScreen',
+                                    label = ~paste0(if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                        'Clipped '
+                                                        }, 'CES Polygon (', 
+                                                    input$analysis_indicator_selection, ': ', 
+                                                    eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))), 
+                                                    ')')
+                        ) 
 
         # Add the HOLC (redline) polygon outlines
             # Create the color palette for the Redline scores
@@ -3479,7 +3520,8 @@ server <- function(input, output, session) {
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
                                             # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
                             ),
-                            group = 'HOLC Polygons'
+                            group = 'HOLC Polygons',
+                            label = ~glue('HOLC Polygon (Grade {holc_grade})')
                 )
             
         # add centroid info if selected
@@ -3504,7 +3546,8 @@ server <- function(input, output, session) {
                                             '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
                                             '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>'
                                             ),
-                                     group = 'HOLC Centroids'
+                                     group = 'HOLC Centroids',
+                                     label = ~glue('HOLC Centroid (Grade {holc_grade})')
                                      )
             }
             
@@ -3541,7 +3584,13 @@ server <- function(input, output, session) {
                                                                                                       replacement = 'Percentile')) %>%
                                                                            pull(ces_variable)))
                                             ),
-                                     group = 'CES Centroids'
+                                     group = 'CES Centroids',
+                                     label = ~paste0('CES Centroid (', 
+                                                     input$analysis_indicator_selection, ': ',
+                                                     eval(as.symbol(ces_field_names %>% 
+                                                                       filter(name == input$analysis_indicator_selection) %>%
+                                                                       pull(ces_variable))),
+                                                     ')')
                                      )
             }
             
@@ -3560,7 +3609,8 @@ server <- function(input, output, session) {
                                  # fillOpacity = 1,
                                  popup = ~paste0('<b>', paste0('HOLC-CES Centroid Match'), '</b>','<br/>'
                                  ),
-                                 group = 'HOLC-CES Centroid Match'
+                                 group = 'HOLC-CES Centroid Match',
+                                 label = ~glue('HOLC-CES Centroid Match')
                     )
             }
             
@@ -3743,7 +3793,13 @@ server <- function(input, output, session) {
                                                                        filter(name == input$analysis_indicator_selection) %>%
                                                                        pull(ces_variable))), 2)
                                     ),
-                                    group = 'HOLC Aggregated Score') 
+                                    group = 'HOLC Aggregated Score',
+                                    label = ~paste0('Aggregated ', input$analysis_indicator_selection, ': ', # ({input$analysis_aggregation_method}): '),
+                                                    round(eval(as.symbol(ces_field_names %>%
+                                                                             filter(name == input$analysis_indicator_selection) %>%
+                                                                             pull(ces_variable))), 2)
+                                                    )
+                                    )
 
         # Add the HOLC (redline) polygon outlines
             # Create the color palette for the Redline scores
@@ -3784,7 +3840,8 @@ server <- function(input, output, session) {
                                             paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
                                             # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
                             ),
-                            group = 'HOLC Polygons'
+                            group = 'HOLC Polygons',
+                            label = ~glue('HOLC Polygon (Grade {holc_grade})')
                 )
             
         # add the legend
@@ -3998,16 +4055,54 @@ server <- function(input, output, session) {
                                                                        filter(name == input$analysis_indicator_selection) %>%
                                                                        pull(ces_variable))), 2)
                                     ),
-                                    group = 'HOLC Aggregated Score'# ,
-                                    # label = ~paste0('<b>', glue('Aggregated {input$analysis_indicator_selection} ({input$analysis_aggregation_method}): '), 
-                                    #                 '</b>',
-                                    #                 round(eval(as.symbol(ces_field_names %>%
-                                    #                                          filter(name == input$analysis_indicator_selection) %>%
-                                    #                                          pull(ces_variable))), 2)
-                                    # )# ,
+                                    group = 'HOLC Aggregated Score',
+                                    label = ~paste0('Aggregated ', input$analysis_indicator_selection, ': ', # ({input$analysis_aggregation_method}): '),
+                                                    round(eval(as.symbol(ces_field_names %>%
+                                                                             filter(name == input$analysis_indicator_selection) %>%
+                                                                             pull(ces_variable))), 2)
+                                    )# ,
                                     # labelOptions = labelOptions(noHide = if(input$facet_map_labels == TRUE) {TRUE} else {FALSE},
                                     #                             textOnly = TRUE)
-                        ) 
+                        )
+                    
+        # add HOLC polygons
+            map_facet <- map_facet %>% 
+                # addPolygons(data = redline_analysis_data() %>% 
+                addPolylines(data = redline_analysis_data() %>% 
+                                 filter(holc_grade == map_grade) %>% 
+                                st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
+                                # filter(holc_grade %in% input$holc_rating_sites_filter) %>% 
+                                {.},
+                            options = pathOptions(pane = "redline_polygons_pane"),
+                            color = ~redline_leaflet_pal(holc_grade), # 'black', # "#444444",
+                            weight = 2.0,
+                            smoothFactor = 1.0,
+                            opacity = 1.0,
+                            # fill = FALSE,
+                            fill = FALSE,
+                            # fillOpacity = 0, # input$redline_fill_1,
+                            # fillColor = 'lightgrey',
+                            # fillColor = ~redline_leaflet_pal(holc_grade),
+                            highlightOptions = highlightOptions(color = "white", weight = 2),#,bringToFront = TRUE
+                            popup = ~paste0('<b>', '<u>', paste0('HOLC Assessed Area (', holc_year, ')'), '</u>', '</b>','<br/>',
+                                            '<b>', 'City: ', '</b>', holc_city, '<br/>',
+                                            '<b>', 'HOLC Name: ', '</b>', holc_name, '<br/>',
+                                            '<b>', 'HOLC Grade (A-D): ', '</b>', holc_grade, '<br/>',
+                                            '<b>', 'HOLC ID: ', '</b>', holc_id, '<br/>',
+                                            if(input$analysis_aggregation_method == 'Area Weighted Average') {
+                                                paste0(
+                                                    '<b>', 'Area (1000 sq meters): ', '</b>', 
+                                                    format(x = area_calc_meters_sq / 1000, digits = 0, big.mark = ',', scientific = FALSE), 
+                                                    '<br/>')
+                                            },
+                                            # '<b>', paste0('HOLC Form Link (', year, '): '), '</b>', link, '</b>', 
+                                            '<b>', 'HOLC Form Link: ', '</b>', 
+                                            paste0('<a href = "', holc_link, '" ', 'target="_blank"> ', holc_link, ' </a>')# , '<br/>',
+                                            # '<b>', 'Area Description Excerpts: ', '</b>', area_description_excerpts
+                            ),
+                            group = 'HOLC Polygons',
+                            label = ~glue('HOLC Polygon (Grade {holc_grade})')
+                )
             
         # add the legend
             map_facet <- map_facet %>% 
@@ -4023,7 +4118,7 @@ server <- function(input, output, session) {
         # Add controls to select the basemap and layers
             map_facet <- map_facet %>% 
                 addLayersControl(# baseGroups = basemap_options,
-                                 overlayGroups = c('HOLC Aggregated Score', 'Legend'), # 'HOLC Polygons'
+                                 overlayGroups = c('HOLC Polygons', 'HOLC Aggregated Score', 'Legend'),
                                  options = layersControlOptions(collapsed = TRUE, autoZIndex = TRUE)) 
             
         # Hide some groups by default (can be turned on with the layers control box on the map)
