@@ -1,3 +1,4 @@
+library(dplyr)
 library(readr)
 library(vroom)
 library(data.table)
@@ -42,7 +43,8 @@ library(tidylog)
             
         # get CES polygons
             ces3_poly <- st_read(here('data_processed',
-                                      'ces3_poly.gpkg'))
+                                      'ces3_poly.gpkg')) %>% 
+                select(-c(latitude, longitude))
                 # st_crs(ces3_poly) # 4326
         # join CES data to the sites data
             # calepa_reg_sites <- st_join(calepa_reg_sites %>% st_transform(3310), 
@@ -59,7 +61,7 @@ library(tidylog)
                     st_transform(3310) %>% 
                     {.}
                 tiger_2010_tracts <- tiger_2010_tracts %>% 
-                    filter(GEOID10 %in% ces3_poly$Census_Tract) %>% 
+                    filter(GEOID10 %in% ces3_poly$census_tract) %>% 
                     {.}
                 # join
                     calepa_reg_sites_joined <- st_join(calepa_reg_sites, 
@@ -83,14 +85,14 @@ library(tidylog)
             # join the CES3 data to the sites data using the census tract identified using the tiger file
                 calepa_reg_sites <- left_join(calepa_reg_sites_joined,
                                               ces3_poly %>% st_drop_geometry(), 
-                                              by = c('GEOID10' = 'Census_Tract'),
+                                              by = c('GEOID10' = 'census_tract'),
                                               keep = TRUE)
                 calepa_reg_sites <- calepa_reg_sites %>% select(-GEOID10)
             # save the 2010 tiger tracts
                 # add the CES data
                     tiger_2010_tracts <- left_join(tiger_2010_tracts, 
                                                    ces3_poly %>% st_drop_geometry(),
-                                                   by = c('GEOID10' = 'Census_Tract'),
+                                                   by = c('GEOID10' = 'census_tract'),
                                                    keep = TRUE) %>% 
                         select(-GEOID10)
                 st_write(tiger_2010_tracts, 
@@ -215,10 +217,36 @@ library(tidylog)
     reg_actions_all_2 <- bind_rows(inspections_summary, 
                                    violations_summary, 
                                    enforcement_summary)
-    # save file to csv
+    
+    
+    # add fiscal year info to the dataset
+        reg_actions_all_2 <- reg_actions_all_2 %>% 
+            mutate(eval_fiscal_year = case_when(month(ymd(action_date)) <= 6 ~ 
+                                                  paste0(year(ymd(action_date))-1, ' / ', year(ymd(action_date))),
+                                              TRUE ~ paste0(year(ymd(action_date)), ' / ', year(ymd(action_date)) + 1)
+            )) %>% 
+            separate(col = eval_fiscal_year, 
+                     into = c('fy_start', 'fy_end'), 
+                     sep = ' / ', 
+                     remove = FALSE, 
+                     convert = TRUE)
+
+            
+    # save data to csv
         write_csv(x = reg_actions_all_2,
                   path = here('data_regulatory_actions',
                               'regulatory_actions_processed.csv'))
+        
+    # summarize by fiscal year
+        reg_actions_all_2_fy_summary <- reg_actions_all_2 %>% 
+            group_by(site_id, action, eval_fiscal_year, fy_start, fy_end) %>% 
+            summarise(count = n())
+    
+    # save summarized data to csv
+        write_csv(x = reg_actions_all_2_fy_summary,
+                  path = here('data_regulatory_actions',
+                              'regulatory_actions_processed-fy_summary.csv'))
+            
         
 # # tests (to be done in app)
 ##############################################################-
@@ -297,6 +325,7 @@ library(tidylog)
 #############################################################-
 # Option 2 - summarize inspections before loading to app, then join to sites (with CES and Redline info already added) in app
 
+    # !!!!!!!!! JUST FOR TESTING !!!!!!!!!!!!!!!!!!
     # This is the part to be done in the app:
     {
         tic()

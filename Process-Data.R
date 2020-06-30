@@ -1,6 +1,7 @@
 # Load Packages 
     # General data analysis and transformation
         library(readr)
+        library(data.table)
         library(readxl)
         library(dplyr)
         library(janitor)
@@ -9,6 +10,7 @@
         library(skimr)
         library(tidylog)
         library(lubridate)
+        library(tidyr)
     # mapping and geospatial data analysis/transformation
         library(sf)
         library(rmapshaper)

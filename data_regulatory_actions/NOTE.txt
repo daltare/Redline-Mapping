@@ -7,3 +7,5 @@ Manually download and unzip the following datasets to this folder:
 - Evaluations (file = Evaluations.csv) # this is the inspections data
 - Violations (file = Violations.csv)
 - Enforcements (file = EA.csv)
+
+After downloading these files, run the 'Process-Data_RegActions.R' script to create the processed outputs for use in the tool.

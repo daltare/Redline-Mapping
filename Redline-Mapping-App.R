@@ -28,9 +28,9 @@
     # Shiny platform
         library(shiny) # the Shiny web application framework (https://shiny.rstudio.com) (https://cran.r-project.org/package=shiny)
     # General data analysis and transformation
+        library(Hmisc)
         library(readr)
         library(readxl)
-        library(dplyr)
         library(janitor)
         # library(gtools)
         library(stringr)
@@ -44,7 +44,7 @@
         library(ggplot2)
         library(glue)
         library(units)
-        library(Hmisc)
+         library(dplyr)
     # API-related
         library(jsonlite)
         library(urltools)
@@ -148,6 +148,9 @@
     # CalEPA regulatory data
         # all regulatory data (processed)
             regulatory_data_processed <- fread('data_regulatory_actions/regulatory_actions_processed.csv') %>% 
+                tibble()
+        # all regulatory data (processed and summarized by FY)
+            regulatory_data_processed_fy_summary <- fread('data_regulatory_actions/regulatory_actions_processed-fy_summary.csv') %>% 
                 tibble()
         # inspections
             inspections_all_download <- fread('data_regulatory_actions/Evaluations.csv') %>%
@@ -271,7 +274,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                      # Sidebar
                      # div(id ="Sidebar", sidebarPanel(
                      sidebarPanel(
-                         # Inputs: 
+                         # Inputs:
                          selectInput(inputId = 'city_selected_1', 
                                      label = 'Zoom To:', 
                                      choices = c('Statewide', unique(redline_polygons$holc_city)), 
@@ -344,16 +347,51 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          uiOutput('ces_range_filter'),
                          hr(style = "border: 1px solid darkgrey"),
                          h4('CalEPA Regulatory Actions:'),
-                         dateRangeInput2(inputId = "sites_date_range", 
-                                         label = "Select Date Range For Inspections, Violations, & Enforcement Actions:*", 
-                                         startview = "year", 
-                                         minview = "months", 
-                                         maxview = "decades", 
-                                         format = 'yyyy-mm', 
-                                         start = NULL, # as.Date("2010-01-01"),
-                                         end = NULL, #as.Date(paste(year(Sys.Date()), month(Sys.Date()), 1, sep = '-')),
-                                         min = as.Date("1900-01-01"),
-                                         max = as.Date(paste(year(most_recent_reg_records), month(most_recent_reg_records), 1, sep = '-'))),
+                         # dateRangeInput2(inputId = "sites_date_range", 
+                         #                 label = "Select Date Range For Inspections, Violations, & Enforcement Actions:*", 
+                         #                 startview = "year", 
+                         #                 minview = "years", # "months"
+                         #                 maxview = "decades", 
+                         #                 format = 'yyyy/yyyy+1', # 'yyyy-mm',
+                         #                 start = NULL, # as.Date("2010-01-01"),
+                         #                 end = NULL, #as.Date(paste(year(Sys.Date()), month(Sys.Date()), 1, sep = '-')),
+                         #                 min = as.Date("1900-01-01"),
+                         #                 max = as.Date(paste(year(most_recent_reg_records), month(most_recent_reg_records), 1, sep = '-'))),
+                         sliderTextInput(
+                             inputId = "date_range_fy", 
+                             label = "Select Date Range For Inspections, Violations, & Enforcement Actions by Fiscal Year (Fiscal Year is July 1 through June 30):*", 
+                             grid = FALSE, 
+                             force_edges = TRUE,
+                             # choices = if (lubridate::month(Sys.Date()) <= 6) {
+                             #     c(paste0(str_pad(c(90:99,0:(lubridate::year(Sys.Date())-1-2000)), width = 2, pad = 0), 
+                             #              '/', 
+                             #              str_pad(c(91:99, 0:(lubridate::year(Sys.Date())-2000)), width = 2, pad = 0)))
+                             # } else {
+                             #     c(paste0(str_pad(c(90:99,0:(lubridate::year(Sys.Date())-2000)), width = 2, pad = 0), 
+                             #              '/', 
+                             #              str_pad(c(91:99, 0:(lubridate::year(Sys.Date())-2000+1)), width = 2, pad = 0)))
+                             # },
+                             # selected = c('90/91', 
+                             #              if (lubridate::month(Sys.Date()) <= 6) {
+                             #                  paste0(lubridate::year(Sys.Date())-1-2000, '/',lubridate::year(Sys.Date())-2000)
+                             #                  } else {
+                             #                      paste0(lubridate::year(Sys.Date())-2000, '/',lubridate::year(Sys.Date())-2000+1)})
+                             if (lubridate::month(Sys.Date()) <= 6) {
+                                 c(paste0(1990:(lubridate::year(Sys.Date())-1), 
+                                          ' / ', 
+                                          1991:(lubridate::year(Sys.Date()))))
+                             } else {
+                                 c(paste0(1990:(lubridate::year(Sys.Date())), 
+                                          ' / ', 
+                                          1991:(lubridate::year(Sys.Date())+1)))
+                             },
+                             selected = c('1990 / 1991', 
+                                          if (lubridate::month(Sys.Date()) <= 6) {
+                                              paste0(lubridate::year(Sys.Date())-1, ' / ',lubridate::year(Sys.Date()))
+                                              } else {
+                                                  paste0(lubridate::year(Sys.Date()), ' / ',lubridate::year(Sys.Date())+1)})
+                         ),
+                         tags$em(textOutput('date_range_selected')),
                          tags$em(textOutput('data_availability_msg')),
                          br(),
                          # checkboxGroupInput(inputId = 'show_violations_enforcement',
@@ -864,6 +902,25 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
 
 # Define server logic ----
 server <- function(input, output, session) {
+    selected_site_types <- reactive(input$site_type_1)
+    selected_site_types_d <- selected_site_types %>% debounce(3000)
+    
+    selected_ces_range_filter <- reactive(input$ces_range_filter)
+    selected_ces_range_filter_d <- selected_ces_range_filter %>% debounce(3000)
+    
+    output$date_range_selected <-  renderText(
+        paste0('*Selected date range: ', 
+               as.Date(paste0(str_split(string = input$date_range_fy[1], 
+                                        pattern = ' / ', 
+                                        simplify = FALSE)[[1]][1],
+                              '-',7,'-',1)),
+               ' through ',
+               as.Date(paste0(str_split(string = input$date_range_fy[2], 
+                                        pattern = ' / ', 
+                                        simplify = FALSE)[[1]][2],
+                              '-',6,'-',30))
+               )
+    )
     # # create list of which region each city is in (for filtering related datasets) ----
     #     cities_regions <- list('Fresno' = '5F',
     #                            'Los Angeles' = '4',
@@ -1146,7 +1203,7 @@ server <- function(input, output, session) {
                     # return the object
                         return(cal_epa_sites_raw_download)
                 } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & 
-                           length(input$site_type_1) > 0) {    
+                           length(selected_site_types_d()) > 0) {    
                     withProgress(message = 'Getting Site Data', style = 'notification', value = 1, { # style = 'notification' 'old'
                     # })
                     # get CalEPA sites data from the geoserver api
@@ -1174,7 +1231,7 @@ server <- function(input, output, session) {
                                                            'Toxic Release Inventory (TRI)' = 'calepa:mv_fac_from_tri'
                             )
                             counter_sites <- 0
-                            for (site_type in input$site_type_1) {
+                            for (site_type in selected_site_types_d()) {
                                 counter_sites <- counter_sites + 1
                                 # url <- calepa_sites_typenames[[site_type]]
                                 url_sites_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
@@ -1212,7 +1269,7 @@ server <- function(input, output, session) {
                             rename(site_name = facility_name)
                     # transform to projected crs (for mapping and analysis it's best to use a projected CRS -- see: https://s3.amazonaws.com/files.zevross.com/workshops/spatial/slides/html/4-crs.html#31)
                         cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
-                            st_transform(crs = st_crs(projected_crs))
+                            st_transform(crs = projected_crs)
                         # st_crs(cal_epa_sites_raw_download)
                     # join to get the CES3 data (using the geometry from the tiger census tracts)
                         cal_epa_sites_raw_download <- st_join(cal_epa_sites_raw_download, 
@@ -1250,41 +1307,104 @@ server <- function(input, output, session) {
                     }
             })
             
+            
     # REGULATORY ACTIONS
         # get the start and end date
-            start_date <- reactive({
-                start_date <- if (!is.na(input$sites_date_range[1])) {
-                    as.Date(paste(year(input$sites_date_range[1]), # set to the first day of the selected month
-                                  month(input$sites_date_range[1]),
-                                  1,
-                                  sep = '-'))
-                } else {as.Date('0001-01-01')} # arbitrarily small date if no start date selected
-                return(start_date)
+            # FOR MONTH / YEAR SELECTION OPTIONS:
+                # start_date <- reactive({
+                #     start_date <- if (!is.na(input$sites_date_range[1])) {
+                #         as.Date(paste(year(input$sites_date_range[1]), # set to the first day of the selected month
+                #                       month(input$sites_date_range[1]),
+                #                       1,
+                #                       sep = '-'))
+                #     } else {as.Date('0001-01-01')} # arbitrarily small date if no start date selected
+                #     return(start_date)
+                # })
+                # end_date <- reactive({
+                #     end_date <- if (!is.na(input$sites_date_range[2])) {
+                #         as.Date(paste(year(input$sites_date_range[2]),
+                #                       month(input$sites_date_range[2]),
+                #                       1,
+                #                       sep = '-'))
+                #     } else {as.Date('9999-01-01')} # arbitrarily large date if no end date selected
+                #     day(end_date) <- days_in_month(end_date) # set the end date to be the last day in the selected month, rather than the first
+                #     return(end_date)
+                # })
+            
+        # by fiscal year
+            start_date_raw <- reactive({
+                return(
+                    as.Date(paste0(str_split(string = input$date_range_fy[1], # the [1] gives the start FY
+                                             pattern = ' / ', 
+                                             simplify = FALSE)[[1]][1], # the [1] gives the beginning calendar year of the FY
+                                   '-',7,'-',1))
+                )
             })
-            end_date <- reactive({
-                end_date <- if (!is.na(input$sites_date_range[2])) {
-                    as.Date(paste(year(input$sites_date_range[2]),
-                                  month(input$sites_date_range[2]),
-                                  1,
-                                  sep = '-'))
-                } else {as.Date('9999-01-01')} # arbitrarily large date if no end date selected
-                day(end_date) <- days_in_month(end_date) # set the end date to be the last day in the selected month, rather than the first
-                return(end_date)
+            start_date <- start_date_raw %>% debounce(5000)
+            
+            end_date_raw <- reactive({
+                return(
+                    as.Date(paste0(str_split(string = input$date_range_fy[2], # the [2] gives the end FY
+                                             pattern = ' / ', 
+                                             simplify = FALSE)[[1]][2], # the [2] gives the ending calendar year of the FY
+                                   '-',6,'-',30))
+                )
+            })
+            end_date <- end_date_raw %>% debounce(5000)
+            
+            # start_date_fy_filter_raw <- reactive({
+            #     return(
+            #         str_split(string = input$date_range_fy[1], # the [1] gives the start FY
+            #                   pattern = ' / ', 
+            #                   simplify = FALSE)[[1]][1] # the [1] gives the beginning calendar year of the FY
+            #         )
+            #     })
+            # start_date_fy_filter <- start_date_fy_filter_raw %>% debounce(5000)
+            
+            # end_date_fy_filter_raw <- reactive({
+            #     return(
+            #         str_split(string = input$date_range_fy[2], # the [2] gives the end FY
+            #                   pattern = ' / ', 
+            #                   simplify = FALSE)[[1]][1] # the [1] gives the beginning calendar year of the FY
+            #         )
+            #     })
+            # end_date_fy_filter <- end_date_fy_filter_raw %>% debounce(5000)
+            
+            date_range_raw <- reactive({
+                return(
+                    paste0(
+                        str_replace_all(string = input$date_range_fy[1], 
+                                        pattern = ' ', 
+                                        replacement = ''),
+                        ' ', HTML('&ndash;'), ' ',
+                        str_replace_all(string = input$date_range_fy[2], 
+                                        pattern = ' ', 
+                                        replacement = '')
+                    )
+                )
             })
             
+            date_range <- date_range_raw %>% debounce(5000)
+           
     # summarize the inspections, violations, and enforcement actions for the selected period
-        regulatory_data_summary <- reactive({
+        regulatory_data_summary <- reactive({ # use 'debounce' above to slow down reactions to the start/end date filter
             withProgress(message = 'Summarizing Data...', 
                          style = 'notification', 
                          value = 1, 
                          {
                              if (nrow(cal_epa_sites_raw()) > 0) {
                                  # summarize the regulatory data for the given time period, then add the site info (via a left join)
-                                 reg_data_summary <- regulatory_data_processed %>% 
-                                     filter(action_date >= start_date(), action_date <= end_date()) %>%
+                                 # reg_data_summary <- regulatory_data_processed %>% 
+                                 reg_data_summary <- regulatory_data_processed_fy_summary %>% 
+                                     # filter(action_date >= start_date(), action_date <= end_date()) %>%
+                                     # filter(fy_start >= start_date_fy_filter(), 
+                                     #        fy_start <= end_date_fy_filter()) %>%
+                                     filter(fy_start >= year(start_date()), 
+                                            fy_end <= year(end_date())) %>%
                                      filter(site_id %in% (cal_epa_sites_raw() %>% pull(site_id))) %>%
                                      group_by(site_id, action) %>% 
-                                     summarize(count = n()) %>%
+                                     # summarize(count = sum(count)) %>%
+                                     summarise(count = sum(count)) %>%
                                      ungroup() %>% 
                                      pivot_wider(names_from = action, 
                                                  values_from = count) %>% # count) %>% 
@@ -1296,14 +1416,15 @@ server <- function(input, output, session) {
                                               enforcement_actions_count, 
                                               .after = site_id) %>%
                                      mutate_if(is.integer, ~replace(., is.na(.), 0)) %>% # replace NAs with zeros
-                                     left_join(calepa_sites_processed) %>% 
+                                     # left_join(calepa_sites_processed) %>% 
+                                     left_join(cal_epa_sites_raw(), by = c('site_id')) %>% 
                                      {.}
-                                 # find sites in the sites that don't have any regulatory actions and add a zero record to make sure they are included
+                                 # find sites that don't have any regulatory actions and add a zero record to make sure they are included
                                     missing_site_ids <- cal_epa_sites_raw() %>% 
                                         filter(!(site_id %in% reg_data_summary$site_id)) %>% 
                                         pull(site_id) %>% 
                                         {.}
-                                    missing_sites <- calepa_sites_processed %>% 
+                                    missing_sites <- cal_epa_sites_raw() %>% 
                                         filter(site_id %in% missing_site_ids) %>% 
                                         mutate(inspections_count = 0,
                                                violations_count = 0,
@@ -1469,10 +1590,10 @@ server <- function(input, output, session) {
     #                                  filter(name == input$ces_parameter) %>% 
     #                                  pull(ces_variable)
     #                              ces3_poly_filtered <- ces3_poly() %>% 
-    #                                  filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>%
-    #                                  # filter(CES_3_Score >= input$ces_range_filter[1]) %>% 
-    #                                  filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
-    #                                  # filter(CES_3_Score <= input$ces_range_filter[2]) %>%
+    #                                  filter(!!as.name(parameter) >= selected_ces_range_filter_d[1]) %>%
+    #                                  # filter(CES_3_Score >= selected_ces_range_filter_d[1]) %>% 
+    #                                  filter(!!as.name(parameter) <= selected_ces_range_filter_d[2]) %>%
+    #                                  # filter(CES_3_Score <= selected_ces_range_filter_d[2]) %>%
     #                                  st_as_sf() %>% 
     #                                  {.}
     #                              # filter for sites with CES polygons meeting the selected criteria
@@ -1521,8 +1642,8 @@ server <- function(input, output, session) {
                                              pull(ces_variable)
                                     # filter for sites with CES polygons meeting the selected criteria
                                          cal_epa_sites_filtered_0_compute <- cal_epa_sites_filtered_0_compute %>% 
-                                             filter(!!as.name(parameter) >= input$ces_range_filter[1]) %>% 
-                                             filter(!!as.name(parameter) <= input$ces_range_filter[2]) %>%
+                                             filter(!!as.name(parameter) >= selected_ces_range_filter_d()[1]) %>% 
+                                             filter(!!as.name(parameter) <= selected_ces_range_filter_d()[2]) %>%
                                              {.}
                                  # 3 - filter for sites by HOLC rating
                                      if (input$holc_rating_sites_filter_on_off == TRUE) {
@@ -1563,7 +1684,7 @@ server <- function(input, output, session) {
             selectInput(inputId = 'program_type_1',
                         label = '**Filter Sites By Program Type:**',
                         multiple = TRUE,
-                        choices = if (nrow(cal_epa_sites_raw()) > 0) { #(length(input$site_type_1) > 0 | input$sites_source == 'Select By Type (Source: CalEPA Geoserver)') {
+                        choices = if (nrow(cal_epa_sites_raw()) > 0) { #(length(selected_site_types_d()) > 0 | input$sites_source == 'Select By Type (Source: CalEPA Geoserver)') {
                             program_types %>%
                                 filter(site_id %in% (cal_epa_sites_filtered_0()$site_id)) %>%
                                 # st_drop_geometry() %>%
@@ -1591,11 +1712,11 @@ server <- function(input, output, session) {
             #     )
             # })
         # revise the data frame for use in the data table
-            summary_table_df <- reactive({ # eventReactive(input$site_type_1, {
+            summary_table_df <- reactive({ # eventReactive(selected_site_types_d(), {
                 # if(input$sites_source == site_source_choices[1]) { 
                 #     shiny::showNotification("No data", type = "error")
                 #     NULL
-                # } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & length(input$site_type_1) == 0) {
+                # } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & length(selected_site_types_d()) == 0) {
                 #     shiny::showNotification("No data", type = "error")
                 #     NULL
                 if (nrow(cal_epa_sites_raw()) == 0) {
@@ -1641,27 +1762,29 @@ server <- function(input, output, session) {
                             # rename(!!paste0('inspections_', col_name_custom()) := 'inspections_count') %>% 
                             # st_drop_geometry() %>%
                             mutate(ces3_measure = input$ces_parameter) %>% 
-                            mutate(reg_action_filter_start_date = if (is.na(input$sites_date_range[1]) | # this adds a new column showing the start date filter
-                                                           is.null(input$sites_date_range[1])) {
-                                'NA'
-                                } else {
-                                    input$sites_date_range[1]
-                                    },
-                                reg_action_filter_end_date = if (is.na(input$sites_date_range[2]) | # this adds a new column showing the end date filter
-                                                      is.null(input$sites_date_range[2])) {
-                                    'NA'
-                                    } else {
-                                        min(
-                                            as.Date(paste0(year(input$sites_date_range[2]), '-',
-                                                           month(input$sites_date_range[2]), '-',
-                                                           days_in_month(input$sites_date_range[2]))),
-                                            most_recent_reg_records
-                                        )
-                                        }) %>% 
+                            # mutate(reg_action_filter_start_date = if (is.na(input$sites_date_range[1]) | # this adds a new column showing the start date filter
+                            #                                is.null(input$sites_date_range[1])) {
+                            #     'NA'
+                            #     } else {
+                            #         input$sites_date_range[1]
+                            #         },
+                            #     reg_action_filter_end_date = if (is.na(input$sites_date_range[2]) | # this adds a new column showing the end date filter
+                            #                           is.null(input$sites_date_range[2])) {
+                            #         'NA'
+                            #         } else {
+                            #             min(
+                            #                 as.Date(paste0(year(input$sites_date_range[2]), '-',
+                            #                                month(input$sites_date_range[2]), '-',
+                            #                                days_in_month(input$sites_date_range[2]))),
+                            #                 most_recent_reg_records
+                            #             )
+                            #             }) %>%
+                            mutate(reg_action_filter_start_date = start_date(),
+                                reg_action_filter_end_date = end_date()) %>%
                             rename(holc_polygon_grade = holc_grade) %>% 
                             # double check for cases where there are multiple joins on the CES data (overlapping polygons)
-                            # filter(ces3_polygon_score >= input$ces_range_filter[1] & # first re-filter for sites within the selected range
-                            #            ces3_polygon_score <= input$ces_range_filter[2]) %>%
+                            # filter(ces3_polygon_score >= selected_ces_range_filter_d[1] & # first re-filter for sites within the selected range
+                            #            ces3_polygon_score <= selected_ces_range_filter_d[2]) %>%
                             # filter(!duplicated(site_id)) %>%  # if duplicates still remain, just keep the first one
                             # in text columns, convert NAs to "NA"
                             mutate_if(is.character, ~replace(., is.na(.), 'NA')) %>% # replace NAs with "NA" in character columns
@@ -1669,6 +1792,7 @@ server <- function(input, output, session) {
                     )
                 }
             })
+            
         # create table
             # file_name <- reactive({
             #     return(paste0('Filtered_Regulatory_Actions_Summary_',
@@ -2058,7 +2182,7 @@ server <- function(input, output, session) {
         # CalEPA sites
             observe({
                 withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
-                if (length(input$site_type_1) > 0 | input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
+                if (length(selected_site_types_d()) > 0 | input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
                     cal_epa_sites <- cal_epa_sites_filtered() %>% 
                         filter(!is.na(latitude) & !is.na(longitude)) %>% 
                         st_as_sf(coords = c('longitude', 'latitude'),
@@ -2098,7 +2222,8 @@ server <- function(input, output, session) {
                                                          #<b>', 'County: ', '</b>', County,'<br/>',
                                                          '<b>', 'Zip Code: ', '</b>', zip_code, '<br/>',
                                                          '<b>', 'Source: ', '</b>', data_source, '<br/>',
-                                                         '<b>', 'Regulatory Actions (for selected time period):', '</b>','<br/>',
+                                                         # '<b>', 'Regulatory Actions (for selected time period):', '</b>','<br/>',
+                                                         '<b>', 'Regulatory Actions (FY ', date_range(), '):', '</b>','<br/>',
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Inspection Records: ', '</b>', inspections_count, '<br/>', # chr(149),
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Violation Records: ', '</b>', violations_count, '<br/>', # chr(149),
                                                          '<b>', HTML('&nbsp;'), HTML('&nbsp;'), ' - Number of Enforcement Records: ', '</b>', enforcement_actions_count # chr(149),
@@ -2931,9 +3056,9 @@ server <- function(input, output, session) {
             analysis_departure_scores_summary <- analysis_departure_scores_summary %>%
                 group_by(holc_city, holc_grade) %>%
                 # summarize(city_holc_dep_average = mean(!!as.name(var_name)),
-                #           city_holc_dep_median = median(!!as.name(var_name))) %>% 
+                #           city_holc_dep_median = median(!!as.name(var_name))) %>%
                 summarise(city_holc_dep_average = mean(!!as.name(var_name)),
-                          city_holc_dep_median = median(!!as.name(var_name))) %>% 
+                          city_holc_dep_median = median(!!as.name(var_name))) %>%
                 ungroup() %>% 
                 {.}
         # make plot
@@ -4228,4 +4353,3 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
-        
