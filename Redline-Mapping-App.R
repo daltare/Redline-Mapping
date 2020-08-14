@@ -19,10 +19,9 @@
                 # see: https://epsg.io/4326
                 
                     
-    
+     
     # initial zoom level / location
-         initial_zoom_level <- 'State' # options: 'Redline Bounds (All)', 'State','City'
-        # initial_selected_city <- 'Sacramento' # un-comment this line if the 'City' option is selected in the line above
+        initial_zoom_level <- 'City' # options: 'Redline Bounds (All)', 'State','City'
     
 # Load Packages ----
     # Shiny platform
@@ -103,23 +102,23 @@
             st_transform(projected_crs)
         
     # CalEPA regulated sites
-        calepa_reg_sites <- fread('data_regulatory_actions/Site.csv') %>%
-        # calepa_reg_sites <- read_csv('data_regulatory_actions/Site.csv') %>%
-            tibble() %>% 
-            clean_names() %>% 
-            select(-dplyr::ends_with(as.character(0:9))) %>% 
-            rename(zip_code = zip) %>% 
-            mutate(state = 'ca', 
-                   data_source = 'CalEPA Regulated Site Portal') %>% 
-            # mutate(coordinates = Map(c, longitude, latitude)) %>%  # see: https://stackoverflow.com/a/46396386
-            arrange(site_id) %>% 
-            # mutate(site_id = factor(site_id)) %>%
-            {.}
-            # check (NOTE: no missing coordinate data in the flat file)
-                # range(calepa_reg_sites$latitude)
-                # range(calepa_reg_sites$longitude)
+        # calepa_reg_sites <- fread('data_regulatory_actions/Site.csv') %>%
+        # # calepa_reg_sites <- read_csv('data_regulatory_actions/Site.csv') %>%
+        #     tibble() %>% 
+        #     clean_names() %>% 
+        #     select(-dplyr::ends_with(as.character(0:9))) %>% 
+        #     rename(zip_code = zip) %>% 
+        #     mutate(state = 'ca', 
+        #            data_source = 'CalEPA Regulated Site Portal') %>% 
+        #     # mutate(coordinates = Map(c, longitude, latitude)) %>%  # see: https://stackoverflow.com/a/46396386
+        #     arrange(site_id) %>% 
+        #     # mutate(site_id = factor(site_id)) %>%
+        #     {.}
+        #     # check (NOTE: no missing coordinate data in the flat file)
+        #         # range(calepa_reg_sites$latitude)
+        #         # range(calepa_reg_sites$longitude)
     # regulated sites - processed version (with CES and HOLC data for each site included)
-        calepa_sites_processed <- fread('data_regulatory_actions/regulated_sites_processed.csv') %>% 
+        calepa_sites_processed <- fread('data_regulatory_actions_filter/regulated_sites_processed_filter.csv') %>% 
             tibble() %>% 
             {.}
         
@@ -130,7 +129,7 @@
                                  )
         
     # List of program types to select
-        program_types <- fread('data_regulatory_actions/SiteEI.csv') %>%
+        program_types <- fread('data_regulatory_actions_filter/SiteEI_filter.csv') %>%
         # program_types <- read_csv('data_regulatory_actions/SiteEI.csv') %>%
         # program_types <- read_csv('data_regulatory_actions/Site Regulated Programs.zip', guess_max = 100000) %>%
             tibble() %>% 
@@ -147,49 +146,49 @@
 
     # CalEPA regulatory data
         # all regulatory data (processed)
-            regulatory_data_processed <- fread('data_regulatory_actions/regulatory_actions_processed.csv') %>% 
+            regulatory_data_processed <- fread('data_regulatory_actions_filter/regulatory_actions_processed_filter.csv') %>% 
                 tibble()
         # all regulatory data (processed and summarized by FY)
-            regulatory_data_processed_fy_summary <- fread('data_regulatory_actions/regulatory_actions_processed-fy_summary.csv') %>% 
+            regulatory_data_processed_fy_summary <- fread('data_regulatory_actions_filter/regulatory_actions_processed-fy_summary_filter.csv') %>% 
                 tibble()
         # inspections
-            inspections_all_download <- fread('data_regulatory_actions/Evaluations.csv') %>%
-                # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.zip') %>% 
-                # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.csv') %>%
-                # inspections_all_download <- vroom('data_regulatory_actions/Evaluations.csv') %>% 
-                tibble() %>% 
-                clean_names() %>%
-                select(-dplyr::ends_with(as.character(0:9))) %>%
-                mutate(eval_date = mdy(eval_date)) %>% 
-                mutate(site_id = as.integer(site_id)) %>% 
-                arrange(site_id, eval_date) %>% 
-                # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+            inspections_all_download <- fread('data_regulatory_actions_filter/Evaluations_filter.csv') %>%
+                # # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.zip') %>% 
+                # # inspections_all_download <- read_csv('data_regulatory_actions/Evaluations.csv') %>%
+                # # inspections_all_download <- vroom('data_regulatory_actions/Evaluations.csv') %>% 
+                # tibble() %>% 
+                # clean_names() %>%
+                # select(-dplyr::ends_with(as.character(0:9))) %>%
+                # mutate(eval_date = mdy(eval_date)) %>% 
+                # mutate(site_id = as.integer(site_id)) %>% 
+                # arrange(site_id, eval_date) %>% 
+                # # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
                 {.}
         # violations
-            violations_all_download <- fread('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
-                # violations_all_download <- read_csv('data_regulatory_actions/Violations.zip') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
-                # violations_all_download <- read_csv('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
-                # violations_all_download <- vroom('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
-                tibble() %>%
-                clean_names() %>% 
-                select(-dplyr::ends_with(as.character(0:9))) %>%
-                mutate(violation_date = mdy(violation_date)) %>% 
-                mutate(site_id = as.integer(site_id)) %>% 
-                arrange(site_id, violation_date) %>% 
-                # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+            violations_all_download <- fread('data_regulatory_actions_filter/Violations_filter.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
+                # # violations_all_download <- read_csv('data_regulatory_actions/Violations.zip') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
+                # # violations_all_download <- read_csv('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>%
+                # # violations_all_download <- vroom('data_regulatory_actions/Violations.csv') %>% #, guess_max = 1000, trim_ws = FALSE) %>% 
+                # tibble() %>%
+                # clean_names() %>% 
+                # select(-dplyr::ends_with(as.character(0:9))) %>%
+                # mutate(violation_date = mdy(violation_date)) %>% 
+                # mutate(site_id = as.integer(site_id)) %>% 
+                # arrange(site_id, violation_date) %>% 
+                # # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
                 {.}      
         # enforcement actions
-            enforcement_all_download <- fread('data_regulatory_actions/EA.csv') %>%
-                # enforcement_all_download <- read_csv('data_regulatory_actions/Enforcements.zip') %>% 
-                # enforcement_all_download <- read_csv('data_regulatory_actions/EA.csv') %>%
-                # enforcement_all_download <- vroom('data_regulatory_actions/EA.csv') %>% 
-                tibble() %>%
-                clean_names() %>% 
-                select(-dplyr::ends_with(as.character(0:9))) %>%
-                mutate(enf_action_date = mdy(enf_action_date)) %>% 
-                mutate(site_id = as.integer(site_id)) %>% 
-                arrange(site_id, enf_action_date) %>% 
-                # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
+            enforcement_all_download <- fread('data_regulatory_actions_filter/EA_filter.csv') %>%
+                # # enforcement_all_download <- read_csv('data_regulatory_actions/Enforcements.zip') %>% 
+                # # enforcement_all_download <- read_csv('data_regulatory_actions/EA.csv') %>%
+                # # enforcement_all_download <- vroom('data_regulatory_actions/EA.csv') %>% 
+                # tibble() %>%
+                # clean_names() %>% 
+                # select(-dplyr::ends_with(as.character(0:9))) %>%
+                # mutate(enf_action_date = mdy(enf_action_date)) %>% 
+                # mutate(site_id = as.integer(site_id)) %>% 
+                # arrange(site_id, enf_action_date) %>% 
+                # # mutate(site_id = factor(site_id, levels = calepa_reg_sites$site_id)) %>%
                 {.}
         # get the date of the most recent regulatory records
             most_recent_reg_records <- max(
@@ -219,10 +218,6 @@
             analysis_ces_centroids <- st_read('data_processed-analysis/ces_centroids.gpkg')
             analysis_holc_centroids <- st_read('data_processed-analysis/redline_polygons_centroid.gpkg')
             analysis_centroid_connecting_lines <- st_read('data_processed-analysis/holc_centroid_ces_connecting_lines.gpkg')
-            
-           
-
-
 
     # California Counties
         ca_counties <- st_read('data_processed/CA_Counties.gpkg') %>% 
@@ -238,6 +233,13 @@
       d$children[[2L]]$children[[3]]$attribs[["data-date-max-view-mode"]] <- maxview
       d
     }
+        
+        
+# select a city to plot when the app loads
+    initial_selected_city <- sample(unique(redline_polygons$holc_city), 1) # pick a random city # un-comment this line if the 'City' option is selected in the line above
+
+# get hulls for holc map areas (used to filter regulated site data from the geoserver)
+    holc_map_hulls <- st_read('data_processed/holc_map_hulls.gpkg')
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------- #       
 # ----------------------------------------------------------------------------------------------------------------------------------------------- #
@@ -277,8 +279,8 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          # Inputs:
                          selectInput(inputId = 'city_selected_1', 
                                      label = 'Zoom To:', 
-                                     choices = c('Statewide', unique(redline_polygons$holc_city)), 
-                                     selected = 'Statewide'), # 'All'
+                                     choices = c(unique(redline_polygons$holc_city)), # 'Statewide', 
+                                     selected = initial_selected_city), # ifelse (initial_zoom_level == 'State', 'Statewide', initial_selected_city)),
                          hr(style = "border: 1px solid darkgrey"),
                          h4('CalEPA Regulated Sites:'),
                          # checkboxGroupInput(inputId = 'site_type_1', 
@@ -612,7 +614,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                             selectInput(inputId = 'analysis_city_selection',
                                         label = 'Select a City to Display in the Maps Below:',
                                         choices = unique(redline_polygons$holc_city),
-                                        selected = unique(redline_polygons$holc_city)[sample(1:length(unique(redline_polygons$holc_city)),1)], # pick a random city
+                                        selected = sample(unique(redline_polygons$holc_city), 1), # pick a random city
                                         multiple = FALSE)#,
                             ),
                         # div(style = "display:inline-block;vertical-align:top;",
@@ -1022,7 +1024,8 @@ server <- function(input, output, session) {
             ces3_poly <- reactive({
                 withProgress(message = 'Downloading Data...', style = 'notification', value = 1, {
                 if (data_source_ces3 == 'local') {
-                    ces3_poly_download <- st_read('data_processed/ces3_poly.gpkg') # st_read('data_processed/ces3_poly_simplified.gpkg')
+                    # ces3_poly_download <- st_read('data_processed/ces3_poly.gpkg') # st_read('data_processed/ces3_poly_simplified.gpkg')
+                    ces3_poly_download <- st_read('data_processed/ces3_poly_filtered.gpkg') # st_read('data_processed/ces3_poly_simplified.gpkg')
                 } else if (data_source_ces3 == 'remote') {
                 # # get data
                 #     ces3_poly_download <- read_rds('data_processed/ces3_poly_download.RDS')
@@ -1205,19 +1208,19 @@ server <- function(input, output, session) {
                 } else if (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & 
                            length(selected_site_types_d()) > 0) {    
                     withProgress(message = 'Getting Site Data', style = 'notification', value = 1, { # style = 'notification' 'old'
-                    # })
-                    # get CalEPA sites data from the geoserver api
-                        # # get the coordinates of the simplified rb boundary containing the selected city and convert to geojson
-                        #     rb_boundary_simplify_geojson <- rb_boundary_simplify() %>% sf_geojson()
-                        # # extract coordinates
-                        #     rb_boundary_coordinates <- rb_boundary_simplify_geojson %>%
-                        #         str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
-                        #                 end = nchar(rb_boundary_simplify_geojson)-7)
-                        # # format the coordinates for the api
-                        #     rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\],\\[', replacement = '|')
-                        #     rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = ',', replacement = '%20')
-                        #     rb_boundary_coordinates <- str_replace_all(string = rb_boundary_coordinates, pattern = '\\|', replacement = ',%20')
-                        # construct and make the api call
+                        # get CalEPA sites data from the geoserver api
+                        for (city_number in seq(nrow(holc_map_hulls))) {
+                            # get the coordinates of the hulls around each holc mapped city and convert to geojson
+                            holc_map_hulls_geojson <- holc_map_hulls[city_number,] %>% st_transform(4326) %>% sf_geojson()
+                            # extract coordinates
+                            hulls_coordinates <- holc_map_hulls_geojson %>% 
+                                str_sub(start = str_locate(string = ., pattern = 'coordinates\":') %>% as.data.frame() %>% pull(end) + 4,
+                                        end = nchar(holc_map_hulls_geojson)-7)
+                            # format the coordinates for the api
+                            hulls_coordinates <- str_replace_all(string = hulls_coordinates, pattern = '\\],\\[', replacement = '|')
+                            hulls_coordinates <- str_replace_all(string = hulls_coordinates, pattern = ',', replacement = '%20')
+                            hulls_coordinates <- str_replace_all(string = hulls_coordinates, pattern = '\\|', replacement = ',%20')
+                            # construct and make the api call
                             calepa_sites_typenames <- list('California Integrated Water Quality System (CIWQS)' = 'calepa:mv_fac_from_ciwqs',
                                                            'GeoTracker' = 'calepa:mv_fac_from_geotracker',
                                                            'Storm Water Multiple Application and Report Tracking System (SMARTS)' = 'calepa:mv_fac_from_smarts',
@@ -1235,14 +1238,14 @@ server <- function(input, output, session) {
                                 counter_sites <- counter_sites + 1
                                 # url <- calepa_sites_typenames[[site_type]]
                                 url_sites_api <- paste0('https://services.calepa.ca.gov/geoserver/calepa/',
-                                                           'ows?service=WFS&version=1.0.0',
-                                                           '&request=GetFeature',
-                                                           '&typeName=', calepa_sites_typenames[[site_type]], # 'calepa:mv_fac_from_ciwqs', # calepa:mv_fac_from_geotracker # calepa:mv_fac_from_smarts
-                                                           '&outputFormat=application%2Fjson'#,
-                                                           # '&CQL_FILTER=INTERSECTS(fac_point,POLYGON((',
-                                                           # rb_boundary_coordinates,
-                                                           # ')))'
-                                                        )
+                                                        'ows?service=WFS&version=1.0.0',
+                                                        '&request=GetFeature',
+                                                        '&typeName=', calepa_sites_typenames[[site_type]], # 'calepa:mv_fac_from_ciwqs', # calepa:mv_fac_from_geotracker # calepa:mv_fac_from_smarts
+                                                        '&outputFormat=application%2Fjson',
+                                                        '&CQL_FILTER=INTERSECTS(fac_point,POLYGON((',
+                                                        hulls_coordinates,
+                                                        ')))'
+                                )
                                 api_output <- readr::read_lines(url_sites_api)
                                 json_list <- jsonlite::fromJSON(api_output)
                                 df_api_result <- json_list$features
@@ -1251,12 +1254,18 @@ server <- function(input, output, session) {
                                 df_api_result <- bind_cols(df_api_result %>% select(id, data_source),
                                                            df_api_result$geometry,
                                                            df_api_result$properties)
-                                if (counter_sites == 1) {
-                                    cal_epa_sites_raw_download <- df_api_result
-                                } else {
-                                    cal_epa_sites_raw_download <- bind_rows(cal_epa_sites_raw_download, df_api_result)
-                                }
+                                ifelse(counter_sites == 1,
+                                       cal_epa_sites_raw_download_city <- df_api_result,
+                                       cal_epa_sites_raw_download_city <- bind_rows(cal_epa_sites_raw_download_city, 
+                                                                                    df_api_result)
+                                )
                             }
+                            ifelse (city_number == 1,
+                                    cal_epa_sites_raw_download <- cal_epa_sites_raw_download_city,
+                                    cal_epa_sites_raw_download <- bind_rows(cal_epa_sites_raw_download, 
+                                                                            cal_epa_sites_raw_download_city)
+                            )
+                        }
                     })
                     # Create an sf object from the sites data
                     cal_epa_sites_raw_download <- st_as_sf(cal_epa_sites_raw_download %>% filter(!is.na(latitude) & !is.na(longitude)),
@@ -1271,6 +1280,9 @@ server <- function(input, output, session) {
                         cal_epa_sites_raw_download <- cal_epa_sites_raw_download %>% 
                             st_transform(crs = projected_crs)
                         # st_crs(cal_epa_sites_raw_download)
+                        
+                    # filter for sites within the holc map polygons
+                        cal_epa_sites_raw_download <- cal_epa_sites_raw_download[redline_polygons, ]
                     # join to get the CES3 data (using the geometry from the tiger census tracts)
                         cal_epa_sites_raw_download <- st_join(cal_epa_sites_raw_download, 
                                                               ces3_tiger, 
@@ -1810,7 +1822,7 @@ server <- function(input, output, session) {
             #     )
             # })
             output$summary_table = DT::renderDataTable(
-                summary_table_df(),
+                summary_table_df(), # %>% mutate_if(is.numeric, as.numeric),
                 extensions = c('Buttons', 'Scroller'),
                 options = list(dom = 'Bfrtip',
                                buttons = list('colvis'#, 
@@ -2642,7 +2654,7 @@ server <- function(input, output, session) {
             } else if (initial_zoom_level == 'City') {
                 bounds_selected <- attributes(st_geometry(redline_polygons %>%
                                                               st_transform(crs = geographic_crs) %>% # have to convert to geographic coordinate system for leaflet
-                                                              filter(city == initial_selected_city)))$bbox
+                                                              filter(holc_city == initial_selected_city)))$bbox
             }
         # create the new (empty) map
             l_map2 <- leaflet(options = leafletOptions(zoomControl = FALSE, 
@@ -3086,7 +3098,7 @@ server <- function(input, output, session) {
 # MAPS (ANALYSIS) ----
     # create a list of counties corresponding to the HOLC city maps
     cities_counties <- list('Fresno' = 'Fresno',
-                            'Los Angeles' = 'Los Angeles',
+                            'Los Angeles' = c('Los Angeles', 'Orange'),
                             'Oakland' = 'Alameda',
                             'Sacramento' = c('Sacramento', 'Yolo'),
                             'San Diego' = 'San Diego',
