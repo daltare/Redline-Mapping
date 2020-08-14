@@ -146,7 +146,17 @@
                      here('data_processed', 
                           'rb_boundary_simplified.gpkg'), 
                      append = FALSE)
-
+    
+    # get hulls (simplified envelopes around each region, for use in API filters which 
+    # require relatively simple geometries (i.e. relatively few points) for filtering)
+        rb_boundary_hulls <- rb_boundary %>% slice(0)
+        for (rb_office in rb_boundary$RB_OFF) {
+            hull <- st_convex_hull(rb_boundary %>% filter(RB_OFF == rb_office))
+            rb_boundary_hulls <- bind_rows(rb_boundary_hulls, hull)
+        }
+        st_write(obj = rb_boundary_hulls, 
+                 here('data_processed', 'rb_boundary_hulls.gpkg'),
+                 append = FALSE)
 
 
 

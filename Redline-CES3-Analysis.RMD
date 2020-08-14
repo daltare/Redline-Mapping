@@ -3,12 +3,18 @@ title: "Redline - CalEnviroScreen3 Analysis"
 # author: "David"
 date: "*Updated: `r format(Sys.Date())`*"
 # output: html_document
+# output:
+#   html_document:
+#     code_folding: hide
+#     toc: TRUE
+#     toc_float: TRUE
+#     toc_depth: 5
 output:
-  html_document:
-    code_folding: hide
+  github_document:
     toc: TRUE
-    toc_float: TRUE
     toc_depth: 5
+    html_preview: TRUE
+    keep_html: TRUE
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
