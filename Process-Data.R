@@ -195,6 +195,27 @@
         st_write(obj = ces3_poly_simplify, 
                  here('data_processed', 'ces3_poly_simplified.gpkg'),
                  append = FALSE)
+        
+    # create filtered dataset with just CES3 polygons in or near holc mapped areas
+        redlined_cities_list <- c("Fresno", "Los Angeles", "Oakland", 
+                                  "Sacramento", "San Diego", "San Francisco", 
+                                  "San Jose", "Stockton")
+        ces3_poly_filtered <- ces3_poly %>% slice(0)
+        redline_polygons <- redline_polygons %>% st_transform(3310)
+        for (city in redlined_cities_list) {
+            hull <- st_convex_hull(st_union(redline_polygons %>% filter(holc_city == city)))
+            ifelse(city == 'Fresno', 
+                   hulls <- st_sf(hull) %>% mutate(city = city), 
+                   hulls <- bind_rows(hulls, st_sf(hull) %>% mutate(city = city)))
+            ces3_poly_filtered <- bind_rows(ces3_poly_filtered, ces3_poly[hull, ])
+        }
+        st_write(obj = ces3_poly_filtered, 
+                 here('data_processed', 'ces3_poly_filtered.gpkg'),
+                 append = FALSE)
+        st_write(obj = hulls, 
+                 here('data_processed', 'holc_map_hulls.gpkg'),
+                 append = FALSE)
+        
 
         
 # Water Supplier Service Areas ----------------------------------------------------------------------------------------------

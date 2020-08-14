@@ -131,11 +131,20 @@ library(tidylog)
                                         redline_polygons %>% select(-c(area_description_excerpts, holc_link, holc_year)), 
                                         join = st_intersects) # only join sites that fall within HOLC polygons
         # drop the geometry (make into data frame)
-            calepa_reg_sites <- calepa_reg_sites %>% st_drop_geometry()
+            calepa_reg_sites_df <- calepa_reg_sites %>% st_drop_geometry()
     # save the revised sites dataset to csv
-        write_csv(x = calepa_reg_sites,
+        write_csv(x = calepa_reg_sites_df,
                   path = here('data_regulatory_actions',
                               'regulated_sites_processed.csv'))
+
+    # create a filtered dataset with just the sites in the holc mapped areas
+        calepa_reg_sites_filter <- calepa_reg_sites[redline_polygons, ]
+        calepa_reg_sites_filter_df <- calepa_reg_sites_filter %>% st_drop_geometry()
+        # save the revised sites dataset to csv
+            write_csv(x = calepa_reg_sites_filter_df,
+                      path = here('data_regulatory_actions_filter',
+                                  'regulated_sites_processed_filter.csv'))
+            
             
             
     # CalEPA regulatory data
@@ -209,8 +218,33 @@ library(tidylog)
                        source = enf_action_source) %>% 
                 relocate(action, .after = action_date) %>% 
                 {.}
+            
+    # write filtered datasets to csv
+        # Inspections
+        write_csv(x = inspections_all_download %>% 
+                      filter(site_id %in% calepa_reg_sites_filter_df$site_id),
+                  path = here('data_regulatory_actions_filter',
+                              'Evaluations_filter.csv'))
+        # Violations
+        write_csv(x = violations_all_download %>% 
+                      filter(site_id %in% calepa_reg_sites_filter_df$site_id),
+                  path = here('data_regulatory_actions_filter',
+                              'Violations_filter.csv'))
+        # Enforcement Actions
+        write_csv(x = enforcement_all_download %>% 
+              filter(site_id %in% calepa_reg_sites_filter_df$site_id),
+          path = here('data_regulatory_actions_filter',
+                      'EA_filter.csv'))
+        # Program Types (Site EI)
+        program_types <- fread('data_regulatory_actions/SiteEI.csv') %>% 
+            tibble() %>% clean_names() %>% select(-dplyr::ends_with(as.character(0:9)))
+        write_csv(x = program_types %>% 
+              filter(site_id %in% calepa_reg_sites_filter_df$site_id),
+          path = here('data_regulatory_actions_filter',
+                      'SiteEI_filter.csv'))
 
-        rm(list = c('inspections_all_download', 'violations_all_download', 'enforcement_all_download'))            
+        rm(list = c('inspections_all_download', 'violations_all_download', 
+                    'enforcement_all_download', 'program_types'))            
         gc()
 
 # for option 2 below
@@ -247,6 +281,18 @@ library(tidylog)
                   path = here('data_regulatory_actions',
                               'regulatory_actions_processed-fy_summary.csv'))
             
+    # create filtered datasets with just reg action data for sites in holc mapped areas
+        reg_actions_all_2_filter <- reg_actions_all_2 %>% 
+            filter(site_id %in% calepa_reg_sites_filter_df$site_id)
+        write_csv(x = reg_actions_all_2_filter,
+                  path = here('data_regulatory_actions_filter',
+                              'regulatory_actions_processed_filter.csv'))
+        reg_actions_all_2_fy_summary_filter <- reg_actions_all_2_fy_summary %>% 
+            filter(site_id %in% calepa_reg_sites_filter_df$site_id)
+        write_csv(x = reg_actions_all_2_fy_summary_filter,
+                  path = here('data_regulatory_actions_filter',
+                              'regulatory_actions_processed-fy_summary_filter.csv'))
+        
         
 # # tests (to be done in app)
 ##############################################################-
