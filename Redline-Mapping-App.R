@@ -1,3 +1,8 @@
+# NOTE: to publish this app, include the following folders (along with this script file):
+#   - data_processed
+#   - data_processed-analysis
+#   - data_regulatory_actions_filter
+
 # Define some initial settings ----
     # DEFINE DATA SOURCES - local or remote (remote = API)
         data_source_ces3 <- 'local' # CalEnviroScreen - getting from local source allows them to be simplified first
@@ -316,7 +321,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                          #                    selected = c('A','B','C','D')),
                          hr(style = "border: 1px solid darkgrey"),
                          h4('Redlining Data:'),
-                         tags$b('Filter For Sites Within HOLC Assessed Areas:'),
+                         tags$b('Filter For Sites By HOLC Grade or Location:'),
                          switchInput(inputId = 'holc_rating_sites_filter_on_off', 
                                      value = FALSE, 
                                      size = 'small'),
@@ -1266,7 +1271,11 @@ server <- function(input, output, session) {
                                                                             cal_epa_sites_raw_download_city)
                             )
                         }
-                    })
+                    # if (input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)' | 
+                    #     (input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & 
+                    #        length(selected_site_types_d()) > 0)) {
+                        
+                    
                     # Create an sf object from the sites data
                     cal_epa_sites_raw_download <- st_as_sf(cal_epa_sites_raw_download %>% filter(!is.na(latitude) & !is.na(longitude)),
                                                          coords = c('longitude', 'latitude'),
@@ -1314,9 +1323,10 @@ server <- function(input, output, session) {
                             select(names(calepa_sites_processed)) # reorder the columns
                     # return the object
                         return(cal_epa_sites_raw_download)
-                } else {
+                    })
+                    } else {
                         return(tibble())
-                    }
+                }
             })
             
             
@@ -2194,7 +2204,7 @@ server <- function(input, output, session) {
         # CalEPA sites
             observe({
                 withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
-                if (length(selected_site_types_d()) > 0 | input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
+                if ((input$sites_source == 'Select By Type (Source: CalEPA Geoserver)' & length(selected_site_types_d()) > 0) | input$sites_source == 'All Sites (Source: CalEPA Regulated Site Portal)') {
                     cal_epa_sites <- cal_epa_sites_filtered() %>% 
                         filter(!is.na(latitude) & !is.na(longitude)) %>% 
                         st_as_sf(coords = c('longitude', 'latitude'),
