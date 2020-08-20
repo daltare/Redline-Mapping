@@ -1,0 +1,222 @@
+---
+title: 'Build Model To Predict HOLC Grade Based On CES Scores'
+author: "Dave"
+date: "`r format(Sys.Date())`"
+# output:
+#     html_document:
+#         code_folding: show
+#         toc: TRUE
+#         toc_float: TRUE
+#         toc_depth: 5
+output:
+  github_document:
+    toc: TRUE
+    toc_depth: 5
+    html_preview: TRUE
+    keep_html: TRUE
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE) # cache = TRUE, # dpi = 180, fig.width = 8, fig.height = 5
+library(tidyverse)
+library(here)
+```
+
+## Intro - Random Forest Model For Multi-Class Classification
+
+Reference: https://juliasilge.com/blog/multinomial-volcano-eruptions/
+
+
+
+## Import Data
+```{r}
+library(sf)
+
+df_departure_scores <- st_read(here('data_processed-analysis', 
+                                    'departure-area_weighted_scores.gpkg'))
+glimpse(df_departure_scores)
+range(df_departure_scores$ces_3_score)
+```
+
+
+
+## Build a Model
+
+Create a dataset for modeling, by selecting the relevant predictor and outcome variables, and converting character fields to factor.
+```{r}
+library(tidymodels)
+
+holc_df <- df_departure_scores %>% 
+    st_drop_geometry() %>% 
+    mutate(holc_city = factor(holc_city),
+           holc_grade = factor(holc_grade)) %>% 
+    select(-holc_id, 
+           -score_type, 
+           -ces_3_score,
+           -pollution_burden_group, 
+           -pollution_burden_group_score, 
+           -pollution_burden_group_percentile,
+           -population_characteristics_group,
+           -population_characteristics_group_score,
+           -population_characteristics_group_percentile) %>% 
+    select(-contains('percentile'))
+
+glimpse(holc_df)
+holc_df %>%
+  count(holc_grade, sort = TRUE)
+```
+
+
+Instead of splitting this small-ish dataset into training and testing data, let’s create a set of bootstrap resamples.
+
+```{r}
+holc_boot <- bootstraps(holc_df)
+
+holc_boot
+```
+
+Let’s train our multinomial classification model on these resamples, but keep in mind that the performance estimates are probably pessimistically biased.
+
+Let’s preprocess our data next, using a recipe. Since there are imbalances, let’s use SMOTE upsampling (via the themis package) to balance the classes.
+
+Let’s walk through the steps in this recipe:
+
+- First, we must tell the recipe() what our model is going to be (using a formula here) and what data we are using.
+- Next, we update the role for holc_city and holc_id, since these are a variable we want to keep around for convenience as an identifier for rows but are not a predictor or outcome.
+- Next, we can create indicator variables and remove variables with zero variance.
+- Before oversampling, we center and scale (i.e. normalize) all the predictors.
+- Finally, we implement SMOTE oversampling so that the holc grades are balanced!
+
+```{r}
+library(themis)
+
+holc_rec <- recipe(holc_grade ~ ., data = holc_df) %>%
+  update_role(holc_city, holc_id_2, new_role = "Id") %>%
+  # step_other(tectonic_settings) %>%
+  # step_other(major_rock_1) %>%
+  # step_dummy(tectonic_settings, major_rock_1) %>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_predictors()) %>%
+  step_smote(holc_grade)
+```
+
+Before using prep() these steps have been defined but not actually run or implemented. The prep() function is where everything gets evaluated. You can use juice() to get the preprocessed data back out and check on your results.
+
+```{r}
+holc_prep <- prep(holc_rec)
+juice(holc_prep)
+```
+
+Now it’s time to specify our model. I am using a workflow() in this example for convenience; these are objects that can help you manage modeling pipelines more easily, with pieces that fit together like Lego blocks. This workflow() contains both the recipe and the model, a random forest classifier. The ranger implementation for random forest can handle multinomial classification without any special handling.
+
+```{r}
+rf_spec <- rand_forest(trees = 1000) %>%
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+holc_wf <- workflow() %>%
+  add_recipe(holc_rec) %>%
+  add_model(rf_spec)
+
+holc_wf
+```
+
+Now we can fit our workflow to our resamples.
+
+```{r}
+holc_res <- fit_resamples(
+  holc_wf,
+  resamples = holc_boot,
+  control = control_resamples(save_pred = TRUE)
+)
+```
+
+
+
+## Explore results
+
+One of the biggest differences when working with multiclass problems is that your performance metrics are different. The yardstick package provides implementations for many multiclass metrics.
+
+```{r}
+holc_res %>%
+  collect_metrics()
+```
+
+We can create a confusion matrix to see how the different classes did.
+
+```{r}
+holc_res %>%
+  collect_predictions() %>%
+  conf_mat(holc_grade, .pred_class)
+```
+
+What can we learn about variable importance, using the vip package?
+
+```{r}
+library(vip)
+
+rf_spec %>%
+    set_engine("ranger", importance = "permutation") %>%
+    fit(
+        holc_grade ~ .,
+        data = juice(holc_prep) %>%
+            select(-holc_city, -holc_id_2) # %>% janitor::clean_names()
+    ) %>%
+    vip(geom = "point")
+```
+
+Let’s explore the spatial information a bit further, and make a map showing how right or wrong our modeling is across the state. Let’s join the predictions back to the original data.
+
+```{r}
+holc_pred <- holc_res %>%
+    collect_predictions() %>%
+    mutate(correct = holc_grade == .pred_class) %>%
+    left_join(holc_df %>% 
+                  select(-holc_grade) %>% 
+                  mutate(.row = row_number()), 
+              by = '.row')
+
+# get the lat/lon of the centroid for each holc polygon
+df_centroids <- df_departure_scores %>% 
+    st_centroid() %>% 
+    st_transform(4326) %>% 
+    mutate(.row = row_number()) %>% 
+    mutate(long = st_coordinates(.)[,1],
+           lat = st_coordinates(.)[,2])
+# join
+holc_pred <- holc_pred %>% 
+    left_join(df_centroids %>% 
+                  select(.row, long, lat) %>% 
+                  st_drop_geometry(), 
+              by = '.row')
+    
+holc_pred
+View(holc_pred)
+```
+
+
+Then, let’s make a map using stat_summary_hex(). Within each hexagon, let’s take the mean of correct to find what percentage of holc grades were classified correctly, across all our bootstrap resamples.
+
+```{r}
+library(maps)
+# world <- map_data('world')
+states <- map_data('state')
+california <- states %>% filter(region == 'california')
+
+ggplot() +
+  geom_map(
+    data = california, map = california,
+    aes(long, lat, map_id = region),
+    color = "white", fill = "gray90", size = 0.05, alpha = 0.5
+  ) +
+  stat_summary_hex(
+    data = holc_pred,
+    aes(long, lat, z = as.integer(correct)),
+    fun = "mean",
+    alpha = 0.7, bins = 50
+  ) +
+  scale_fill_gradient(high = "cyan3", labels = scales::percent) +
+  theme_void() + # base_family = "IBMPlexSans") +
+  labs(x = NULL, y = NULL, fill = "Percent classified\ncorrectly")
+```
