@@ -1,17 +1,23 @@
-Build Model To Predict HOLC Grade Based On CES Scores
+Statistical Analysis and Modeling
 ================
 Dave
-2020-08-20
+2020-08-21
 
-  - [Intro - Random Forest Model For Multi-Class
-    Classification](#intro---random-forest-model-for-multi-class-classification)
+  - [Intro](#intro)
   - [Import Data](#import-data)
+  - [Correlation Test For Aggregation
+    Methods](#correlation-test-for-aggregation-methods)
+      - [Visualize Correlation](#visualize-correlation)
+      - [Run Correlation Tests](#run-correlation-tests)
+  - [Statistical Tests For Significance of Differences In CES Scores
+    Between HOLC
+    Grades](#statistical-tests-for-significance-of-differences-in-ces-scores-between-holc-grades)
+      - [Pairwise t-test](#pairwise-t-test)
+      - [Tukey HSD](#tukey-hsd)
   - [Build a Model](#build-a-model)
   - [Explore results](#explore-results)
 
-## Intro - Random Forest Model For Multi-Class Classification
-
-Reference: <https://juliasilge.com/blog/multinomial-volcano-eruptions/>
+## Intro
 
 ## Import Data
 
@@ -105,10 +111,209 @@ range(df_departure_scores$ces_3_score)
 
     ## [1] -29.85058  37.41357
 
+``` r
+# departure scores using the nearest centroid approach
+df_departure_scores_centroid <- st_read(here('data_processed-analysis', 
+                                             'departure-centroid_scores.gpkg'))
+```
+
+    ## Reading layer `departure-centroid_scores' from data source `C:\David\Redline-Mapping\data_processed-analysis\departure-centroid_scores.gpkg' using driver `GPKG'
+    ## Simple feature collection with 868 features and 62 fields
+    ## geometry type:  MULTIPOLYGON
+    ## dimension:      XY
+    ## bbox:           xmin: -220760 ymin: -590129.8 xmax: 279880.3 ymax: 68016.7
+    ## projected CRS:  NAD83 / California Albers
+
+## Correlation Test For Aggregation Methods
+
+Test the correlation between HOLC CES scores calculated with the area
+weighted average approach versus the nearest centroid approach.
+
+### Visualize Correlation
+
+Start with a scatter plot of the CES departure scores computed with each
+method to visualize the correlation.
+
+``` r
+g <- ggplot() +
+    geom_point(aes(x = df_departure_scores$ces_3_score,
+                   y = df_departure_scores_centroid$ces_3_score)) + 
+    geom_smooth(aes(x = df_departure_scores$ces_3_score,
+                   y = df_departure_scores_centroid$ces_3_score), 
+                method = 'lm') + 
+    labs(x = 'Departure Score (Area Weighted Average)',
+         y = 'Departure Score (Nearest Centroid)') +
+    geom_abline(slope = 1, linetype = 'dashed') +
+    coord_fixed()
+    
+g
+```
+
+![](Statistical-Analysis-And-Modeling_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
+``` r
+# df_delete <- df_departure_scores %>%
+#     st_drop_geometry() %>% 
+#     tibble() %>% 
+#     left_join(df_departure_scores_centroid %>%
+#                   st_drop_geometry() %>% 
+#                   tibble() %>% 
+#                   select(holc_city, holc_id_2, ces_3_score) %>% 
+#                   rename(ces_3_score_cent = ces_3_score),
+#               by = c('holc_city', 'holc_id_2'))
+# gg <- ggplot() +
+#     geom_point(aes(x = df_delete$ces_3_score,
+#                    y = df_delete$ces_3_score_cent))
+# gg
+```
+
+### Run Correlation Tests
+
+Reference:
+<http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r#spearman-rank-correlation-coefficient>
+
+Start with a Spearman rank correlation test (calculate the Spearman’s
+rho statistic) which is a non-parametric test (can be used if the data
+do not come from a bivariate normal distribution).
+
+The correlation coefficient is a number between -1 and 1. Values near -1
+or 1 indicate strong negative or positive correlations, and values near
+zero indicate no correlation.
+
+``` r
+aggregation_corr_spear <- cor.test(df_departure_scores$ces_3_score, 
+                                   df_departure_scores_centroid$ces_3_score,
+                                   method = "spearman", 
+                                   exact = FALSE)
+aggregation_corr_spear
+```
+
+    ## 
+    ##  Spearman's rank correlation rho
+    ## 
+    ## data:  df_departure_scores$ces_3_score and df_departure_scores_centroid$ces_3_score
+    ## S = 6658799, p-value < 2.2e-16
+    ## alternative hypothesis: true rho is not equal to 0
+    ## sample estimates:
+    ##       rho 
+    ## 0.9389074
+
+``` r
+broom::tidy(aggregation_corr_spear)
+```
+
+    ## # A tibble: 1 x 5
+    ##   estimate statistic p.value method                          alternative
+    ##      <dbl>     <dbl>   <dbl> <chr>                           <chr>      
+    ## 1    0.939  6658799.       0 Spearman's rank correlation rho two.sided
+
+Alternatively try a Kendall rank correlation test. The Kendall rank
+correlation coefficient or Kendall’s tau statistic is used to estimate a
+rank-based measure of association. This test may be used if the data do
+not necessarily come from a bivariate normal distribution.
+
+``` r
+aggregation_corr_kendall <- cor.test(df_departure_scores$ces_3_score, 
+                                   df_departure_scores_centroid$ces_3_score,
+                                   method = "kendall")
+aggregation_corr_kendall
+```
+
+    ## 
+    ##  Kendall's rank correlation tau
+    ## 
+    ## data:  df_departure_scores$ces_3_score and df_departure_scores_centroid$ces_3_score
+    ## z = 35.725, p-value < 2.2e-16
+    ## alternative hypothesis: true tau is not equal to 0
+    ## sample estimates:
+    ##       tau 
+    ## 0.8102906
+
+``` r
+broom::tidy(aggregation_corr_kendall)
+```
+
+    ## # A tibble: 1 x 5
+    ##   estimate statistic   p.value method                         alternative
+    ##      <dbl>     <dbl>     <dbl> <chr>                          <chr>      
+    ## 1    0.810      35.7 1.63e-279 Kendall's rank correlation tau two.sided
+
+## Statistical Tests For Significance of Differences In CES Scores Between HOLC Grades
+
+Perform some statistical tests to determine the level of significance of
+the observed differences in aggregated CES departure scores between HOLC
+grades.
+
+References:
+
+  - <https://towardsdatascience.com/a-gentle-guide-to-statistics-in-r-ccb91cc1177e>
+
+### Pairwise t-test
+
+``` r
+df_stats <- df_departure_scores %>% 
+    transmute(holc_grade = factor(holc_grade),
+              ces_3_score)
+test_pairwise <- pairwise.t.test(df_stats$ces_3_score, df_stats$holc_grade, p.adj = "none")
+tidy_test_pairwise <- broom::tidy(test_pairwise)
+tidy_test_pairwise
+```
+
+    ## # A tibble: 6 x 3
+    ##   group1 group2  p.value
+    ##   <chr>  <chr>     <dbl>
+    ## 1 B      A      4.70e- 8
+    ## 2 C      A      2.98e-26
+    ## 3 C      B      1.69e-12
+    ## 4 D      A      2.23e-44
+    ## 5 D      B      1.12e-31
+    ## 6 D      C      7.89e-11
+
+### Tukey HSD
+
+``` r
+# Tukey
+# AOV
+test_aov <- aov(ces_3_score ~ holc_grade, data = df_stats)
+summary(test_aov)
+```
+
+    ##              Df Sum Sq Mean Sq F value Pr(>F)    
+    ## holc_grade    3  36515   12172   91.41 <2e-16 ***
+    ## Residuals   864 115043     133                   
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+# call and tidy the tukey posthoc
+tidy_tukey <- broom::tidy(TukeyHSD(test_aov, which = 'holc_grade'))
+tidy_tukey
+```
+
+    ## # A tibble: 6 x 7
+    ##   term       contrast null.value estimate conf.low conf.high adj.p.value
+    ##   <chr>      <chr>         <dbl>    <dbl>    <dbl>     <dbl>       <dbl>
+    ## 1 holc_grade B-A               0     7.21     3.84     10.6     2.81e- 7
+    ## 2 holc_grade C-A               0    14.0     10.7      17.2     7.47e-13
+    ## 3 holc_grade D-A               0    21.4     17.6      25.1     7.20e-13
+    ## 4 holc_grade C-B               0     6.76     4.33      9.19    1.09e-11
+    ## 5 holc_grade D-B               0    14.2     11.2      17.1     7.20e-13
+    ## 6 holc_grade D-C               0     7.40     4.50     10.3     4.74e-10
+
 ## Build a Model
 
-Create a dataset for modeling, by selecting the relevant predictor and
-outcome variables, and converting character fields to factor.
+Try building a model to predict HOLC grade based on CES scores. This is
+primarily just for testing and practice, but may also possibly be used
+to better understand what CES indicators contribute most to the
+differences observed in overall CES scores between the HOLC grades
+(i.e., what CES indicators are most significant in explaining
+differences in current conditions between HOLC grades).
+
+Reference (Random Forest Model For Multi-Class Classification):
+<https://juliasilge.com/blog/multinomial-volcano-eruptions/>
+
+First create a dataset for modeling, by selecting the relevant predictor
+and outcome variables, and converting character fields to factor.
 
 ``` r
 library(tidymodels)
@@ -190,16 +395,16 @@ holc_boot
     ## # A tibble: 25 x 2
     ##    splits            id         
     ##    <list>            <chr>      
-    ##  1 <split [868/326]> Bootstrap01
-    ##  2 <split [868/313]> Bootstrap02
-    ##  3 <split [868/315]> Bootstrap03
-    ##  4 <split [868/316]> Bootstrap04
-    ##  5 <split [868/309]> Bootstrap05
-    ##  6 <split [868/336]> Bootstrap06
-    ##  7 <split [868/325]> Bootstrap07
-    ##  8 <split [868/324]> Bootstrap08
-    ##  9 <split [868/340]> Bootstrap09
-    ## 10 <split [868/318]> Bootstrap10
+    ##  1 <split [868/330]> Bootstrap01
+    ##  2 <split [868/320]> Bootstrap02
+    ##  3 <split [868/317]> Bootstrap03
+    ##  4 <split [868/304]> Bootstrap04
+    ##  5 <split [868/325]> Bootstrap05
+    ##  6 <split [868/311]> Bootstrap06
+    ##  7 <split [868/309]> Bootstrap07
+    ##  8 <split [868/315]> Bootstrap08
+    ##  9 <split [868/325]> Bootstrap09
+    ## 10 <split [868/323]> Bootstrap10
     ## # ... with 15 more rows
 
 Let’s train our multinomial classification model on these resamples, but
@@ -337,8 +542,8 @@ holc_res %>%
     ## # A tibble: 2 x 5
     ##   .metric  .estimator  mean     n std_err
     ##   <chr>    <chr>      <dbl> <int>   <dbl>
-    ## 1 accuracy multiclass 0.436    25 0.00505
-    ## 2 roc_auc  hand_till  0.734    25 0.00307
+    ## 1 accuracy multiclass 0.436    25 0.00417
+    ## 2 roc_auc  hand_till  0.732    25 0.00290
 
 We can create a confusion matrix to see how the different classes did.
 
@@ -350,10 +555,10 @@ holc_res %>%
 
     ##           Truth
     ## Prediction    A    B    C    D
-    ##          A  459  524   94   32
-    ##          B  446 1055  880  136
-    ##          C   68  811 1411  671
-    ##          D   17  136  706  563
+    ##          A  496  531  107   33
+    ##          B  422 1008  822  143
+    ##          C   80  860 1404  661
+    ##          D   22  134  689  569
 
 What can we learn about variable importance, using the vip package?
 
@@ -370,7 +575,7 @@ rf_spec %>%
     vip(geom = "point")
 ```
 
-![](Redline-CES-Classification-Model_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](Statistical-Analysis-And-Modeling_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 Let’s explore the spatial information a bit further, and make a map
 showing how right or wrong our modeling is across the state. Let’s join
@@ -402,20 +607,20 @@ holc_pred <- holc_pred %>%
 holc_pred
 ```
 
-    ## # A tibble: 8,009 x 42
+    ## # A tibble: 7,981 x 42
     ##    id    .pred_A .pred_B .pred_C .pred_D  .row .pred_class holc_grade correct
     ##    <chr>   <dbl>   <dbl>   <dbl>   <dbl> <int> <fct>       <fct>      <lgl>  
-    ##  1 Boot~  0.0110   0.359   0.443  0.187      6 C           B          FALSE  
-    ##  2 Boot~  0.0115   0.136   0.590  0.262      7 C           B          FALSE  
-    ##  3 Boot~  0.187    0.284   0.155  0.374      8 D           C          FALSE  
-    ##  4 Boot~  0.104    0.542   0.253  0.101     10 B           C          FALSE  
-    ##  5 Boot~  0.0130   0.150   0.572  0.265     18 C           D          FALSE  
-    ##  6 Boot~  0.0350   0.159   0.695  0.111     19 C           D          FALSE  
-    ##  7 Boot~  0.0135   0.128   0.457  0.401     22 C           D          FALSE  
-    ##  8 Boot~  0.0743   0.289   0.432  0.205     23 C           D          FALSE  
-    ##  9 Boot~  0.0218   0.245   0.526  0.208     24 C           D          FALSE  
-    ## 10 Boot~  0.241    0.556   0.170  0.0330    25 B           A          FALSE  
-    ## # ... with 7,999 more rows, and 33 more variables: holc_city <fct>,
+    ##  1 Boot~ 0.406    0.283   0.227  0.0833      1 A           A          TRUE   
+    ##  2 Boot~ 0.311    0.342   0.248  0.0985      3 B           B          TRUE   
+    ##  3 Boot~ 0.00873  0.0473  0.691  0.253       7 C           B          FALSE  
+    ##  4 Boot~ 0.146    0.351   0.336  0.167      10 B           C          FALSE  
+    ##  5 Boot~ 0.0405   0.0933  0.789  0.0774     19 C           D          FALSE  
+    ##  6 Boot~ 0.0602   0.123   0.418  0.399      20 C           D          FALSE  
+    ##  7 Boot~ 0.0952   0.182   0.336  0.387      21 D           D          TRUE   
+    ##  8 Boot~ 0.357    0.421   0.178  0.0431     25 B           A          FALSE  
+    ##  9 Boot~ 0.208    0.330   0.288  0.174      27 B           A          FALSE  
+    ## 10 Boot~ 0.916    0.0572  0.0220 0.00494    30 A           A          TRUE   
+    ## # ... with 7,971 more rows, and 33 more variables: holc_city <fct>,
     ## #   holc_id_2 <chr>, ozone_score <dbl>, pm_2_5_score <dbl>,
     ## #   diesel_pm_score <dbl>, drinking_water_score <dbl>, pesticides_score <dbl>,
     ## #   toxic_releases_score <dbl>, traffic_score <dbl>, cleanup_sites_score <dbl>,
@@ -461,4 +666,4 @@ ggplot() +
   labs(x = NULL, y = NULL, fill = "Percent classified\ncorrectly")
 ```
 
-![](Redline-CES-Classification-Model_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](Statistical-Analysis-And-Modeling_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->

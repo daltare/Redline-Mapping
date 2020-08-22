@@ -1,5 +1,5 @@
 ---
-title: 'Build Model To Predict HOLC Grade Based On CES Scores'
+title: 'Statistical Analysis and Modeling'
 author: "Dave"
 date: "`r format(Sys.Date())`"
 # output:
@@ -18,14 +18,12 @@ output:
 
 ```{r setup, include=FALSE}
 library(knitr)
-knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE) # cache = TRUE, # dpi = 180, fig.width = 8, fig.height = 5
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = TRUE, cache = TRUE) # dpi = 180, fig.width = 8, fig.height = 5
 library(tidyverse)
 library(here)
 ```
 
-## Intro - Random Forest Model For Multi-Class Classification
-
-Reference: https://juliasilge.com/blog/multinomial-volcano-eruptions/
+## Intro 
 
 
 
@@ -37,13 +35,114 @@ df_departure_scores <- st_read(here('data_processed-analysis',
                                     'departure-area_weighted_scores.gpkg'))
 glimpse(df_departure_scores)
 range(df_departure_scores$ces_3_score)
+
+# departure scores using the nearest centroid approach
+df_departure_scores_centroid <- st_read(here('data_processed-analysis', 
+                                             'departure-centroid_scores.gpkg'))
+```
+
+
+
+## Correlation Test For Aggregation Methods
+Test the correlation between HOLC CES scores calculated with the area weighted average approach versus the nearest centroid approach. 
+
+### Visualize Correlation
+Start with a scatter plot of the CES departure scores computed with each method to visualize the correlation.
+```{r}
+g <- ggplot() +
+    geom_point(aes(x = df_departure_scores$ces_3_score,
+                   y = df_departure_scores_centroid$ces_3_score)) + 
+    geom_smooth(aes(x = df_departure_scores$ces_3_score,
+                   y = df_departure_scores_centroid$ces_3_score), 
+                method = 'lm') + 
+    labs(x = 'Departure Score (Area Weighted Average)',
+         y = 'Departure Score (Nearest Centroid)') +
+    geom_abline(slope = 1, linetype = 'dashed') +
+    coord_fixed()
+    
+g
+
+# df_delete <- df_departure_scores %>%
+#     st_drop_geometry() %>% 
+#     tibble() %>% 
+#     left_join(df_departure_scores_centroid %>%
+#                   st_drop_geometry() %>% 
+#                   tibble() %>% 
+#                   select(holc_city, holc_id_2, ces_3_score) %>% 
+#                   rename(ces_3_score_cent = ces_3_score),
+#               by = c('holc_city', 'holc_id_2'))
+# gg <- ggplot() +
+#     geom_point(aes(x = df_delete$ces_3_score,
+#                    y = df_delete$ces_3_score_cent))
+# gg
+```
+
+### Run Correlation Tests
+Reference: http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r#spearman-rank-correlation-coefficient
+
+Start with a Spearman rank correlation test (calculate the Spearman’s rho statistic) which is a non-parametric test (can be used if the data do not come from a bivariate normal distribution).
+
+The correlation coefficient is a number between -1 and 1. Values near -1 or 1 indicate strong negative or positive correlations, and values near zero indicate no correlation.
+```{r}
+aggregation_corr_spear <- cor.test(df_departure_scores$ces_3_score, 
+                                   df_departure_scores_centroid$ces_3_score,
+                                   method = "spearman", 
+                                   exact = FALSE)
+aggregation_corr_spear
+broom::tidy(aggregation_corr_spear)
+```
+
+Alternatively try a Kendall rank correlation test. The Kendall rank correlation coefficient or Kendall’s tau statistic is used to estimate a rank-based measure of association. This test may be used if the data do not necessarily come from a bivariate normal distribution.
+```{r}
+aggregation_corr_kendall <- cor.test(df_departure_scores$ces_3_score, 
+                                   df_departure_scores_centroid$ces_3_score,
+                                   method = "kendall")
+aggregation_corr_kendall
+broom::tidy(aggregation_corr_kendall)
+```
+
+
+
+## Statistical Tests For Significance of Differences In CES Scores Between HOLC Grades
+
+Perform some statistical tests to determine the level of significance of the observed differences in aggregated CES departure scores between HOLC grades. 
+
+References: 
+
+- https://towardsdatascience.com/a-gentle-guide-to-statistics-in-r-ccb91cc1177e
+
+### Pairwise t-test
+
+```{r}
+df_stats <- df_departure_scores %>% 
+    transmute(holc_grade = factor(holc_grade),
+              ces_3_score)
+test_pairwise <- pairwise.t.test(df_stats$ces_3_score, df_stats$holc_grade, p.adj = "none")
+tidy_test_pairwise <- broom::tidy(test_pairwise)
+tidy_test_pairwise
+```
+
+### Tukey HSD
+
+```{r}
+# Tukey
+# AOV
+test_aov <- aov(ces_3_score ~ holc_grade, data = df_stats)
+summary(test_aov)
+
+# call and tidy the tukey posthoc
+tidy_tukey <- broom::tidy(TukeyHSD(test_aov, which = 'holc_grade'))
+tidy_tukey
 ```
 
 
 
 ## Build a Model
+Try building a model to predict HOLC grade based on CES scores. This is primarily just for testing and practice, but may also possibly be used to better understand what CES indicators contribute most to the differences observed in overall CES scores between the HOLC grades (i.e., what CES indicators are most significant in explaining differences in current conditions between HOLC grades).
 
-Create a dataset for modeling, by selecting the relevant predictor and outcome variables, and converting character fields to factor.
+Reference (Random Forest Model For Multi-Class Classification):  https://juliasilge.com/blog/multinomial-volcano-eruptions/
+
+First create a dataset for modeling, by selecting the relevant predictor and outcome variables, and converting character fields to factor.
 ```{r}
 library(tidymodels)
 
