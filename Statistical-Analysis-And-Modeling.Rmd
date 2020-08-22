@@ -61,20 +61,6 @@ g <- ggplot() +
     coord_fixed()
     
 g
-
-# df_delete <- df_departure_scores %>%
-#     st_drop_geometry() %>% 
-#     tibble() %>% 
-#     left_join(df_departure_scores_centroid %>%
-#                   st_drop_geometry() %>% 
-#                   tibble() %>% 
-#                   select(holc_city, holc_id_2, ces_3_score) %>% 
-#                   rename(ces_3_score_cent = ces_3_score),
-#               by = c('holc_city', 'holc_id_2'))
-# gg <- ggplot() +
-#     geom_point(aes(x = df_delete$ces_3_score,
-#                    y = df_delete$ces_3_score_cent))
-# gg
 ```
 
 ### Run Correlation Tests
@@ -192,9 +178,8 @@ library(themis)
 
 holc_rec <- recipe(holc_grade ~ ., data = holc_df) %>%
   update_role(holc_city, holc_id_2, new_role = "Id") %>%
-  # step_other(tectonic_settings) %>%
-  # step_other(major_rock_1) %>%
-  # step_dummy(tectonic_settings, major_rock_1) %>%
+  # step_other() %>%
+  # step_dummy() %>%
   step_zv(all_predictors()) %>%
   step_normalize(all_predictors()) %>%
   step_smote(holc_grade)
@@ -260,7 +245,7 @@ rf_spec %>%
     fit(
         holc_grade ~ .,
         data = juice(holc_prep) %>%
-            select(-holc_city, -holc_id_2) # %>% janitor::clean_names()
+            select(-holc_city, -holc_id_2) 
     ) %>%
     vip(geom = "point")
 ```
