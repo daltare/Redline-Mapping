@@ -25,3 +25,11 @@ regulatory_actions_processed-fy_summary.csv
 *.html
 *_OLD.R
 *_cache/
+
+CES_ZipCode_App.R
+Redline thoughts.txt
+Redline-CES3-Analysis-Shiny.RMD
+_data_raw/
+_data_regulatory_actions/
+_storymap/
+data_zip_codes/

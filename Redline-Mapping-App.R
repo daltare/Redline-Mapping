@@ -250,7 +250,42 @@
 # ----------------------------------------------------------------------------------------------------------------------------------------------- #
 # Define UI --------------------------------------------------------------------
 ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythemes::shinytheme('flatly'),
-    # Maps / Tabular Data Tab ----
+    # Home tab ----
+    id = "tab_being_displayed", # will set input$tab_being_displayed
+        tabPanel('Home',
+                 h3('Welcome to the CalEPA Redlining and Environmental Justice Tool'),
+                 p('This tool was developed by the CalEPA to allow staff and the public
+                   to access and assess CalEPA data as it relates to environmental justice and
+                   racial equity isses.'),
+                 p('The ',
+                   tags$b('Maps & CalEPA Data'),
+                   ' tab allows users to import CalEPA regulatory data (inspections, violations,
+                     and enforcement actions) in areas that were assessed by the federal
+                     government\'s Home Owners Loan Corporation (HOLC) in the 1930s (part of a process
+                     now commonly known as \'redlining\'), and view that data relative to the HOLC
+                     \'redlining\' maps as well as present-day indicators of pollution burden and
+                     vulnerability from the CalEPA\'s CalEnviroScreen 3.0 (CES) tool. Use the options
+                   in the pane on the left side of the screen to select a city, select data types to
+                   import, and apply additional filters to the data. The dataset is also available in
+                   the table below the map, and can be downloaded for use outside of this tool.'
+                   ),
+                   p('The ',
+                     tags$b('Redline-CES Analysis'),
+                     ' tab takes users through a study that investigates potential correlations
+                       between the historical HOLC redlining maps and the current day indicators
+                       from CES 3.0, to determine if the trends detected and promoted by the HOLC
+                       appraisal and mapping practices are still present today. Users can select any
+                     CES indicator to assess, and can view maps showing any of the eight California
+                     cities that were assessed by the HOLC in the 1930s.'
+                   ),
+                 p('The ',
+                   tags$b('Background Information'),
+                   ' tab has additional information about the history of HOLC redlining, information
+                   about the datasets used in this tool, and links to the source code and contact
+                   information.'
+                   )
+                 ),
+        # Maps / Tabular Data Tab ----
         tabPanel('Maps & CalEPA Data', icon = icon('map'),
                  useShinyjs(),
                  tags$head(
@@ -494,7 +529,7 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         h3('Redline-CalEnviroScreen Analysis'),
                         #  --------------------- INTRODUCTORY TEXT ---------------------
                         p('This section investigates potential correlations between: (1) Residential 
-                          Security (i.e., Redline) maps created by the federal government\'s 
+                          Security (i.e., redline) maps created by the federal government\'s 
                           Home Owners’ Loan Corporation (HOLC) in major California cities in 
                           the 1930s, and (2) current measures of public health, environmental 
                           conditions, and socioeconomic characteristics in areas assessed by the 
@@ -2262,6 +2297,7 @@ server <- function(input, output, session) {
             
         # CalEnvironScreen Polygons 
             observe({
+                req(input$tab_being_displayed == "Maps & CalEPA Data") # Only display if tab is 'Map Tab' - see: https://github.com/rstudio/leaflet/issues/590
                 withProgress(message = 'Drawing Map', value = 1, style = 'notification', {
                 # create the color palette for the CES polygons
                     parameter <- ces_choices %>% filter(name == input$ces_parameter) %>% pull(ces_variable)

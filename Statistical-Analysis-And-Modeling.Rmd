@@ -33,8 +33,8 @@ library(sf)
 
 df_departure_scores <- st_read(here('data_processed-analysis', 
                                     'departure-area_weighted_scores.gpkg'))
-glimpse(df_departure_scores)
-range(df_departure_scores$ces_3_score)
+# glimpse(df_departure_scores)
+# range(df_departure_scores$ces_3_score)
 
 # departure scores using the nearest centroid approach
 df_departure_scores_centroid <- st_read(here('data_processed-analysis', 
@@ -101,6 +101,8 @@ References:
 
 ```{r}
 df_stats <- df_departure_scores %>% 
+    st_drop_geometry() %>% 
+    tibble() %>% 
     transmute(holc_grade = factor(holc_grade),
               ces_3_score)
 test_pairwise <- pairwise.t.test(df_stats$ces_3_score, df_stats$holc_grade, p.adj = "none")
@@ -109,7 +111,7 @@ tidy_test_pairwise
 ```
 
 ### Tukey HSD
-
+** !!!!! NOTE: Check out corrections and/or non-parametric tests !!!!!!
 ```{r}
 # Tukey
 # AOV
@@ -120,6 +122,51 @@ summary(test_aov)
 tidy_tukey <- broom::tidy(TukeyHSD(test_aov, which = 'holc_grade'))
 tidy_tukey
 ```
+
+### Another Method
+Reference: https://www.tidymodels.org/learn/statistics/infer/
+
+The infer package also provides functionality to use theoretical methods for "Chisq", "F" and "t" test statistics.
+
+Generally, to find a null distribution using theory-based methods, use the same code that you would use to find the null distribution using randomization-based methods, but skip the generate() step. For example, if we wanted to find a null distribution for the relationship between age (age) and party identification (partyid) using randomization, we could write:
+```{r}
+library(tidymodels)
+null_f_distn <- df_stats %>%
+    specify(response = ces_3_score, explanatory = holc_grade) %>%
+    hypothesize(null = "independence") %>%
+    generate(reps = 500, type = "permute") %>% 
+    calculate(stat = "F")
+```
+
+To find the null distribution using theory-based methods, instead, skip the generate() step entirely:
+```{r}
+null_f_distn_theoretical <- df_stats %>%
+    specify(response = ces_3_score, explanatory = holc_grade) %>%
+    hypothesize(null = "independence") %>%
+    # generate(reps = 500, type = "permute") %>% 
+    calculate(stat = "F")
+```
+
+We’ll calculate the observed statistic to make use of in the following visualizations; this procedure is the same, regardless of the methods used to find the null distribution.
+```{r}
+F_hat <- df_stats %>% 
+  specify(response = ces_3_score, explanatory = holc_grade) %>%
+  calculate(stat = "F")
+```
+
+Now, instead of just piping the null distribution into visualize(), as we would do if we wanted to visualize the randomization-based null distribution, we also need to provide method = "theoretical" to visualize().
+```{r}
+visualize(null_f_distn_theoretical, method = "theoretical") +
+  shade_p_value(obs_stat = F_hat, direction = "greater")
+```
+
+
+To get a sense of how the theory-based and randomization-based null distributions relate, we can pipe the randomization-based null distribution into visualize() and also specify method = "both"
+```{r}
+visualize(null_f_distn, method = "both") +
+  shade_p_value(obs_stat = F_hat, direction = "greater")
+```
+
 
 
 
