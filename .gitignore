@@ -31,5 +31,7 @@ Redline thoughts.txt
 Redline-CES3-Analysis-Shiny.RMD
 _data_raw/
 _data_regulatory_actions/
-_storymap/
 data_zip_codes/
+_storymap/*
+
+!_storymap/*.R
