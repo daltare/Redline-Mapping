@@ -23,15 +23,18 @@
 # plotting
     library(ggplot2)
     library(forcats)
+    library(patchwork)
 
 options(scipen = 999)
-   
+
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
 # Get list of CES 3 variable names and plain text names ----
     # ces_variables <- read_csv(here('data_processed', 
     #                                 'ces_names.csv'))
     # ces_variables <- ces_variables %>% 
     #     mutate(name_revised = make_clean_names(name)) 
-    
+
 # Define coordinate systems to use for transformations ----
     projected_crs <- 3310 # see: https://epsg.io/3310 
 
@@ -106,7 +109,9 @@ options(scipen = 999)
         #     ces3_poly <- ces3_poly %>% 
         #         clean_names()
 
-
+            
+            
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # get the intersection of the CES polygons and redline polygons ----
     # this clips the ces3 polygons to the area contained within the redline polygons
     # gives the CES component polygons used to calculate the weighted average sorces for HOLC polyogons 
@@ -238,6 +243,10 @@ options(scipen = 999)
         mutate(category = factor(category, 
                                  levels = rev(c('White', 'Hispanic', 'Asian American', 'African American', 'Native American', 'Other'))))
     
+    
+    
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# PLOT ----
     color_palette_1 <- RColorBrewer::brewer.pal(name = 'Dark2', n = 6)
     race_plot <- ggplot(dem_summary_long %>% filter(holc_grade != 'All Neighborhoods')) +
         geom_bar(mapping = aes(x = holc_grade, 
@@ -247,18 +256,22 @@ options(scipen = 999)
         guides(fill = guide_legend(reverse = TRUE, title = 'Race/Ethnicity')) +
         scale_y_continuous(labels = scales::percent) + 
         labs(x = 'HOLC Rating',
-             y = 'Percent Composition of Population',
-             title = 'Present-Day Racial/Ethnic Composition of HOLC-Assessed Neighborhoods') + # ,
+             y = 'Percent of Population',
+             title = 'Present-Day Racial/Ethnic Composition of Neighborhoods Assessed by the HOLC in the 1930s in California', 
+             caption = 'Note: Present-day demographic information is from 2010 U.S. Census data') + # ,
              # subtitle = 'Demographic Data from 2010 Census') +
         coord_flip()
     
+    ggsave(filename = here('_storymap', 'storymap_images', 'race_plot_bar.png'), 
+       plot = race_plot, width = 10, height = 4.5, dpi = 125)
+    
     # race_plot_2 <- ggplot(dem_summary_long) + # %>% filter(holc_grade != 'Total')) +
-    #     geom_bar(mapping = aes(x = holc_grade, 
-    #                            y = percent, 
+    #     geom_bar(mapping = aes(x = holc_grade,
+    #                            y = percent,
     #                            fill = category), stat = 'identity', position = 'dodge') +
     #     guides(fill = guide_legend(reverse = TRUE)) +
-    #     scale_y_continuous(labels = scales::percent) + 
-    #     xlab('HOLC Grade') + 
+    #     scale_y_continuous(labels = scales::percent) +
+    #     xlab('HOLC Grade') +
     #     ylab('Percent') +
     #     coord_flip()
     
@@ -294,25 +307,27 @@ options(scipen = 999)
     # color_palette[1] <- c('#000000', color_palette)
     # color_palette <- viridis::viridis(n = 7)
     # color_palette[1] <- c('#000000', color_palette)
-    pop_distributions_by_race_plot <- ggplot(data = pop_distributions_by_race, 
-                                             mapping = aes(x = holc_grade, y = value)) +
-        geom_bar(mapping = aes(fill = name), stat = 'identity', position = 'dodge') +
-        # scale_fill_brewer(
-        #     type = "seq",
-        #     palette = 1,
-        #     direction = 1,
-        #     aesthetics = "fill"
-        # ) +
-        # scale_fill_viridis_d() + 
-        # scale_fill_viridis_d(option = 'plasma') +
-        scale_fill_manual(values = color_palette) +
-        # scale_fill_brewer(palette = 'Dark2') +
-        scale_y_continuous(labels = scales::percent_format(accuracy = 1)) + 
-        # geom_text( size = 3, position = position_stack(vjust = 0.5))
-        xlab('HOLC Grade') + 
-        ylab('Percent of Population of Given Race/Ethnicity Currently Residing in HOLC Grade') +
-        guides(fill = guide_legend(reverse = TRUE, title = 'Race/Ethnicity')) + 
-        coord_flip()
+    
+    
+    # pop_distributions_by_race_plot <- ggplot(data = pop_distributions_by_race, 
+    #                                          mapping = aes(x = holc_grade, y = value)) +
+    #     geom_bar(mapping = aes(fill = name), stat = 'identity', position = 'dodge') +
+    #     # scale_fill_brewer(
+    #     #     type = "seq",
+    #     #     palette = 1,
+    #     #     direction = 1,
+    #     #     aesthetics = "fill"
+    #     # ) +
+    #     # scale_fill_viridis_d() + 
+    #     # scale_fill_viridis_d(option = 'plasma') +
+    #     scale_fill_manual(values = color_palette) +
+    #     # scale_fill_brewer(palette = 'Dark2') +
+    #     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) + 
+    #     # geom_text( size = 3, position = position_stack(vjust = 0.5))
+    #     xlab('HOLC Grade') + 
+    #     ylab('Percent of Population of Given Race/Ethnicity Currently Residing in HOLC Grade') +
+    #     guides(fill = guide_legend(reverse = TRUE, title = 'Race/Ethnicity')) + 
+    #     coord_flip()
         
 # to get the tabular values
     pop_distributions_by_race %>% filter(name == 'Total Population')
@@ -320,7 +335,10 @@ options(scipen = 999)
     pop_distributions_by_race %>% filter(name == 'Hispanic')
     pop_distributions_by_race %>% filter(name == 'African American')
 
+
     
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# PLOT ----
 # facet plot
 pop_distributions_by_race_2 <- pop_distributions_by_race %>% 
     mutate(holc_grade = case_when(holc_grade == 'A' ~ 'A (Best)', 
@@ -357,4 +375,44 @@ pop_distributions_by_race_plot_2 <- ggplot(data = pop_distributions_by_race_2 %>
     guides(fill = guide_legend(reverse = TRUE, title = 'Race/Ethnicity')) + 
     theme(axis.ticks.y = element_blank(), axis.title.y = element_blank()) +
     coord_flip()
-        
+ggsave(filename = here('_storymap', 'storymap_images', 'race_plot_facet.png'), 
+       plot = pop_distributions_by_race_plot_2, width = 10, height = 4.5, dpi = 125)    
+
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ordering_a <- pop_distributions_by_race_2 %>% 
+    filter(holc_grade == 'A (Best)' & name != 'Total Population') %>% 
+    arrange(desc(value)) %>% 
+    pull(name) %>% 
+    as.character()
+
+ordering_d <- pop_distributions_by_race_2 %>% 
+    filter(holc_grade == 'D (Hazardous)' & name != 'Total Population') %>% 
+    arrange(desc(value)) %>% 
+    pull(name) %>% 
+    as.character()
+    
+# race plot - bar plot by ethnic group
+    race_plot_by_race <- ggplot(pop_distributions_by_race_2 %>% 
+                                    filter(name != 'Total Population') %>% 
+                                    mutate(name = fct_relevel(name, rev(ordering_a)))) +
+        geom_bar(mapping = aes(x = name, 
+                               y = value, 
+                               fill = fct_rev(holc_grade)), stat = 'identity') +
+        # scale_fill_manual(values = color_palette_1) +
+        scale_fill_manual(values = rev(alpha(c('green', 'blue', 'orange', 'red'), 1.0)),
+                           name = 'HOLC Grade') +
+        # guides(fill = guide_legend(reverse = TRUE, title = 'HOLC Grade')) +
+        guides(fill = guide_legend(reverse = TRUE, title = 'HOLC Grade')) +
+        scale_y_continuous(labels = scales::percent) + 
+        labs(x = 'Racial / Ethnic Group',
+             y = 'Percent of Population',
+             title = 'Present-Day Distribution of Racial / Ethinc Group Populations Within Neighborhoods \nAssessed by the HOLC in the 1930s in California', #) + # ,
+             # subtitle = 'Present-Day Demographic Data from 2010 Census', 
+            caption = 'Note: Present-day demographic information is from 2010 U.S. Census data'
+             ) +
+        coord_flip()
+    
+    ggsave(filename = here('_storymap', 'storymap_images', 'race_plot_bar_by_race.png'), 
+       plot = race_plot_by_race, width = 10, height = 4.5, dpi = 125)
+

@@ -49,7 +49,8 @@ fn_departures_boxplot <- function(plot_var) {
                              mapping = aes(x = holc_grade, 
                                            y = !!as.name(plot_var))) +
     geom_boxplot(aes(fill = holc_grade), notch = TRUE, outlier.shape = NA) +
-    scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
+    scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6), 
+                      labels = c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)')) +
     geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
     scale_x_discrete(limits = rev(levels(factor(df_departure_scores$holc_grade)))) +
     coord_flip() + # ylim = c(axis_min, axis_max)) +
@@ -90,7 +91,9 @@ fn_plot_point_raw <- function(plot_var, show_sd, show_titles, show_legend, fixed
                                                  y = holc_city)) +
             geom_jitter(mapping = aes(color = holc_grade),
                         height = 0.25) +
-            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), name = 'HOLC Grade') +
+            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), 
+                               name = 'HOLC Grade',
+                               labels = c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)')) +
             # scale_y_discrete(limits = rev(levels(factor(df_raw_scores$holc_city)))) +
             # draw a point at the mean for each city
             # stat_summary(fun = mean, geom = 'point') + 
@@ -143,13 +146,23 @@ fn_plot_point_raw <- function(plot_var, show_sd, show_titles, show_legend, fixed
                 scale_shape_manual("", values=c("City Average"=124)) # 19
         }
             
-    if (show_titles) {
-        raw_scores_point <- raw_scores_point +
-            labs(title = glue('{measure_name} Grouped by City for California Neighborhoods Assessed by the HOLC in the 1930s'),
-                     subtitle = 'Each colored point represents a neighborhood in the HOLC maps') # 'and lines represent mean score +/- 1 standard deviation') +
-            
+    if (show_titles == TRUE) {
+        if (show_sd == FALSE) {
+            raw_scores_point <- raw_scores_point +
+                labs(title = glue('{measure_name} for Neighborhoods in California Cities Assessed by the HOLC in the 1930s'),
+                     caption = glue('Note: Higher {str_replace(measure_name, "Score", "score")}s indicate greater pollution burden and/or population vulnerability'),
+                     subtitle = glue('Each colored point represents a neighborhood in the HOLC maps, and black lines represent the average {measure_name} \nof all neighborhoods assessed by the HOLC in the given city')) # 'and lines represent mean score +/- 1 standard deviation') +
+
+        } else {
+            raw_scores_point <- raw_scores_point +
+                labs(title = glue('{measure_name} for Neighborhoods in California Cities Assessed by the HOLC in the 1930s'),
+                     caption = glue('Note: Higher {str_replace(measure_name, "Score", "score")}s indicate greater pollution burden and/or population vulnerability'),
+                     subtitle = glue('Each colored point represents a neighborhood in the HOLC maps, and black dots/lines represent the mean {measure_name} \n+/- 1 standard deviation of all neighborhoods assessed by the HOLC in the given city')
+                     ) # 'and lines represent mean score +/- 1 standard deviation') +
+
+        }
     }
-    
+        
     if (show_legend) {
         raw_scores_point <- raw_scores_point + 
             theme(legend.position = 'right')
@@ -225,7 +238,8 @@ fn_plot_point_city_avgs <- function(plot_var, show_titles, show_legend, fixed_x)
         #                 color = holc_grade),
         #             height = 0.15) +
         scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 1.0),
-                           name = 'HOLC Grade') +
+                           name = 'HOLC Grade',
+                           labels = c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)')) +
         # scale_y_discrete(limits = rev(levels(factor(df_raw_scores_summary$holc_city)))) +
         # theme(legend.position = 'bottom') +
         # stat_summary(# fun.data = "mean_cl_normal", 
@@ -246,9 +260,9 @@ fn_plot_point_city_avgs <- function(plot_var, show_titles, show_legend, fixed_x)
     
     if (show_titles) {
         holc_city_means_plot <- holc_city_means_plot +
-            labs(title = glue('Average {measure_name} by City and 1930s HOLC Grade for California Neighborhoods Assessed by the HOLC'),
-                 # caption = 'CES 3 = CalEnviroScreen 3.0 | HOLC = Home Owners Loan Corporation',
-                 subtitle = 'Black lines represent the average score of all neighborhoods assessed by the HOLC in each city'
+            labs(title = glue('Average {measure_name} by City and HOLC Grade for Neighborhoods in California Cities Assessed \nby the HOLC in the 1930s'),
+                 caption = glue('Note: Higher {str_replace(measure_name, "Score", "score")}s indicate greater pollution burden and/or population vulnerability'),
+                 subtitle = glue('Black lines represent the average {measure_name} of all neighborhoods assessed by the HOLC in the given city')
             )
     }
     
@@ -274,10 +288,16 @@ plot_point_sxs <- fn_plot_point_raw(plot_var = 'ces_3_score',
                                     show_titles = FALSE, 
                                     show_legend = FALSE,
                                     fixed_x = TRUE) + 
+    # labs(subtitle = 'Colored dots represent individual neighborhoods \nassessed by the HOLC') + 
     fn_plot_point_city_avgs(plot_var = 'ces_3_score', 
                             show_titles = FALSE, 
                             show_legend = TRUE, 
-                            fixed_x = TRUE)
+                            fixed_x = TRUE) +
+    labs(y = '') +
+    # labs(subtitle = 'Colored dots represent average CES 3 scores \nfor neighborhood of each HOLC grade') +
+    plot_annotation(title = 'CES 3 Score by Neighborhood (Left) and Average CES 3 Score by HOLC Grade (Right) for Neighborhoods in \nCalifonia Cities Assessed by the HOLC in the 1930s', 
+                    caption = 'Note: Higher CES scores indicate greater pollution burden and/or population vulnerability',
+                    subtitle = 'Black lines represent the average CES 3 score for all neighborhoods assessed by the HOLC in the given city')
 ggsave(filename = here('_storymap', 'storymap_images', 'point_city_side_x_side.png'), 
        plot = plot_point_sxs, width = 10, height = 4.5, dpi = 125)
 
@@ -355,12 +375,18 @@ departure_scores_dec <- df_departure_scores %>%
 
 deciles_plot <- ggplot(data = departure_scores_dec) +
     geom_bar(mapping = aes(x = dec, y = n, fill = holc_grade), stat = 'identity') +
-    scale_fill_manual(values = alpha(rev(c('green', 'blue', 'orange', 'red')), 0.8), name = 'HOLC Rating') +
+    scale_fill_manual(values = alpha(rev(c('green', 'blue', 'orange', 'red')), 0.8), 
+                      name = 'HOLC Rating',
+                      labels = rev(c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)'))) +
     # scale_y_discrete(limits = levels(factor(df_departure_scores$holc_grade))) +
     scale_x_discrete(limits = rev(levels(departure_scores_dec$dec))) +
-    labs(x = 'CES 3 Score Decile',
-         y = 'Number of HOLC-Assessed Neighborhoods',
-         title = 'HOLC Rating of Neighborhoods in California by CES 3 Score Decile') + # 'CES 3 Score Deciles for HOLC-Assessed Neighborhoods in California') +
+    labs(x = 'Adjusetd CES 3 Score Decile',
+         y = 'Number of HOLC Rated Neighborhoods', 
+         caption = 'Note: Pollution burden and/or population vulnerability increases with increasing decile number (from 1 to 10)',
+         title = 'Number of HOLC Rated Neighborhoods by Adjusted CES 3 Score Decile for All California Cities \nAssessed by the HOLC in the 1930s') +
+         
+    # title = 'HOLC Ratings of Neighborhoods in each CES 3 Score Decile for Neighborhoods in California Cities Assessed by the HOLC in the 1930s') +
+         # title = 'HOLC Rating of Neighborhoods in California by CES 3 Score Decile') + # 'CES 3 Score Deciles for HOLC-Assessed Neighborhoods in California') +
     coord_flip() +
     guides(fill = guide_legend(reverse = TRUE))
 ggsave(filename = here('_storymap', 'storymap_images', 'bar_deciles.png'), 
