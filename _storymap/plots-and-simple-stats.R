@@ -103,7 +103,8 @@ fn_plot_point_raw <- function(plot_var, show_sd, show_titles, show_legend, fixed
             #              aes(xmax = ..x.., xmin = ..x..),
             #              width = 0.5, size = 0.7, linetype = "solid", color = 'black') +
             # draw the mean and standard deviation for each city (# of std deviations in the fun.args part)
-            xlab(glue('{measure_name}')) + 
+            # xlab(glue('{measure_name}')) +
+            xlab(glue('{measure_name} (Increasing Disadvantage???)')) +
             ylab('City') +
             geom_blank()
         
@@ -249,7 +250,7 @@ fn_plot_point_city_avgs <- function(plot_var, show_titles, show_legend, fixed_x)
         #     size = 2.5,
         #     geom="point") +
         scale_shape_manual("", values=c("City Average"=124)) +
-        xlab(glue('Average {measure_name}')) +  
+        xlab(glue('Average {measure_name} (Increasing Disadvantage???)')) + 
         ylab('City') +
         geom_blank()
     
@@ -380,7 +381,7 @@ deciles_plot <- ggplot(data = departure_scores_dec) +
                       labels = rev(c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)'))) +
     # scale_y_discrete(limits = levels(factor(df_departure_scores$holc_grade))) +
     scale_x_discrete(limits = rev(levels(departure_scores_dec$dec))) +
-    labs(x = 'Adjusetd CES 3 Score Decile',
+    labs(x = 'Adjusetd CES 3 Score Decile \n(???Increasing Disadvantage)',
          y = 'Number of HOLC Rated Neighborhoods', 
          caption = 'Note: Pollution burden and/or population vulnerability increases with increasing decile number (from 1 to 10)',
          title = 'Number of HOLC Rated Neighborhoods by Adjusted CES 3 Score Decile for All California Cities \nAssessed by the HOLC in the 1930s') +
