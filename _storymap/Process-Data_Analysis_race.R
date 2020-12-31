@@ -370,7 +370,7 @@ pop_distributions_by_race_plot_2 <- ggplot(data = pop_distributions_by_race_2 %>
     # geom_text( size = 3, position = position_stack(vjust = 0.5))
     # xlab('HOLC Grade') + 
     labs(y = 'Percent of 2010 Population of Given Race/Ethnicity Residing in Neighborhoods with Given HOLC Rating',
-         title = 'Present-Day Distribution of Racial or Ethinc Group Populations by Historical HOLC Neighborhood Rating',
+         title = 'Present-Day Distribution of Racial or Ethnic Group Populations by Historical HOLC Neighborhood Rating',
          subtitle = 'Dashed lines represent distribution of overall present-day population by HOLC neighborhood rating') +
     guides(fill = guide_legend(reverse = TRUE, title = 'Race/Ethnicity')) + 
     theme(axis.ticks.y = element_blank(), axis.title.y = element_blank()) +
@@ -407,7 +407,7 @@ ordering_d <- pop_distributions_by_race_2 %>%
         scale_y_continuous(labels = scales::percent) + 
         labs(x = 'Racial / Ethnic Group',
              y = 'Percent of Population',
-             title = 'Present-Day Distribution of Racial / Ethinc Group Populations Within Neighborhoods \nAssessed by the HOLC in the 1930s in California', #) + # ,
+             title = 'Present-Day Distribution of Racial / Ethnic Group Populations Within Neighborhoods \nAssessed by the HOLC in the 1930s in California', #) + # ,
              # subtitle = 'Present-Day Demographic Data from 2010 Census', 
             caption = 'Note: Present-day demographic information is from 2010 U.S. Census data'
              ) +
