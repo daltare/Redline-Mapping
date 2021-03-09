@@ -18,3 +18,6 @@ For more information on the history around Redline mapping and other studies of 
 - [CalEPA Regulated Sites, Site Program Types, Inspections, Violations, and Enforcement Actions (CalEPA Regulated Site Portal)](https://siteportal.calepa.ca.gov/nsite/map/export)
 - [California Drinking Water Provider Service Areas (California State Water Resources Control Board Map Services)](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc#overview) | For web-service, use the "Service URL" link | Also available from the [California State Geoportal](https://gis.data.ca.gov/datasets/waterboards::california-drinking-water-system-area-boundaries)
 - [California Water Board Regional Office Boundaries (California State Water Resources Control Board Map Services)](http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0) | Also available from the [California State Geoportal](https://gis.data.ca.gov/datasets/waterboards::regional-board-boundaries)
+
+### Slides
+Slides from March 18, 2021 presentation available at: https://daltare.github.io/Redline-Mapping//presentation_march_2021/redlining_presentation_2021_03.html
