@@ -35,3 +35,4 @@ data_zip_codes/
 _storymap/*
 
 !_storymap/*.R
+!presentation_march_2021/*.html
