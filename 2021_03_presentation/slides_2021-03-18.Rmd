@@ -1,5 +1,6 @@
 ---
 title: "Exploring the Legacy of Redlining in California with Open Data & Open Source Tools"
+subtitle: "<span style = 'font-size: 75%;'>Investigating linkages to pollution burden and public health trends with CalEnviroScreen data</span>"
 author: "David Altare<br><span style = 'font-size: 60%; line-height: 130%; display: block;'>California Environmental Protection Agency (CalEPA)<br>State Water Resources Control Board<br>Office of Information Management & Analysis (OIMA)</span>"
 date: 'Water Data Seminar Series | March 18, 2021<br><br>`r icons::fontawesome("link")` [bit.ly/redline-2021-03](https://bit.ly/redline-2021-03)'
 
@@ -51,7 +52,7 @@ style_mono_light(base_color = "#125972",
                  link_color = "#197b9e",
                  title_slide_background_image = 'images/data_center_logo_withText_crop_resize.png',
                  title_slide_background_size = '400px',
-                 title_slide_background_position = '95% 95%')
+                 title_slide_background_position = '95% 90%')
 ```
 
 ```{r xaringan-logo, echo=FALSE}
@@ -88,11 +89,11 @@ ces_choices <- read_csv(here('data_processed',
     filter(type != 'other?')
 ```  
 
-## Overview
+### Overview
 
-1. Background
+1. Background / Context
     - CalEPA Team
-    - History
+    - Definitions & History
     
 2. Analysis
     - Data
@@ -100,7 +101,7 @@ ces_choices <- read_csv(here('data_processed',
     - Tools
  
 3. Presentation Formats
-    - Storymap (ESRI ArcGIS)
+    - Storymap website
     - Shiny App
     
 4. Considerations / Limitations / Next Steps
@@ -109,11 +110,11 @@ ces_choices <- read_csv(here('data_processed',
 ---
 class: inverse center middle
 
-# Background
+# Background / Context
 
 ---
 
-## Background -- CalEPA’s Racial Equity Team
+### Background -- CalEPA Racial Equity Team
 
 .pull-left[
 #### [Pollution and Prejudice: Redlining and Environmental Injustice in California](https://storymaps.arcgis.com/stories/f167b251809c43778a2f9f040f43d2f5)
@@ -121,11 +122,13 @@ class: inverse center middle
 
 ![](images/CalEPA_page_small.JPG)
 
-Storymap released February 1, 2021
+Storymap released February 1, 2021 
 
 #### `r icons::fontawesome("link")` [bit.ly/pollutionandprejudice](https://bit.ly/pollutionandprejudice)
 
 ]
+
+--
 
 .pull-right[
 #### Project Team:
@@ -144,11 +147,11 @@ Storymap released February 1, 2021
 
 ---
 
-## Background -- Redlining
+### Background -- What is Redlining?
 
 --
 
-### Some Standard Definitions: 
+#### Some Standard Definitions: 
 
 - Wikipedia: "the systematic denial of various services or goods by federal government agencies, local governments, or the private sector either directly or through the selective raising of prices" <sup>1</sup>
 
@@ -159,7 +162,9 @@ Storymap released February 1, 2021
 --
 
 <br>
-### In the context of this project, "Redlining" refers to a specific, well documented practice...
+<br>
+
+#### In the context of this project, "redlining" refers to a specific, well documented practice...
 
 .footnote[
 [1] [Wikipedia](https://en.wikipedia.org/wiki/Redlining)   
@@ -168,39 +173,111 @@ Storymap released February 1, 2021
 
 ---
 
-## Background -- History
+### Background -- History
 
 .pull-left[
 
-- 1930s "Residential Security" maps of major cities (population >40,000)
+- 1930s "Residential Security" maps of major cities across the country (population >40,000), including 8 in California:
 
-    - Federal government agency --- Home Owners’ Loan Corporation (HOLC)
+    - Fresno
     
-    - Evaluated mortgage lending risk by neighborhood (A-D scale)
+    - Los Angeles
+    
+    - Oakland
+    
+    - Sacramento
+    
+    - San Diego
+    
+    - San Francisco
+    
+    - San Jose
+    
+    - Stockton
     
 ]
 
 .pull-right[
 .center[
-```{r out.width = '60%', echo=FALSE}
+```{r out.width = '70%', echo=FALSE}
 # local
-knitr::include_graphics("images/holc-scan_sac.jpg")
+knitr::include_graphics("images/holc-scan_sac_cropped.jpg")
 ```
 ]
 ]
 
 ---
 
-## Background -- History
+### Background -- History
 
 .pull-left[
 
-- 1930s "Residential Security" maps of major cities (population >40,000)
+- 1930s "Residential Security" maps of major cities across the country (population >40,000)
 
-    - Federal government agency --- Home Owners’ Loan Corporation (HOLC)
+    - Created by a federal government agency --- Home Owners’ Loan Corporation (HOLC)
     
-    - Evaluated mortgage lending risk by neighborhood (A-D scale)
+    - HOLC bought mortgages at risk of default, re-issued loans on more favorable terms
     
+    - Evaluated mortgage lending risk by neighborhood -- A (green) to D (red) scale
+    
+]
+
+.pull-right[
+.center[
+```{r out.width = '70%', echo=FALSE}
+# local
+knitr::include_graphics("images/holc-scan_sac_cropped.jpg")
+```
+]
+]
+
+---
+
+class: hide_logo
+
+background-image: url(images/holc-scan_sac_cropped.jpg)
+
+background-size: contain
+
+.footnote[
+Image Source: <br>[Mapping Inequality](https://dsl.richmond.edu/panorama/redlining/#loc=&text=downloads)
+]
+
+--
+
+<br>
+.right[
+```{r out.width = '30%', echo=FALSE}
+knitr::include_graphics("images/holc-scan_sac_legend.jpg")
+```
+]
+
+---
+
+class: hide_logo
+
+background-image: url(images/holc-scan_oakland.jpg)
+
+background-size: contain
+
+.footnote[
+Image <br>Source: <br>[Mapping<br> Inequality](https://dsl.richmond.edu/panorama/redlining/#loc=&text=downloads)
+]
+
+---
+
+### Background -- History
+
+.pull-left[
+
+- 1930s "Residential Security" maps of major cities across the country (population >40,000)
+
+    - <span style='color:#b7b4b4'>Created by a federal government agency --- Home Owners’ Loan Corporation (HOLC)</span>
+    
+    - <span style='color:#b7b4b4'>HOLC bought mortgages at risk of default, reissued loans on more favorable terms</span>
+    
+    - <span style='color:#b7b4b4'>Evaluated mortgage lending risk by neighborhood -- A (green) to D (red) scale</span>
+ 
     - Explicitly considered racial and ethnic makeup of neighborhoods
     
 ]
@@ -218,17 +295,36 @@ knitr::include_graphics("images/holc-scan_sac.jpg")
 
 ---
 
-## Background -- History
+class: hide_logo
+
+background-image: url(images/sac_form_D4.jpg)
+
+background-size: contain
+
+--
+
+<br>
+.center[
+```{r out.width = '70%', echo=FALSE}
+knitr::include_graphics("images/sac_form_D4_crop.jpg")
+```
+]
+
+---
+
+### Background -- History
 
 .pull-left[
 
-- 1930s "Residential Security" maps of major cities (population >40,000)
+- 1930s "Residential Security" maps of major cities across the country (population >40,000)
 
-    - Federal government agency --- Home Owners’ Loan Corporation (HOLC)
+    - <span style='color:#b7b4b4'>Created by a federal government agency --- Home Owners’ Loan Corporation (HOLC)</span>
     
-    - Evaluated mortgage lending risk by neighborhood (A-D Scale)
+    - <span style='color:#b7b4b4'>HOLC bought mortgages at risk of default, reissued loans on more favorable terms</span>
     
-    - Explicitly considered racial and ethnic makeup of neighborhoods
+    - <span style='color:#b7b4b4'>Evaluated mortgage lending risk by neighborhood -- A (green) to D (red) scale</span>
+ 
+    - <span style='color:#b7b4b4'>Explicitly considered racial and ethnic makeup of neighborhoods</span>
     
     - Resulting disparities in pathways to home ownership, community development, and other economic and social opportunities
     
@@ -245,20 +341,9 @@ knitr::include_graphics("images/holc-scan_sac.jpg")
 
 ]
 
-
 ---
 
-class: hide_logo
-
-background-image: url(images/holc-scan_sac.jpg)
-
-background-size: contain
-
-<!-- add closeup of legend and holc assessment form -->
-
----
-
-## Background -- History
+### Background -- Other Studies
 
 .center[
 ```{r out.width = '70%', echo=FALSE}
@@ -268,30 +353,63 @@ knitr::include_graphics("images/fed-reserve-paper.JPG")
 
 --
 
-> “Our results suggest that the HOLC maps had an economically meaningful and lasting effect on the development of urban neighborhoods through reduced credit access and subsequent disinvestment” 
-> 
-> --- [Federal Reserve Bank of Chicago, 2020](https://www.chicagofed.org/publications/working-papers/2017/wp2017-12)
+> “Our results suggest that the **<u>HOLC maps had an economically meaningful and lasting effect on the development of urban neighborhoods</u>** through reduced credit access and subsequent disinvestment” 
+
+--- [Federal Reserve Bank of Chicago, 2020](https://www.chicagofed.org/publications/working-papers/2017/wp2017-12)
+
 
 ---
 
-## Background -- History
+### Background -- Other Studies
+
+#### `r icons::fontawesome("link")` [Redlining & Asthma Rates](https://www.sciencedirect.com/science/article/pii/S2542519619302414)<sup>1</sup>
+
+.footnote[<span style='font-size:16px'>1 - A. Nardone, J.A. Casey, R. Morello-Frosch, M. Mujahid, J.R. Balmes, N. Thakur. **Associations between historical residential redlining and current age-adjusted rates of emergency department visits due to asthma across eight cities in California: an ecological study**. Lancet Planet Health, 4 (1) (2020), pp. e24-e31. https://doi.org/10.1016/S2542-5196(19)30241-4</span>]
+
+.pull-left[
+```{r out.width = '80%', echo=FALSE}
+knitr::include_graphics("images/asthma_study.jpg")
+```
+]
+
+.pull-right[
+> "**<u>Historically redlined census tracts have significantly higher rates of emergency department visits due to  asthma</u>**,  suggesting  that  this  discriminatory  practice  might  be  contributing  to  racial  and  ethnic  asthma  health  disparities"
+
+]
+
+---
+
+### Background -- Other Studies
+
+#### `r icons::fontawesome("link")` [Redlining & tree cover / urban heat islands](https://doi.org/10.3390/cli8010012)<sup>1</sup>
+
+.footnote[<span style='font-size:16px'>1 - Hoffman JS, Shandas V, Pendleton N. **The Effects of Historical Housing Policies on Resident Exposure to Intra-Urban Heat: A Study of 108 US Urban Areas**. Climate. 2020; 8(1):12. https://doi.org/10.3390/cli8010012</span>]
+
+.center[
+```{r out.width = '70%', echo=FALSE}
+knitr::include_graphics("images/redline_temp_study.jpg")
+```
+]
+
+---
+
+### Background -- Other Historical Factors
 
 #### Zoning (Los Angeles): 
 
 > "a black community became established in the South Central area of the city in the 1940s. The neighborhood had some industry, but its **<u>nonresidential character was more firmly entrenched when the city began a process of 'spot' rezoning</u>** for commercial or industrial facilities. **<u>Automobile junkyards became commonplace</u>** in the African American neighborhood. In 1947, an **<u>electroplating plant explosion</u>** in this newly developing ghetto killed five local residents (as well as fifteen white factory workers) and destroyed more than one hundred homes.
->
-> ---Richard Rothstein, *[The Color of Law: A Forgotten History of How Our Government Segregated America (2017)](https://www.epi.org/publication/the-color-of-law-a-forgotten-history-of-how-our-government-segregated-america/)*
+
+---Richard Rothstein, *[The Color of Law: A Forgotten History of How Our Government Segregated America (2017)](https://www.epi.org/publication/the-color-of-law-a-forgotten-history-of-how-our-government-segregated-america/)*
 
 <!-- quote - Rothstein page 55 -->
 
 ---
 
-## Background -- History
+### Background -- Other Historical Factors
 
 #### Zoning & Redlining: 
 
 > "when the Federal Housing Administration (FHA) developed insured amortized mortgage as a way to promote homeownership nationwide, **<u>these zoning practices rendered African Americans ineligible for such mortgages</u>** because banks and the FHA considered the existence of nearby rooming houses, commercial development, or industry to create risk to the property value of single-family areas. **<u>Without such mortgages, the effective cost of African American housing was greater than that of similar housing in white neighborhoods, leaving owners with fewer resources for upkeep</u>**. African American homes were then more likely to deteriorate, reinforcing their neighborhoods' slum conditions."
->
 
 <!-- quote - Rothstein page 50 -->
 
@@ -311,9 +429,25 @@ class: inverse center middle
 # Analysis
 
 ---
-class: center middle
 
-## Results
+### Redlining & CalEnviroScreen
+
+
+---
+
+### Datasets
+
+Redline Maps (University of Richmond)
+CalEnviroScreen 3.0 (Office of Environmental Health Hazard Assessment Website & CalEPA Geoserver)
+CalEPA Regulated Sites (CalEPA Geoserver & CalEPA Regulated Site Portal)
+CalEPA Site Program Types, Inspections, Violations, and Enforcement Actions (CalEPA Regulated Site Portal)
+2014/2016 Clean Water Act Section 303(d) Listed Waterbodies (State Water Resources Control Board Website)
+California Drinking Water Provider Service Areas (Water Resources Control Board Map Services & State Geoportal)
+California Water Board Regional Office Boundaries (California State Water Resources Control Board Map Services & State Geoportal)
+
+---
+
+### Results
 
 <!-- fig.width = 10, fig.height = 5 -->
 
@@ -352,34 +486,60 @@ plot_box_ces
 
 
 ---
+
+### Technial Analysis -- Tools & Methods
+
+#### R (programming language) & RStudio used for:
+- data access
+- cleaning and reformatting data
+- basic analysis and visualization
+- geospatial data processing and analysis
+- reporting 
+    - reports / presentations -- [Rmarkdown](https://rmarkdown.rstudio.com/)
+    - interactive tools -- [Shiny](https://shiny.rstudio.com/) & [shinyapps.io](https://www.shinyapps.io/)
+    
+`r icons::fontawesome("link")` [r-project.org](https://www.r-project.org/)
+
+--
+
+#### Code and data on GitHub  `r icons::fontawesome("github")`
+- transparency
+- reuse
+- collaboration
+
+`r icons::fontawesome("link")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
+
+
+
+---
 class: inverse center middle
 
 # Presentation Formats
 
 ---
 
-## Presentation Formats
+### Presentation Formats
 
-### Storymap (ESRI / ArcGIS)
+#### Storymap (ESRI / ArcGIS) --- Pollution and Prejudice: Redlining and Environmental Injustice in California 
 
-Pollution and Prejudice: Redlining and Environmental Injustice in California
+- Detailed history / context
 
-#### - Detailed history / context
+- Interactive Maps
 
-#### - High level overview of analysis / results
+- High level overview of analysis / results
 
-#### [Link](https://storymaps.arcgis.com/stories/f167b251809c43778a2f9f040f43d2f5)
+`r icons::fontawesome("link")` [bit.ly/pollutionandprejudice](https://bit.ly/pollutionandprejudice)
 
-### Shiny App (R / RStudio)
+#### Shiny App (R / RStudio)
 
-#### - Details about the analysis / results
+- Interactive tool to explore analysis / results in detail
 
-#### - Tool to view CalEPA regulory data
+- Tool to view CalEPA regulatory data in context of redlined areas (may add other tools / features to explore other data?)
 
-#### - Other tools / features to explore in context?
+`r icons::fontawesome("link")` [cawaterdatadive.shinyapps.io/Redline-Mapping/](https://cawaterdatadive.shinyapps.io/Redline-Mapping/)
 
 ???
-full link at: 
+storymap - full link at: 
 https://storymaps.arcgis.com/stories/f167b251809c43778a2f9f040f43d2f5
 
 ---
@@ -392,21 +552,16 @@ class: inverse center middle
 ## Considerations
 
 ---
+class: middle center
 
 # Thanks!
 
-.pull-left[
 ### Slides / Contact
 #### `r icons::fontawesome("link")` [bit.ly/redline-2021-03](https://bit.ly/redline-2021-03)
 #### `r icons::fontawesome("github")` [github.com/daltare](https://github.com/daltare/)
 #### `r icons::fontawesome("envelope")` [david.altare@waterboards.ca.gov](mailto: david.altare@waterboards.ca.gov)
 
 
-### Waterboards Data Center Info:
+### Waterboards Data Center
 #### `r icons::fontawesome("github")` [github.com/CAWaterBoardDataCenter](https://github.com/CAWaterBoardDataCenter)
 #### `r icons::fontawesome("envelope")` [waterdata@waterboards.ca.gov](mailto: waterdata@waterboards.ca.gov)
-]
-
-.pull-right[
-
-]

@@ -139,7 +139,7 @@ a, a > code {
   background-color: var(--title-slide-background-color);
   background-image: url("images/data_center_logo_withText_crop_resize.png");
   background-size: 400px;
-  background-position: 95% 95%;
+  background-position: 95% 90%;
 }
 .title-slide .remark-slide-number {
   display: none;
