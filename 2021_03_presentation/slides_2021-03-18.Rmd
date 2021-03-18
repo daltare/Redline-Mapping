@@ -67,41 +67,41 @@ xaringanExtra::use_logo(
 ```
 
 ```{r setup-data, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
-
-library(sf)
-library(ggplot2)
-library(dplyr)
-library(here)
-library(glue)
-library(readr)
-library(janitor)
-library(tidyr)
-library(stringr)
-library(tmap)
-library(tmaptools)
-library(ceramic)
-library(patchwork)
-library(forcats)
-
-# load data ----
-df_departure_scores <- st_read(here('data_processed-analysis',
-                                    'departure-area_weighted_scores.gpkg'))
-
-df_raw_scores <- st_read(here('data_processed-analysis',
-                              'holc_area_weighted_scores.gpkg'))
-
-# departure scores using the nearest centroid approach
-df_departure_scores_centroid <- st_read(here('data_processed-analysis', 
-                                             'departure-centroid_scores.gpkg'))
-df_raw_scores_centroid <- st_read(here('data_processed-analysis', 
-                                       'holc_centroid_scores.gpkg'))
-
-ces_choices <- read_csv(here('data_processed', 
-                             'ces_names.csv')) %>% 
-    mutate(ces_variable = make_clean_names(name)) %>% #, 'parsed')) %>% 
-    slice(8:64) %>%  # rows 8 to 64
-    filter(type != 'other?')
+# knitr::opts_chunk$set(echo = FALSE)
+# 
+# library(sf)
+# library(ggplot2)
+# library(dplyr)
+# library(here)
+# library(glue)
+# library(readr)
+# library(janitor)
+# library(tidyr)
+# library(stringr)
+# library(tmap)
+# library(tmaptools)
+# library(ceramic)
+# library(patchwork)
+# library(forcats)
+# 
+# # load data ----
+# df_departure_scores <- st_read(here('data_processed-analysis',
+#                                     'departure-area_weighted_scores.gpkg'))
+# 
+# df_raw_scores <- st_read(here('data_processed-analysis',
+#                               'holc_area_weighted_scores.gpkg'))
+# 
+# # departure scores using the nearest centroid approach
+# df_departure_scores_centroid <- st_read(here('data_processed-analysis', 
+#                                              'departure-centroid_scores.gpkg'))
+# df_raw_scores_centroid <- st_read(here('data_processed-analysis', 
+#                                        'holc_centroid_scores.gpkg'))
+# 
+# ces_choices <- read_csv(here('data_processed', 
+#                              'ces_names.csv')) %>% 
+#     mutate(ces_variable = make_clean_names(name)) %>% #, 'parsed')) %>% 
+#     slice(8:64) %>%  # rows 8 to 64
+#     filter(type != 'other?')
 ```  
 
 ### Overview
@@ -113,13 +113,14 @@ ces_choices <- read_csv(here('data_processed',
 2. Analysis
     - Data
     - Results
-    - Tools
  
 3. Presentation Formats
     - Storymap website
     - Shiny App
-    
-4. Considerations / Limitations / Next Steps
+
+4. Tools & Methods
+
+5. Considerations, Limitations, & Next Steps
 
 
 ---
@@ -550,8 +551,8 @@ knitr::include_graphics("images/visual_comparison_stockton.jpg")
 #### For quantitative comparisons, translate CalEnviroScreen scores from census tracts to neighborhoods in Redline maps
 
 .center[
-```{r out.width = '90%', echo=FALSE}
-knitr::include_graphics("images/1-map_combined.png")
+```{r out.width = '110%', echo=FALSE}
+knitr::include_graphics("images/area_weighted_avg_stockton.JPG")
 ```
 ]
 
@@ -562,7 +563,7 @@ knitr::include_graphics("images/1-map_combined.png")
 #### Multiple methods for translating CalEnviroScreen scores from census tracts to neighborhoods in Redline maps
 
 .center[
-```{r out.width = '90%', echo=FALSE}
+```{r out.width = '110%', echo=FALSE}
 knitr::include_graphics("images/nearest_centroid_stockton.jpg")
 ```
 ]
@@ -613,7 +614,7 @@ knitr::include_graphics("images/plot_point_departure_noSD.png")
 
 ---
 
-### Results --- Adjusted CalEnviroScreen Scores
+### Results -- Adjusted CalEnviroScreen Scores
 
 .center[
 ```{r out.width = '100%', echo=FALSE}
@@ -640,37 +641,6 @@ knitr::include_graphics("images/indicators_dot_scaled.png")
 knitr::include_graphics("images/5-race_ethnicity_plot _revised.png")
 ```
 ]
-
----
-
-### Technial Analysis -- Tools & Methods
-
-#### R (programming language) & RStudio used for:
-- data access
-- cleaning and reformatting data
-- basic analysis and visualization
-- geospatial data processing and analysis
-- reporting 
-    - reports / presentations -- [Rmarkdown](https://rmarkdown.rstudio.com/)
-    - interactive tools -- [Shiny](https://shiny.rstudio.com/) & [shinyapps.io](https://www.shinyapps.io/)
-    
-`r icons::fontawesome("link")` [r-project.org](https://www.r-project.org/)
-
---
-
-#### Code and data on GitHub  `r icons::fontawesome("github")`
-- transparency
-- reuse
-- collaboration
-
-`r icons::fontawesome("link")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
-
----
-class: center middle hide_logo
-
-# GitHub Site
-
-## `r icons::fontawesome("github")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
 
 ---
 class: inverse center middle
@@ -736,17 +706,124 @@ class: center middle hide_logo
 - California Water Board Regional Office Boundaries ([California State Water Resources Control Board Map Services](http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0) & [State Geoportal](https://gis.data.ca.gov/datasets/waterboards::regional-board-boundaries))
 
 ---
+
 class: inverse center middle
 
-# Considerations / Limitations / Next Steps
+# Tools & Methods
+
+---
+
+### Tools & Methods
+
+#### R (programming language) & RStudio used for:
+- data access
+- cleaning and reformatting data
+- basic analysis and visualization
+- geospatial data processing and analysis
+- reporting 
+    - reports / presentations -- [Rmarkdown](https://rmarkdown.rstudio.com/)
+    - interactive tools -- [Shiny](https://shiny.rstudio.com/) & [shinyapps.io](https://www.shinyapps.io/)
+    
+`r icons::fontawesome("link")` [r-project.org](https://www.r-project.org/)
+
+--
+
+#### Code and data on GitHub  `r icons::fontawesome("github")`
+- transparency
+- reuse
+- collaboration
+
+`r icons::fontawesome("link")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
+
+---
+class: center middle hide_logo
+
+# GitHub Site
+
+## `r icons::fontawesome("github")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
+
+
+---
+class: inverse center middle
+
+# Considerations / Limitations & Next Steps
 
 ---
 
 ### Considerations / Limitations
 
-- 
+.pull-left[
+#### Limited geographic coverage
+    - areas that existed in the 1930s
+    - only cities with population > 40,000
+    
+#### May be difficult to use to formulate specific policies on broad scale<sup>1</sup>
+]
+
+.footnote[
+1 - [America’s formerly redlined neighborhoods have changed, and so must solutions to rectify them](https://www.brookings.edu/research/americas-formerly-redlines-areas-changed-so-must-solutions/). Brookings Institution, 2019.
+]
+
+--
+
+.pull-right[
+> "the racial makeup of the population in redlined areas has grown and evolved dramatically over the last eight decades, and **<u>the effects of the practice have spread beyond the confines of the original maps</u>**.
+
+> "proposals that base their remedies primarily on formerly redlined areas... exclude important Black neighborhoods and communities, and would skew impact toward a handful of large cities"
+
+---America’s formerly redlined neighborhoods have changed, and so must solutions to rectify them. Brookings Institution, 2019.
+
+]
 
 ---
+
+### Considerations / Limitations
+
+.pull-left[
+#### Difficult to determine degree of causation
+- lots of other factors between the 1930s and today that impact current conditions  
+- many HOLC loans were made before the maps were drawn <sup>1</sup>
+- distribution of HOLC loans doesn't necessarily follow the pattern you'd expect from the maps (HOLC ratings were not always deterministic) <sup>1</sup>
+]
+
+.footnote[
+1 - [HOLC “Redlining” Maps: The Persistent Structure Of Segregation And Economic Inequality](https://ncrc.org/holc/). National Community Reinvestment Coalition, 2018.
+]
+
+--
+
+.pull-right[
+> "Others have argued that the maps were confidential documents and an analysis of individual **<u>HOLC loans, most of which were made by 1936, before the “residential security maps” were completed, indicates that the agency provided mortgages to both white and minority borrowers</u>**"
+
+---HOLC “Redlining” Maps: The Persistent Structure Of Segregation And Economic Inequality. National Community Reinvestment Coalition, 2018.<sup>1</sup>
+]
+    
+---
+
+### Considerations / Limitations
+
+.pull-left[
+#### Still important because...
+- reflection of prevailing attitudes about race and credit risk (influences on FHA, VA, and other public and private lending programs)<sup>1</sup>
+- we understand the mechanisms that lead from reduced credit access to socioeconomic / environmental / public health impacts
+- helps to understand context for our work
+]
+
+.footnote[
+1 - [HOLC “Redlining” Maps: The Persistent Structure Of Segregation And Economic Inequality](https://ncrc.org/holc/). National Community Reinvestment Coalition, 2018.
+]
+
+--
+
+.pull-right[
+> "While the ultimate use of the HOLC residential security maps is a subject of debate, **<u>it is clear that the HOLC maps compiled the common understanding of local-level lending decision makers of the risk in the neighborhoods of their cities</u>**."<sup>1</sup>
+
+
+> "Since the HOLC maps document the contemporary expert judgement of neighborhood lending risk, they provide an **<u>archive of lending risk perception</u>** ... which **<u>can help us understand the extensive reconfiguration of the U.S. urban system</u>**"<sup>1</sup>
+
+]
+
+--
 
 ### Potential Next Steps 
 
@@ -768,11 +845,11 @@ class: inverse center middle
 
 ### Potential Next Steps
 
-- Inform and support our mission to ensure equitable access to clean air, water, and land for all Californians
+#### Inform and support our mission to ensure equitable access to clean air, water, and land for all Californians
 
 --
 
-    - already know that people of color are vastly over-represented in the census tracts with the highest pollution burden / vulnerability
+- from CalEnviroScreen we know that, state-wide, people of color are vastly over-represented in the census tracts with the highest pollution burden / vulnerability state-wide
 
 .center[
 ```{r out.width = '60%', echo=FALSE}
