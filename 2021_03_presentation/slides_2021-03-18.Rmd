@@ -638,7 +638,7 @@ knitr::include_graphics("images/indicators_dot_scaled.png")
 
 .center[
 ```{r out.width = '100%', echo=FALSE}
-knitr::include_graphics("images/5-race_ethnicity_plot _revised.png")
+knitr::include_graphics("images/5-race_ethnicity_plot_revised.png")
 ```
 ]
 
