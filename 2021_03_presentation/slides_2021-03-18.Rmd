@@ -754,8 +754,8 @@ class: inverse center middle
 
 .pull-left[
 #### Limited geographic coverage
-    - areas that existed in the 1930s
-    - only cities with population > 40,000
+- areas that existed in the 1930s
+- only cities with population > 40,000
     
 #### May be difficult to use to formulate specific policies on broad scale<sup>1</sup>
 ]
@@ -823,7 +823,7 @@ class: inverse center middle
 
 ]
 
---
+---
 
 ### Potential Next Steps 
 
