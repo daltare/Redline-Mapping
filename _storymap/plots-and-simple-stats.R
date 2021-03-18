@@ -191,6 +191,114 @@ ggsave(filename = here('_storymap', 'storymap_images', 'point_raw_score_by_city_
        plot = plot_point_raw_noSD, width = 10, height = 4.5, dpi = 125)
 
 
+##################################################3
+# point plot - grouped by city - departure scores
+fn_plot_point_departure <- function(plot_var, show_sd, show_titles, show_legend, fixed_x) {
+        measure_name <- ces_choices %>% 
+            filter(ces_variable == plot_var) %>% 
+            pull(name)
+        # make plot
+        departure_scores_point <- ggplot(data = df_departure_scores %>% 
+                                       mutate(holc_city = fct_reorder(holc_city, !!as.name(plot_var))),
+                                   mapping = aes(x = !!as.name(plot_var),
+                                                 y = holc_city)) +
+            geom_jitter(mapping = aes(color = holc_grade),
+                        height = 0.25) +
+            scale_color_manual(values = alpha(c('green', 'blue', 'orange', 'red'), 0.3), 
+                               name = 'HOLC Grade',
+                               labels = c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)')) +
+            # scale_y_discrete(limits = rev(levels(factor(df_raw_scores$holc_city)))) +
+            # draw a point at the mean for each city
+            # stat_summary(fun = mean, geom = 'point') + 
+            # draw a vertical line at the mean for each city
+            # stat_summary(fun = mean, 
+            #              geom = 'errorbar',
+            #              aes(xmax = ..x.., xmin = ..x..),
+            #              width = 0.5, size = 0.7, linetype = "solid", color = 'black') +
+            # draw the mean and standard deviation for each city (# of std deviations in the fun.args part)
+            # xlab(glue('{measure_name}')) +
+            # xlab(glue('{measure_name} (\u2013Increasing Disadvantage\u2192)')) +
+            xlab(glue('Adjusted {measure_name} (Increasing Disadvantage\u2192)')) +
+            ylab('City') +
+            geom_blank()
+        
+        if (fixed_x) {
+            departure_scores_point <- departure_scores_point +
+                scale_x_continuous(breaks = seq(0, 100, 20), limits = c(0, 90))
+        }
+        
+        if (show_sd == TRUE) {
+            departure_scores_point <- departure_scores_point + 
+                stat_summary(fun.data = mean_sdl,
+                             fun.args = list(mult = 1),
+                             geom = 'pointrange',
+                             color = 'black',
+                             size = 0.5,
+                             # alpha = 0.5
+                ) +
+                stat_summary(# fun.data = "mean_cl_normal", 
+                    fun = 'mean',
+                    aes(shape="Mean +/- 1 SD"), 
+                    colour = "black",
+                    size = 2.5,
+                    geom="point") +
+                scale_shape_manual("", values=c("Mean +/- 1 SD"=c(19)))
+                # stat_summary(# fun.data = "mean_cl_normal", 
+                #     fun = 'sd',
+                #     # aes(shape="City Average"), 
+                #     colour = "black",
+                #     # size = 2.5,
+                #     geom="line") +
+        } else {
+            departure_scores_point <- departure_scores_point + 
+                stat_summary(# fun.data = "mean_cl_normal", 
+                    fun = 'mean',
+                    aes(shape="City Average"), 
+                    colour = "black",
+                    size = 4.5,
+                    geom="point", 
+                    stroke = 3) +
+                scale_shape_manual("", values=c("City Average"=124)) # 19
+        }
+            
+    if (show_titles == TRUE) {
+        if (show_sd == FALSE) {
+            departure_scores_point <- departure_scores_point +
+                labs(title = glue('Adjusted {measure_name} for Neighborhoods in California Cities Assessed by the HOLC in the 1930s'),
+                     caption = glue('Note: Higher {str_replace(measure_name, "Score", "score")}s indicate greater pollution burden and/or population vulnerability'),
+                     subtitle = glue('Each colored point represents a neighborhood in the HOLC maps, and black lines represent the average adjusted {measure_name} \nof all neighborhoods assessed by the HOLC in the given city')) # 'and lines represent mean score +/- 1 standard deviation') +
+
+        } else {
+            departure_scores_point <- departure_scores_point +
+                labs(title = glue('Adjusted {measure_name} for Neighborhoods in California Cities Assessed by the HOLC in the 1930s'),
+                     caption = glue('Note: Higher {str_replace(measure_name, "Score", "score")}s indicate greater pollution burden and/or population vulnerability'),
+                     subtitle = glue('Each colored point represents a neighborhood in the HOLC maps, and black dots/lines represent the adjusted mean {measure_name} \n+/- 1 standard deviation of all neighborhoods assessed by the HOLC in the given city')
+                     ) # 'and lines represent mean score +/- 1 standard deviation') +
+
+        }
+    }
+        
+    if (show_legend) {
+        departure_scores_point <- departure_scores_point + 
+            theme(legend.position = 'right')
+    } else {
+        departure_scores_point <- departure_scores_point +
+            theme(legend.position = 'none')
+    }
+}
+
+plot_point_departure <- fn_plot_point_departure(plot_var = 'ces_3_score', 
+                                                show_sd = TRUE, 
+                                                show_titles = TRUE, 
+                                                show_legend = TRUE, 
+                                                fixed_x = FALSE)
+plot_point_departure_noSD <- fn_plot_point_departure(plot_var = 'ces_3_score', 
+                                                     show_sd = FALSE, 
+                                                     show_titles = TRUE, 
+                                                     show_legend = TRUE, 
+                                                     fixed_x = FALSE)
+ggsave(filename = here('_storymap', 'storymap_images', 'plot_point_departure_noSD.png'), 
+       plot = plot_point_departure_noSD, width = 10, height = 4.5, dpi = 125)
 
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -652,19 +760,20 @@ holc_scores_map <- function(ces_id, ces_measure_name, city_selected) {
         map_holc_scores
     }
 
-map_redline <- holc_map(city_selected = 'Stockton')
+city_map <- 'Sacramento'
+map_redline <- holc_map(city_selected = all_of(city_map))
 
 map_ces <- ces3_poly_map(ces_id = 'ces_3_score', 
                          ces_measure_name = 'CES 3 Score', 
-                         city_selected = 'Stockton')
+                         city_selected = all_of(city_map))
 
 map_overlap <- ces_redline_overlap_map(ces_id = 'ces_3_score', 
                                        ces_measure_name = 'CES 3 Score', 
-                                       city_selected = 'Stockton')
+                                       city_selected = all_of(city_map))
 
 map_holc_scores <- holc_scores_map(ces_id = 'ces_3_score', 
                                        ces_measure_name = 'CES 3 Score', 
-                                       city_selected = 'Stockton')
+                                       city_selected = all_of(city_map))
 
 
 # tmap_arrange(map_redline, map_ces, map_overlap, nrow = 1)

@@ -28,7 +28,7 @@ library(icons)
 
 options(htmltools.dir.version = FALSE)
 knitr::opts_chunk$set(
-  fig.width=9, fig.height=3.5, fig.retina=3,
+  fig.retina=3, # fig.width=9, fig.height=3.5, 
   out.width = "100%",
   cache = FALSE,
   echo = TRUE,
@@ -71,16 +71,31 @@ knitr::opts_chunk$set(echo = FALSE)
 
 library(sf)
 library(ggplot2)
-library(here)
 library(dplyr)
+library(here)
+library(glue)
 library(readr)
 library(janitor)
-library(glue)
+library(tidyr)
 library(stringr)
+library(tmap)
+library(tmaptools)
+library(ceramic)
+library(patchwork)
+library(forcats)
 
 # load data ----
 df_departure_scores <- st_read(here('data_processed-analysis',
                                     'departure-area_weighted_scores.gpkg'))
+
+df_raw_scores <- st_read(here('data_processed-analysis',
+                              'holc_area_weighted_scores.gpkg'))
+
+# departure scores using the nearest centroid approach
+df_departure_scores_centroid <- st_read(here('data_processed-analysis', 
+                                             'departure-centroid_scores.gpkg'))
+df_raw_scores_centroid <- st_read(here('data_processed-analysis', 
+                                       'holc_centroid_scores.gpkg'))
 
 ces_choices <- read_csv(here('data_processed', 
                              'ces_names.csv')) %>% 
@@ -167,8 +182,8 @@ Storymap released February 1, 2021
 #### In the context of this project, "redlining" refers to a specific, well documented practice...
 
 .footnote[
-[1] [Wikipedia](https://en.wikipedia.org/wiki/Redlining)   
-[2] [Google / Oxford Languages](https://www.google.com/search?&q=redline+definition)
+1 - [Wikipedia](https://en.wikipedia.org/wiki/Redlining)   
+2 - [Google / Oxford Languages](https://www.google.com/search?&q=redline+definition)
 ]
 
 ---
@@ -345,26 +360,32 @@ knitr::include_graphics("images/sac_form_D4_crop.jpg")
 
 ### Background -- Other Studies
 
+#### Economic Impacts
+
+.pull-left[
 .center[
-```{r out.width = '70%', echo=FALSE}
+```{r out.width = '100%', echo=FALSE}
 knitr::include_graphics("images/fed-reserve-paper.JPG")
 ```
+]
 ]
 
 --
 
-> “Our results suggest that the **<u>HOLC maps had an economically meaningful and lasting effect on the development of urban neighborhoods</u>** through reduced credit access and subsequent disinvestment” 
+.pull-right[
+> “Our results suggest that the **<u>HOLC maps had an economically meaningful and lasting effect on the development of urban neighborhoods</u>** through reduced credit access and subsequent disinvestment”<sup>1</sup>
 
---- [Federal Reserve Bank of Chicago, 2020](https://www.chicagofed.org/publications/working-papers/2017/wp2017-12)
+]
 
+.footnote[1 - D. Aaronson, D. Hartley, B. Mazumder. **The Effects of the 1930s HOLC "Redlining" Maps (Revised August 2020)**. Federal Reserve Bank of Chicago. Working Paper, No. 2017-12, 2017. https://www.chicagofed.org/publications/working-papers/2017/wp2017-12]
 
 ---
 
 ### Background -- Other Studies
 
-#### `r icons::fontawesome("link")` [Redlining & Asthma Rates](https://www.sciencedirect.com/science/article/pii/S2542519619302414)<sup>1</sup>
+#### Redlining & Asthma Rates<sup>1</sup>
 
-.footnote[<span style='font-size:16px'>1 - A. Nardone, J.A. Casey, R. Morello-Frosch, M. Mujahid, J.R. Balmes, N. Thakur. **Associations between historical residential redlining and current age-adjusted rates of emergency department visits due to asthma across eight cities in California: an ecological study**. Lancet Planet Health, 4 (1) (2020), pp. e24-e31. https://doi.org/10.1016/S2542-5196(19)30241-4</span>]
+.footnote[1 - A. Nardone, J.A. Casey, R. Morello-Frosch, M. Mujahid, J.R. Balmes, N. Thakur. **Associations between historical residential redlining and current age-adjusted rates of emergency department visits due to asthma across eight cities in California: an ecological study**. Lancet Planet Health, 4 (1) (2020), pp. e24-e31. https://doi.org/10.1016/S2542-5196(19)30241-4]
 
 .pull-left[
 ```{r out.width = '80%', echo=FALSE}
@@ -381,7 +402,7 @@ knitr::include_graphics("images/asthma_study.jpg")
 
 ### Background -- Other Studies
 
-#### `r icons::fontawesome("link")` [Redlining & tree cover / urban heat islands](https://doi.org/10.3390/cli8010012)<sup>1</sup>
+#### Redlining & Tree Cover / Urban Heat Islands<sup>1</sup>
 
 .footnote[<span style='font-size:16px'>1 - Hoffman JS, Shandas V, Pendleton N. **The Effects of Historical Housing Policies on Resident Exposure to Intra-Urban Heat: A Study of 108 US Urban Areas**. Climate. 2020; 8(1):12. https://doi.org/10.3390/cli8010012</span>]
 
@@ -393,7 +414,7 @@ knitr::include_graphics("images/redline_temp_study.jpg")
 
 ---
 
-### Background -- Other Historical Factors
+### Background -- Other Historical Policies
 
 #### Zoning (Los Angeles): 
 
@@ -405,7 +426,7 @@ knitr::include_graphics("images/redline_temp_study.jpg")
 
 ---
 
-### Background -- Other Historical Factors
+### Background -- Other Historical Policies
 
 #### Zoning & Redlining: 
 
@@ -430,60 +451,195 @@ class: inverse center middle
 
 ---
 
-### Redlining & CalEnviroScreen
+### Digitized Redlining Maps
 
-
----
-
-### Datasets
-
-Redline Maps (University of Richmond)
-CalEnviroScreen 3.0 (Office of Environmental Health Hazard Assessment Website & CalEPA Geoserver)
-CalEPA Regulated Sites (CalEPA Geoserver & CalEPA Regulated Site Portal)
-CalEPA Site Program Types, Inspections, Violations, and Enforcement Actions (CalEPA Regulated Site Portal)
-2014/2016 Clean Water Act Section 303(d) Listed Waterbodies (State Water Resources Control Board Website)
-California Drinking Water Provider Service Areas (Water Resources Control Board Map Services & State Geoportal)
-California Water Board Regional Office Boundaries (California State Water Resources Control Board Map Services & State Geoportal)
-
----
-
-### Results
-
-<!-- fig.width = 10, fig.height = 5 -->
-
-```{r boxplot}
-
-# generic CES departure scores boxplot function
-fn_departures_boxplot <- function(plot_var) {
-    measure_name <- ces_choices %>% filter(ces_variable == plot_var) %>% pull(name)
-    ggplot(data = df_departure_scores, 
-                             mapping = aes(x = holc_grade, 
-                                           y = !!as.name(plot_var))) +
-    geom_boxplot(aes(fill = holc_grade), notch = FALSE, outlier.shape = NA) + # notch = FALSE
-    scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6), 
-                      labels = c('A (Best)', 'B (Desirable)', 'C (Declining)', 'D (Hazardous)')) +
-    geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
-    scale_x_discrete(limits = rev(levels(factor(df_departure_scores$holc_grade)))) +
-    coord_flip() + # ylim = c(axis_min, axis_max)) +
-    # NOTE: if not flipping the coordinates, use coord_cartesian(ylim = c(axis_min, axis_max))
-    # theme(legend.position = "none") +
-    labs(x = 'HOLC Grade', 
-         y = glue('{measure_name} Relative to Respective City-Wide Average Score (Increasing Disadvantage\u2192)'),
-         title = glue('{measure_name} for Neighborhoods in California Cities Assessed by the HOLC in the 1930s'), # Departure from Citywide Average, by HOLC Grade'),
-         subtitle = 'Each point represents a neighborhood in the HOLC maps',
-         caption = glue('Note: Higher {str_replace(measure_name, "Score", "score")}s indicate greater pollution burden and/or population vulnerability'),
-         fill = 'HOLC Grade') +
-    geom_blank()
-}
-
-plot_box_ces <- fn_departures_boxplot(plot_var = 'ces_3_score')
-    ggsave(filename = here('_storymap', 'storymap_images', 'box_ces_score.png'), 
-           plot = plot_box_ces, width = 10, height = 4.5, dpi = 125)
-    
-# display the plot
-plot_box_ces
+.center[
+```{r out.width = '70%', echo=FALSE}
+knitr::include_graphics("images/mapping_inequality_homepage.jpg")
 ```
+]
 
+.footnote[Robert K. Nelson, LaDale Winling, Richard Marciano, Nathan Connolly, et al., “Mapping Inequality,” American Panorama, ed. Robert K. Nelson and Edward L. Ayers. https://dsl.richmond.edu/panorama/redlining/]
+
+---
+
+### Digitized Redlining Maps
+
+.center[
+```{r out.width = '65%', echo=FALSE}
+knitr::include_graphics("images/mapping_inequality_downloads.jpg")
+```
+]
+
+.footnote[http://dsl.richmond.edu/panorama/redlining/#text=downloads]
+
+---
+
+### CalEnviroScreen 3.0 
+
+.pull-left[
+
+- broad indicator of present-day environmental / public health conditions state-wide
+
+- mapping tool to identify California communities 
+    - most affected by different sources of pollution
+    - most vulnerable to the effects of pollution
+
+- includes environmental, health, and socioeconomic data 
+
+- produces a numerical score for each census tract in the state
+
+]
+
+.pull-right[
+.center[
+```{r out.width = '80%', echo=FALSE}
+knitr::include_graphics("images/ces_map.jpg")
+```
+]
+]
+
+---
+
+### CalEnviroScreen 3.0
+
+.pull-left[
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/ces_indicators.jpg")
+```
+]
+]
+
+--
+
+.pull-right[
+<br>
+<br>
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/ces_formula.jpg")
+```
+]
+]
+
+---
+
+### Combining Redline Maps & CalEnviroScreen Data
+
+.center[
+```{r out.width = '80%', echo=FALSE}
+knitr::include_graphics("images/visual_comparison_oakland.jpg")
+```
+]
+
+---
+
+### Combining Redline Maps & CalEnviroScreen Data
+
+.center[
+```{r out.width = '80%', echo=FALSE}
+knitr::include_graphics("images/visual_comparison_stockton.jpg")
+```
+]
+
+---
+
+### Translating CalEnviroScreen Scores to Redline Maps
+
+#### For quantitative comparisons, translate CalEnviroScreen scores from census tracts to neighborhoods in Redline maps
+
+.center[
+```{r out.width = '90%', echo=FALSE}
+knitr::include_graphics("images/1-map_combined.png")
+```
+]
+
+---
+
+### Translating CalEnviroScreen Scores to Redline Maps
+
+#### Multiple methods for translating CalEnviroScreen scores from census tracts to neighborhoods in Redline maps
+
+.center[
+```{r out.width = '90%', echo=FALSE}
+knitr::include_graphics("images/nearest_centroid_stockton.jpg")
+```
+]
+
+
+---
+
+### Translating CalEnviroScreen Scores to Redline Maps
+
+.center[
+```{r out.width = '60%', echo=FALSE}
+knitr::include_graphics("images/method_comparison.png")
+```
+]
+
+---
+
+### Results -- CalEnviroScreen Scores by City & Grade
+
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/2-results_by_city.png")
+```
+]
+
+---
+
+### Results -- CalEnviroScreen Scores by City & Grade
+
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/3-results_avg_by_city_and_grade.png")
+```
+]
+
+---
+
+### Results -- Adjusted CalEnviroScreen Scores
+
+.footnote[adjusted score = [neighborhood CalEnviroScreen score] - [citywide average CalEnvrioScreen score]
+]
+
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/plot_point_departure_noSD.png")
+```
+]
+
+---
+
+### Results --- Adjusted CalEnviroScreen Scores
+
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/box_ces_score.png")
+```
+]
+
+---
+
+### Results -- 20 Indicators
+
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/indicators_dot_scaled.png")
+```
+]
+
+---
+
+### Results -- Present-Day Demographics
+
+.center[
+```{r out.width = '100%', echo=FALSE}
+knitr::include_graphics("images/5-race_ethnicity_plot _revised.png")
+```
+]
 
 ---
 
@@ -509,7 +665,12 @@ plot_box_ces
 
 `r icons::fontawesome("link")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
 
+---
+class: center middle hide_logo
 
+# GitHub Site
+
+## `r icons::fontawesome("github")` [github.com/daltare/Redline-Mapping](https://github.com/daltare/Redline-Mapping)
 
 ---
 class: inverse center middle
@@ -543,13 +704,85 @@ storymap - full link at:
 https://storymaps.arcgis.com/stories/f167b251809c43778a2f9f040f43d2f5
 
 ---
+class: center middle hide_logo
+
+# Storymap Demo
+
+## `r icons::fontawesome("link")` [bit.ly/pollutionandprejudice](https://bit.ly/pollutionandprejudice)
+
+---
+class: center middle hide_logo
+
+# Shiny Application Demo
+
+## `r icons::fontawesome("link")` [cawaterdatadive.shinyapps.io/Redline-Mapping/](https://cawaterdatadive.shinyapps.io/Redline-Mapping/)
+
+---
+
+### Datasets Used in Shiny App
+
+- Redline Maps ([Mapping Inequality - University of Richmond / Virginia Tech](http://dsl.richmond.edu/panorama/redlining/#text=downloads))
+
+- CalEnviroScreen 3.0 ([Office of Environmental Health Hazard Assessment Website](https://oehha.ca.gov/calenviroscreen/report/calenviroscreen-30) & [CalEPA Geoserver](https://services.calepa.ca.gov/geoserver/))
+
+- CalEPA Regulated Sites ([CalEPA Geoserver](https://services.calepa.ca.gov/geoserver/) & [CalEPA Regulated Site Portal](https://siteportal.calepa.ca.gov/nsite/map/export))
+
+- CalEPA Site Program Types, Inspections, Violations, and Enforcement Actions ([CalEPA Regulated Site Portal](https://siteportal.calepa.ca.gov/nsite/map/export))
+
+- 2014/2016 Clean Water Act Section 303(d) Listed Waterbodies ([State Water Resources Control Board Website](https://www.waterboards.ca.gov/water_issues/programs/tmdl/integrated2014_2016.shtml))
+
+- California Drinking Water Provider Service Areas ([Water Resources Control Board Map Services](https://gispublic.waterboards.ca.gov/portal/home/item.html?id=fbba842bf134497c9d611ad506ec48cc#overview) & [State Geoportal](https://gis.data.ca.gov/datasets/waterboards::california-drinking-water-system-area-boundaries))
+
+- California Water Board Regional Office Boundaries ([California State Water Resources Control Board Map Services](http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0) & [State Geoportal](https://gis.data.ca.gov/datasets/waterboards::regional-board-boundaries))
+
+---
 class: inverse center middle
 
 # Considerations / Limitations / Next Steps
 
 ---
 
-## Considerations
+### Considerations / Limitations
+
+- 
+
+---
+
+### Potential Next Steps 
+
+- Improve on the existing analysis
+
+--
+
+- Include other indicators of current conditions vs. Redline maps
+
+--
+
+- Incorporate other historical policies / programs that provide more geographic coverage (e.g., zoning, deed restrictions, planning documents)
+
+--
+
+- In-depth study of a particular local area (including other indicators & historical policies)
+
+---
+
+### Potential Next Steps
+
+- Inform and support our mission to ensure equitable access to clean air, water, and land for all Californians
+
+--
+
+    - already know that people of color are vastly over-represented in the census tracts with the highest pollution burden / vulnerability
+
+.center[
+```{r out.width = '60%', echo=FALSE}
+knitr::include_graphics("images/ces_race_analysis.jpg")
+```
+]
+
+.footnote[
+[Analysis of Race/Ethnicity, Age, and CalEnviroScreen 3.0 Scores](https://oehha.ca.gov/media/downloads/calenviroscreen/document-calenviroscreen/raceageces3analysis.pdf), Office of Environmental Health Hazard Assessment, California Environmental Protection Agency, June 2018
+]
 
 ---
 class: middle center
