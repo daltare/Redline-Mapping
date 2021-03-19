@@ -849,7 +849,7 @@ class: inverse center middle
 
 --
 
-- from CalEnviroScreen we know that, state-wide, people of color are vastly over-represented in the census tracts with the highest pollution burden / vulnerability state-wide
+- from CalEnviroScreen we know that, state-wide, people of color are vastly over-represented in the census tracts with the highest pollution burden / vulnerability
 
 .center[
 ```{r out.width = '60%', echo=FALSE}

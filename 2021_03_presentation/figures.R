@@ -308,12 +308,17 @@ ggsave(filename = here('2021_03_presentation', 'images', '3-results_avg_by_city_
 ##################################################3
 # point plot - grouped by city - departure scores
 fn_plot_point_departure <- function(plot_var, show_sd, show_titles, show_legend, fixed_x) {
+        # get the ordering corresponding to the raw data
+        city_order <- levels(fct_reorder(df_raw_scores %>% pull(holc_city), df_raw_scores %>% pull(!!as.name(plot_var))))
+
+        # ces names
         measure_name <- ces_choices %>% 
             filter(ces_variable == plot_var) %>% 
             pull(name)
+        
         # make plot
         departure_scores_point <- ggplot(data = df_departure_scores %>% 
-                                       mutate(holc_city = fct_reorder(holc_city, !!as.name(plot_var))),
+                                       mutate(holc_city = fct_relevel(holc_city, city_order)), # for reordering, use the raw scores, to match the other plots
                                    mapping = aes(x = !!as.name(plot_var),
                                                  y = holc_city)) +
             geom_jitter(mapping = aes(color = holc_grade),
