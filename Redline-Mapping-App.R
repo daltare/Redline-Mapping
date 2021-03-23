@@ -814,10 +814,11 @@ ui <- navbarPage(title = "California's Redlined Communities", # theme = shinythe
                         # BOX PLOT
                         p('The box plot below displays the distribution of the \"departure\" scores (represented in the plot
                above) across all cities, grouped by HOLC grade. Each of the dots represents an 
-               individual polygon from the HOLC maps (and corresponds to a dot in the plot above). The notch in the 
-               center of each box represents the approximate 95% confidence interval for the true value of the 
-               median for that group (if the notches of two boxes do not overlap, this suggests that the 
-                   medians are significantly different).'),
+               individual polygon from the HOLC maps (and corresponds to a dot in the plot above).'
+               # The notch in the center of each box represents the approximate 95% confidence interval for the true value of the 
+               # median for that group (if the notches of two boxes do not overlap, this suggests that the 
+               #     medians are significantly different).'
+                   ),
                         plotOutput('plot_box_departures')
                         )
                  ),
@@ -2940,7 +2941,7 @@ server <- function(input, output, session) {
                                             }, 
                                          mapping = aes(x = holc_grade,
                                                        y = !!as.name(var_name))) +
-                geom_boxplot(aes(fill = holc_grade), notch = TRUE, outlier.shape = NA) +
+                geom_boxplot(aes(fill = holc_grade), notch = FALSE, outlier.shape = NA) + # removed the notch part - makes plot hard to read for some indicators, and may not be that meaningful
                 # scale_color_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.4)) +
                 scale_fill_manual(values = alpha(c('green', 'blue', 'yellow', 'red'), 0.6)) +
                 geom_jitter(color='black', size=0.6, alpha=0.5, width = 0.2) +
