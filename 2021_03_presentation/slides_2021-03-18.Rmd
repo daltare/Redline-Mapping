@@ -301,7 +301,7 @@ Image <br>Source: <br>[Mapping<br> Inequality](https://dsl.richmond.edu/panorama
 --
 
 .pull-right[
-> "***A neighborhood earned a red color if African Americans lived in it***, even if it was a solid middle-class neighborhood of single family homes."
+> "**<u>A neighborhood earned a red color if African Americans lived in it</u>**, even if it was a solid middle-class neighborhood of single family homes."
 
 ---Richard Rothstein, *[The Color of Law: A Forgotten History of How Our Government Segregated America (2017)](https://www.epi.org/publication/the-color-of-law-a-forgotten-history-of-how-our-government-segregated-america/)*
 

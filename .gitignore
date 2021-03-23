@@ -27,6 +27,7 @@ _notes/
 *.html
 *_OLD.R
 *_cache/
+*.pptx
 
 CES_ZipCode_App.R
 Redline-CES3-Analysis-Shiny.RMD
