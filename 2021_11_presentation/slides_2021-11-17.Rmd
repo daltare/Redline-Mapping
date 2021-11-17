@@ -372,13 +372,13 @@ knitr::include_graphics("images/mapping_inequality_downloads.jpg")
 
 .pull-left[
 
+- broad indicator of present-day environmental / public health conditions across the state
+
 - mapping tool to identify California communities 
     - most affected by different sources of pollution
     - most vulnerable to the effects of pollution
-    
-- produces a numerical score for each census tract in the state based on environmental, health, and socioeconomic data 
 
-- broad indicator of present-day environmental / public health conditions across the state
+- gives a numeric score for each census tract in the state based on environmental, health, and socioeconomic data 
 
 ]
 
