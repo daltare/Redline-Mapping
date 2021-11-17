@@ -20,4 +20,9 @@ For more information on the history around Redline mapping and other studies of 
 - [California Water Board Regional Office Boundaries (California State Water Resources Control Board Map Services)](http://gispublic.waterboards.ca.gov/arcgis/rest/services/Administrative/RB_OfficeAreas/MapServer/0) | Also available from the [California State Geoportal](https://gis.data.ca.gov/datasets/waterboards::regional-board-boundaries)
 
 ### Slides
-Slides from March 18, 2021 presentation available at: https://daltare.github.io/Redline-Mapping/2021_03_presentation/slides_2021-03-18.html (NOTE: press the "f" key to view in full screen mode, press "?"" to see other viewing options)
+
+(NOTE: press the "f" key to view in full screen mode, press "?"" to see other viewing options)
+
+Slides from March 18, 2021 presentation available at: https://daltare.github.io/Redline-Mapping/2021_03_presentation/slides_2021-03-18.html 
+
+Slides from November 17, 2021 presentation available at: https://daltare.github.io/Redline-Mapping/2021_11_presentation/slides_2021-11-17.html
