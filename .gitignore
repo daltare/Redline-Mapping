@@ -39,3 +39,6 @@ _storymap/*
 !_storymap/*.R
 !presentation_march_2021/*.html
 !2021_03_presentation/*.html
+!2021_11_presentation/*.html
+
+ArcGIS_hub/
