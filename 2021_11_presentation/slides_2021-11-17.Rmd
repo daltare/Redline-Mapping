@@ -554,7 +554,7 @@ class: middle center
 # Thanks!
 
 ### Slides / Contact
-#### `r icons::fontawesome("link")` [https://bit.ly/redline-GIS-RT](https://bit.ly/redline-GIS-RT)
+#### `r icons::fontawesome("link")` [bit.ly/redline-GIS-RT](https://bit.ly/redline-GIS-RT)
 #### `r icons::fontawesome("github")` [github.com/daltare](https://github.com/daltare/)
 #### `r icons::fontawesome("envelope")` [david.altare@waterboards.ca.gov](mailto: david.altare@waterboards.ca.gov)
 
