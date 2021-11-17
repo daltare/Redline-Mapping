@@ -2,7 +2,7 @@
 title: "Exploring the Legacy of Redlining in California with Open Data & Open Source Tools"
 subtitle: "<span style = 'font-size: 75%;'>Investigating linkages to pollution burden and public health trends with CalEnviroScreen data</span>"
 author: "David Altare<br><span style = 'font-size: 60%; line-height: 130%; display: block;'>California Environmental Protection Agency (CalEPA)<br>State Water Resources Control Board<br>Office of Information Management & Analysis (OIMA)</span>"
-date: 'GIS & Data Science Roundtable | November 17, 2021<br><br>`r icons::fontawesome("link")` [bit.ly/redline-GIS-RT](https://bit.ly/redline-GIT-RT)'
+date: 'GIS & Data Science Roundtable | November 17, 2021<br><br>`r icons::fontawesome("link")` [bit.ly/redline-GIS-RT](https://bit.ly/redline-GIS-RT)'
 
 output:
   xaringan::moon_reader:
@@ -608,7 +608,7 @@ class: middle center
 # Thanks!
 
 ### Slides / Contact
-#### `r icons::fontawesome("link")` [bit.ly/redline-2021-03](https://bit.ly/redline-2021-03)
+#### `r icons::fontawesome("link")` [https://bit.ly/redline-GIS-RT](https://bit.ly/redline-GIS-RT)
 #### `r icons::fontawesome("github")` [github.com/daltare](https://github.com/daltare/)
 #### `r icons::fontawesome("envelope")` [david.altare@waterboards.ca.gov](mailto: david.altare@waterboards.ca.gov)
 
